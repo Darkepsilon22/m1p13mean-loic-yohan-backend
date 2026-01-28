@@ -1,27 +1,502 @@
 const User = require('../models/User');
-const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+const { ApiError, asyncHandler } = require('../middlewares/errorHandler');
+const { sendVerificationEmail, sendOTPEmail, sendWelcomeEmail } = require('../services/emailService');
 
-exports.register = async (req, res) => {
-  const { email, password, role } = req.body;
-  const hash = await bcrypt.hash(password, 10);
-  const user = await User.create({ email, password: hash, role });
-  res.json(user);
+/**
+ * Generate JWT Token
+ * @param {Object} user - User object
+ * @returns {string} JWT token
+ */
+const generateToken = (user) => {
+  return jwt.sign(
+    {
+      id: user._id,
+      role: user.role,
+      email: user.email
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
+  );
 };
 
-exports.login = async (req, res) => {
+/**
+ * @desc    Register a new user
+ * @route   POST /api/auth/register
+ * @access  Public
+ */
+exports.register = asyncHandler(async (req, res, next) => {
+  const { email, password, firstName, lastName, role, phone } = req.body;
+
+  // Check if user already exists
+  const existingUser = await User.findOne({ email: email.toLowerCase() });
+  if (existingUser) {
+    return next(new ApiError(400, 'Email already registered'));
+  }
+
+  // Prevent creation of admin accounts via public registration
+  const userRole = role === 'admin' ? 'acheteur' : role;
+
+  // Create user with pending status
+  const user = await User.create({
+    email: email.toLowerCase(),
+    password,
+    firstName,
+    lastName,
+    role: userRole,
+    phone: phone || undefined,
+    status: 'pending',
+    isEmailVerified: false
+  });
+
+  // Generate email verification token
+  const verificationToken = user.generateVerificationToken();
+  await user.save({ validateBeforeSave: false });
+
+  // Send verification email
+  try {
+    await sendVerificationEmail(user.email, user.firstName, verificationToken);
+
+    res.status(201).json({
+      success: true,
+      message: 'Registration successful. Please check your email to verify your account.',
+      data: {
+        user: {
+          id: user._id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          role: user.role
+        }
+      }
+    });
+  } catch (emailError) {
+    // If email fails, still return success but notify user
+    console.error('Email sending failed:', emailError);
+
+    res.status(201).json({
+      success: true,
+      message: 'Registration successful. Email verification could not be sent. Please request a new verification email.',
+      data: {
+        user: {
+          id: user._id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          role: user.role
+        }
+      }
+    });
+  }
+});
+
+/**
+ * @desc    Verify email address
+ * @route   GET /api/auth/verify-email/:token
+ * @access  Public
+ */
+exports.verifyEmail = asyncHandler(async (req, res, next) => {
+  const { token } = req.params;
+
+  // Hash the token to compare with stored hash
+  const hashedToken = crypto
+    .createHash('sha256')
+    .update(token)
+    .digest('hex');
+
+  // Find user with valid token
+  const user = await User.findOne({
+    emailVerificationToken: hashedToken,
+    emailVerificationExpires: { $gt: Date.now() }
+  });
+
+  if (!user) {
+    return next(new ApiError(400, 'Invalid or expired verification token'));
+  }
+
+  // Update user
+  user.isEmailVerified = true;
+  user.status = user.role === 'boutique' ? 'pending' : 'active'; // Boutiques still need admin approval
+  user.emailVerificationToken = undefined;
+  user.emailVerificationExpires = undefined;
+  await user.save({ validateBeforeSave: false });
+
+  // Send welcome email
+  try {
+    await sendWelcomeEmail(user.email, user.firstName);
+  } catch (error) {
+    console.error('Welcome email failed:', error);
+  }
+
+  // Generate token for auto-login
+  const authToken = generateToken(user);
+
+  res.status(200).json({
+    success: true,
+    message: user.role === 'boutique'
+      ? 'Email verified successfully. Your boutique account is pending admin approval.'
+      : 'Email verified successfully. You can now login.',
+    data: {
+      user,
+      token: authToken
+    }
+  });
+});
+
+/**
+ * @desc    Resend verification email
+ * @route   POST /api/auth/resend-verification
+ * @access  Public
+ */
+exports.resendVerification = asyncHandler(async (req, res, next) => {
+  const { email } = req.body;
+
+  const user = await User.findOne({ email: email.toLowerCase() });
+
+  if (!user) {
+    return next(new ApiError(404, 'No account found with this email'));
+  }
+
+  if (user.isEmailVerified) {
+    return next(new ApiError(400, 'Email is already verified'));
+  }
+
+  // Generate new verification token
+  const verificationToken = user.generateVerificationToken();
+  await user.save({ validateBeforeSave: false });
+
+  // Send verification email
+  await sendVerificationEmail(user.email, user.firstName, verificationToken);
+
+  res.status(200).json({
+    success: true,
+    message: 'Verification email sent successfully'
+  });
+});
+
+/**
+ * @desc    Login user - Step 1: Verify credentials and send OTP
+ * @route   POST /api/auth/login
+ * @access  Public
+ */
+exports.login = asyncHandler(async (req, res, next) => {
   const { email, password } = req.body;
-  const user = await User.findOne({ email });
-  if (!user) return res.status(401).json({ message: 'User not found' });
 
-  const ok = await bcrypt.compare(password, user.password);
-  if (!ok) return res.status(401).json({ message: 'Wrong password' });
+  // Find user by email (include password for comparison)
+  const user = await User.findOne({ email: email.toLowerCase() }).select('+password');
 
-  const token = jwt.sign(
-    { id: user._id, role: user.role },
-    process.env.JWT_SECRET,
-    { expiresIn: '24h' }
+  if (!user) {
+    return next(new ApiError(401, 'Invalid email or password'));
+  }
+
+  // Check if email is verified
+  if (!user.isEmailVerified) {
+    return next(new ApiError(403, 'Please verify your email before logging in'));
+  }
+
+  // Check if account is locked
+  if (user.isLocked) {
+    const remainingTime = Math.ceil((user.lockUntil - Date.now()) / 60000);
+    return next(new ApiError(423, `Account is locked. Try again in ${remainingTime} minutes.`));
+  }
+
+  // Check if account is active
+  if (user.status === 'inactive') {
+    return next(new ApiError(403, 'Your account has been deactivated. Please contact administrator.'));
+  }
+
+  if (user.status === 'pending') {
+    return next(new ApiError(403, 'Your account is pending approval. Please wait for admin validation.'));
+  }
+
+  if (user.status === 'blocked') {
+    return next(new ApiError(403, 'Your account has been blocked. Please contact administrator.'));
+  }
+
+  // Check password
+  const isPasswordValid = await user.comparePassword(password);
+
+  if (!isPasswordValid) {
+    await user.incrementLoginAttempts();
+
+    const attemptsLeft = 5 - (user.loginAttempts + 1);
+    if (attemptsLeft > 0) {
+      return next(new ApiError(401, `Invalid email or password. ${attemptsLeft} attempts remaining.`));
+    } else {
+      return next(new ApiError(423, 'Account locked due to too many failed attempts. Try again in 15 minutes.'));
+    }
+  }
+
+  // Generate OTP
+  const otp = user.generateOTP();
+  await user.save({ validateBeforeSave: false });
+
+  // Send OTP via email
+  try {
+    await sendOTPEmail(user.email, user.firstName, otp);
+
+    res.status(200).json({
+      success: true,
+      message: 'OTP sent to your email. Please verify to complete login.',
+      data: {
+        email: user.email,
+        otpRequired: true
+      }
+    });
+  } catch (emailError) {
+    console.error('OTP email failed:', emailError);
+    return next(new ApiError(500, 'Failed to send OTP. Please try again.'));
+  }
+});
+
+/**
+ * @desc    Verify OTP and complete login
+ * @route   POST /api/auth/verify-otp
+ * @access  Public
+ */
+exports.verifyOTP = asyncHandler(async (req, res, next) => {
+  const { email, otp } = req.body;
+
+  const user = await User.findOne({ email: email.toLowerCase() });
+
+  if (!user) {
+    return next(new ApiError(404, 'User not found'));
+  }
+
+  // Check if OTP exists
+  if (!user.otp || !user.otpExpires) {
+    return next(new ApiError(400, 'No OTP requested. Please login again.'));
+  }
+
+  // Check OTP attempts
+  if (user.otpAttempts >= 3) {
+    user.clearOTP();
+    await user.save({ validateBeforeSave: false });
+    return next(new ApiError(429, 'Too many failed attempts. Please login again.'));
+  }
+
+  // Verify OTP
+  if (!user.verifyOTP(otp)) {
+    user.otpAttempts += 1;
+    await user.save({ validateBeforeSave: false });
+
+    const attemptsLeft = 3 - user.otpAttempts;
+    return next(new ApiError(401, `Invalid or expired OTP. ${attemptsLeft} attempts remaining.`));
+  }
+
+  // Clear OTP and reset login attempts
+  user.clearOTP();
+  await user.resetLoginAttempts();
+  await user.save({ validateBeforeSave: false });
+
+  // Generate token
+  const token = generateToken(user);
+
+  res.status(200).json({
+    success: true,
+    message: 'Login successful',
+    data: {
+      user,
+      token
+    }
+  });
+});
+
+/**
+ * @desc    Resend OTP
+ * @route   POST /api/auth/resend-otp
+ * @access  Public
+ */
+exports.resendOTP = asyncHandler(async (req, res, next) => {
+  const { email } = req.body;
+
+  const user = await User.findOne({ email: email.toLowerCase() });
+
+  if (!user) {
+    return next(new ApiError(404, 'User not found'));
+  }
+
+  if (!user.isEmailVerified) {
+    return next(new ApiError(403, 'Please verify your email first'));
+  }
+
+  // Generate new OTP
+  const otp = user.generateOTP();
+  await user.save({ validateBeforeSave: false });
+
+  // Send OTP via email
+  await sendOTPEmail(user.email, user.firstName, otp);
+
+  res.status(200).json({
+    success: true,
+    message: 'New OTP sent to your email'
+  });
+});
+
+/**
+ * @desc    Get current logged in user
+ * @route   GET /api/auth/me
+ * @access  Private
+ */
+exports.getMe = asyncHandler(async (req, res, next) => {
+  const user = await User.findById(req.user._id);
+
+  res.status(200).json({
+    success: true,
+    data: { user }
+  });
+});
+
+/**
+ * @desc    Update user profile
+ * @route   PUT /api/auth/profile
+ * @access  Private
+ */
+exports.updateProfile = asyncHandler(async (req, res, next) => {
+  const allowedFields = ['firstName', 'lastName', 'phone', 'avatar'];
+
+  // Filter body to only include allowed fields
+  const updates = {};
+  Object.keys(req.body).forEach(key => {
+    if (allowedFields.includes(key)) {
+      updates[key] = req.body[key];
+    }
+  });
+
+  const user = await User.findByIdAndUpdate(
+    req.user._id,
+    updates,
+    {
+      new: true,
+      runValidators: true
+    }
   );
 
-  res.json({ token });
-};
+  res.status(200).json({
+    success: true,
+    message: 'Profile updated successfully',
+    data: { user }
+  });
+});
+
+/**
+ * @desc    Change password
+ * @route   PUT /api/auth/change-password
+ * @access  Private
+ */
+exports.changePassword = asyncHandler(async (req, res, next) => {
+  const { currentPassword, newPassword } = req.body;
+
+  // Get user with password
+  const user = await User.findById(req.user._id).select('+password');
+
+  // Check current password
+  const isPasswordValid = await user.comparePassword(currentPassword);
+  if (!isPasswordValid) {
+    return next(new ApiError(401, 'Current password is incorrect'));
+  }
+
+  // Update password
+  user.password = newPassword;
+  await user.save();
+
+  // Generate new token
+  const token = generateToken(user);
+
+  res.status(200).json({
+    success: true,
+    message: 'Password changed successfully',
+    data: { token }
+  });
+});
+
+/**
+ * @desc    Logout user (client-side should delete token)
+ * @route   POST /api/auth/logout
+ * @access  Private
+ */
+exports.logout = asyncHandler(async (req, res, next) => {
+  res.status(200).json({
+    success: true,
+    message: 'Logged out successfully'
+  });
+});
+
+/**
+ * @desc    Add boutique to favorites
+ * @route   POST /api/auth/favorites/:boutiqueId
+ * @access  Private (Acheteur only)
+ */
+exports.addFavorite = asyncHandler(async (req, res, next) => {
+  const { boutiqueId } = req.params;
+
+  const user = await User.findById(req.user._id);
+
+  if (user.favorites.includes(boutiqueId)) {
+    return next(new ApiError(400, 'Boutique already in favorites'));
+  }
+
+  user.favorites.push(boutiqueId);
+  await user.save();
+
+  res.status(200).json({
+    success: true,
+    message: 'Boutique added to favorites',
+    data: { favorites: user.favorites }
+  });
+});
+
+/**
+ * @desc    Remove boutique from favorites
+ * @route   DELETE /api/auth/favorites/:boutiqueId
+ * @access  Private (Acheteur only)
+ */
+exports.removeFavorite = asyncHandler(async (req, res, next) => {
+  const { boutiqueId } = req.params;
+
+  const user = await User.findById(req.user._id);
+
+  if (!user.favorites.includes(boutiqueId)) {
+    return next(new ApiError(400, 'Boutique not in favorites'));
+  }
+
+  user.favorites = user.favorites.filter(
+    fav => fav.toString() !== boutiqueId
+  );
+  await user.save();
+
+  res.status(200).json({
+    success: true,
+    message: 'Boutique removed from favorites',
+    data: { favorites: user.favorites }
+  });
+});
+
+/**
+ * @desc    Get user favorites
+ * @route   GET /api/auth/favorites
+ * @access  Private
+ */
+exports.getFavorites = asyncHandler(async (req, res, next) => {
+  const user = await User.findById(req.user._id)
+    .populate('favorites', 'name logo rating shortDescription');
+
+  res.status(200).json({
+    success: true,
+    data: { favorites: user.favorites }
+  });
+});
+
+/**
+ * @desc    Verify token validity
+ * @route   GET /api/auth/verify
+ * @access  Private
+ */
+exports.verifyToken = asyncHandler(async (req, res, next) => {
+  res.status(200).json({
+    success: true,
+    message: 'Token is valid',
+    data: { user: req.user }
+  });
+});
