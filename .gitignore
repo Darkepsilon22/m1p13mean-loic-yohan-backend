@@ -3,3 +3,4 @@ node_modules
 .claude
 client_secret.json
 google-auth.js
+/data
