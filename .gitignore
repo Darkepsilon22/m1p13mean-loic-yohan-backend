@@ -1,3 +1,5 @@
 node_modules
 .env
 .claude
+client_secret.json
+google-auth.js

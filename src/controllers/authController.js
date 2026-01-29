@@ -27,7 +27,7 @@ const generateToken = (user) => {
  * @access  Public
  */
 exports.register = asyncHandler(async (req, res, next) => {
-  const { email, password, firstName, lastName, role, phone } = req.body;
+  const { email, password, firstName, lastName, role, phone, adminSecretKey } = req.body;
 
   // Check if user already exists
   const existingUser = await User.findOne({ email: email.toLowerCase() });
@@ -35,8 +35,22 @@ exports.register = asyncHandler(async (req, res, next) => {
     return next(new ApiError(400, 'Email already registered'));
   }
 
-  // Prevent creation of admin accounts via public registration
-  const userRole = role === 'admin' ? 'acheteur' : role;
+  // Handle admin role creation
+  let userRole = role;
+  
+  if (role === 'admin') {
+    // Vérifier si une clé secrète admin est fournie
+    const ADMIN_SECRET_KEY = process.env.ADMIN_SECRET_KEY || 'admin-secret-2024';
+    
+    if (adminSecretKey !== ADMIN_SECRET_KEY) {
+      // Si pas de clé ou clé incorrecte, convertir en acheteur
+      userRole = 'acheteur';
+      console.warn(`Attempt to create admin account without valid secret key: ${email}`);
+    } else {
+      // Clé valide, permettre la création d'admin
+      console.log(`Admin account creation authorized for: ${email}`);
+    }
+  }
 
   // Create user with pending status
   const user = await User.create({
@@ -92,6 +106,48 @@ exports.register = asyncHandler(async (req, res, next) => {
 });
 
 /**
+ * @desc    Create admin account (protected route, admin only)
+ * @route   POST /api/auth/create-admin
+ * @access  Private (Admin only)
+ */
+exports.createAdmin = asyncHandler(async (req, res, next) => {
+  const { email, password, firstName, lastName, phone } = req.body;
+
+  // Check if user already exists
+  const existingUser = await User.findOne({ email: email.toLowerCase() });
+  if (existingUser) {
+    return next(new ApiError(400, 'Email already registered'));
+  }
+
+  // Create admin user directly (status active, email verified)
+  const user = await User.create({
+    email: email.toLowerCase(),
+    password,
+    firstName,
+    lastName,
+    role: 'admin',
+    phone: phone || undefined,
+    status: 'active',
+    isEmailVerified: true
+  });
+
+  res.status(201).json({
+    success: true,
+    message: 'Admin account created successfully',
+    data: {
+      user: {
+        id: user._id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+        status: user.status
+      }
+    }
+  });
+});
+
+/**
  * @desc    Verify email address
  * @route   GET /api/auth/verify-email/:token
  * @access  Public
@@ -115,9 +171,9 @@ exports.verifyEmail = asyncHandler(async (req, res, next) => {
     return next(new ApiError(400, 'Invalid or expired verification token'));
   }
 
-  // Update user
+  // Update user - Admin gets active status immediately
   user.isEmailVerified = true;
-  user.status = user.role === 'boutique' ? 'pending' : 'active'; // Boutiques still need admin approval
+  user.status = (user.role === 'admin' || user.role === 'acheteur') ? 'active' : 'pending';
   user.emailVerificationToken = undefined;
   user.emailVerificationExpires = undefined;
   await user.save({ validateBeforeSave: false });

@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/authController');
 const { verifyToken } = require('../middlewares/auth');
-const { isAcheteur } = require('../middlewares/roles');
+const { isAdmin } = require('../middlewares/roles');
 const {
   registerValidation,
   loginValidation,
@@ -31,6 +31,9 @@ router.get('/verify', authController.verifyToken);
 router.put('/profile', updateProfileValidation, authController.updateProfile);
 router.put('/change-password', changePasswordValidation, authController.changePassword);
 router.post('/logout', authController.logout);
+
+// Admin creation route (admin only)
+router.post('/create-admin', isAdmin, registerValidation, authController.createAdmin);
 
 // Favorites routes (for acheteurs)
 router.get('/favorites', authController.getFavorites);
