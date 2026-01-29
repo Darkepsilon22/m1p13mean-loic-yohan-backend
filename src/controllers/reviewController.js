@@ -1,0 +1,267 @@
+const Review = require('../models/Review');
+const Boutique = require('../models/Boutique');
+const { ApiError, asyncHandler } = require('../middlewares/errorHandler');
+const { recalculateBoutiqueRating } = require('../services/reviewService');
+
+/**
+ * @desc    List reviews (by boutique, with filters)
+ * @route   GET /api/reviews
+ * @access  Public
+ */
+exports.getAll = asyncHandler(async (req, res, next) => {
+  const { boutiqueId, status, page = 1, limit = 20, sort = '-createdAt' } = req.query;
+
+  if (!boutiqueId) {
+    return next(new ApiError(400, 'boutiqueId query parameter is required'));
+  }
+
+  const filter = { boutiqueId };
+  if (status) filter.status = status;
+
+  const skip = (Math.max(1, parseInt(page, 10)) - 1) * Math.min(100, Math.max(1, parseInt(limit, 10)));
+  const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10)));
+
+  const [reviews, total] = await Promise.all([
+    Review.find(filter)
+      .populate('userId', 'firstName lastName')
+      .sort(sort)
+      .skip(skip)
+      .limit(limitNum)
+      .lean(),
+    Review.countDocuments(filter)
+  ]);
+
+  res.status(200).json({
+    success: true,
+    data: {
+      reviews,
+      pagination: {
+        page: Math.floor(skip / limitNum) + 1,
+        limit: limitNum,
+        total,
+        pages: Math.ceil(total / limitNum) || 1
+      }
+    }
+  });
+});
+
+/**
+ * @desc    Get single review by ID
+ * @route   GET /api/reviews/:id
+ * @access  Public
+ */
+exports.getById = asyncHandler(async (req, res, next) => {
+  const review = await Review.findById(req.params.id)
+    .populate('userId', 'firstName lastName')
+    .populate('boutiqueId', 'name slug');
+
+  if (!review) {
+    return next(new ApiError(404, 'Review not found'));
+  }
+
+  res.status(200).json({
+    success: true,
+    data: { review }
+  });
+});
+
+/**
+ * @desc    Create a review (acheteur only, one per user per boutique)
+ * @route   POST /api/reviews
+ * @access  Private (acheteur)
+ */
+exports.create = asyncHandler(async (req, res, next) => {
+  const { boutiqueId, rating, comment } = req.body;
+  const userId = req.user._id;
+
+  const boutique = await Boutique.findById(boutiqueId);
+  if (!boutique) {
+    return next(new ApiError(404, 'Boutique not found'));
+  }
+
+  const existing = await Review.findOne({ boutiqueId, userId });
+  if (existing) {
+    return next(new ApiError(400, 'You have already left a review for this boutique. You can update it.'));
+  }
+
+  const review = await Review.create({
+    boutiqueId,
+    userId,
+    rating: Math.round(Number(rating)),
+    comment: comment || undefined,
+    status: 'published'
+  });
+
+  await recalculateBoutiqueRating(boutiqueId);
+
+  const populated = await Review.findById(review._id)
+    .populate('userId', 'firstName lastName')
+    .populate('boutiqueId', 'name slug');
+
+  res.status(201).json({
+    success: true,
+    message: 'Review created successfully',
+    data: { review: populated }
+  });
+});
+
+/**
+ * @desc    Update own review (rating, comment)
+ * @route   PUT /api/reviews/:id
+ * @access  Private (author or admin)
+ */
+exports.update = asyncHandler(async (req, res, next) => {
+  let review = await Review.findById(req.params.id);
+
+  if (!review) {
+    return next(new ApiError(404, 'Review not found'));
+  }
+
+  const isAuthor = review.userId && review.userId.toString() === req.user._id.toString();
+  const isAdmin = req.user.role === 'admin';
+
+  if (!isAuthor && !isAdmin) {
+    return next(new ApiError(403, 'You can only update your own review'));
+  }
+
+  const { rating, comment } = req.body;
+  if (rating !== undefined) review.rating = Math.round(Number(rating));
+  if (comment !== undefined) review.comment = comment;
+
+  await review.save();
+
+  await recalculateBoutiqueRating(review.boutiqueId);
+
+  const populated = await Review.findById(review._id)
+    .populate('userId', 'firstName lastName')
+    .populate('boutiqueId', 'name slug');
+
+  res.status(200).json({
+    success: true,
+    message: 'Review updated successfully',
+    data: { review: populated }
+  });
+});
+
+/**
+ * @desc    Boutique owner responds to a review
+ * @route   PATCH /api/reviews/:id/response
+ * @access  Private (boutique owner or admin)
+ */
+exports.patchResponse = asyncHandler(async (req, res, next) => {
+  const review = await Review.findById(req.params.id);
+
+  if (!review) {
+    return next(new ApiError(404, 'Review not found'));
+  }
+
+  const boutique = await Boutique.findById(review.boutiqueId);
+  if (!boutique) {
+    return next(new ApiError(404, 'Boutique not found'));
+  }
+
+  const isBoutiqueOwner = boutique.userId && boutique.userId.toString() === req.user._id.toString();
+  const isAdmin = req.user.role === 'admin';
+
+  if (!isBoutiqueOwner && !isAdmin) {
+    return next(new ApiError(403, 'Only the boutique owner or admin can respond to this review'));
+  }
+
+  const { text } = req.body;
+  review.response = {
+    text: text || '',
+    respondedAt: new Date()
+  };
+  await review.save();
+
+  const populated = await Review.findById(review._id)
+    .populate('userId', 'firstName lastName')
+    .populate('boutiqueId', 'name slug');
+
+  res.status(200).json({
+    success: true,
+    message: 'Response added successfully',
+    data: { review: populated }
+  });
+});
+
+/**
+ * @desc    Update review status (published, hidden, reported, deleted)
+ * @route   PATCH /api/reviews/:id/status
+ * @access  Private (admin or boutique owner for hidden; author can delete)
+ */
+exports.patchStatus = asyncHandler(async (req, res, next) => {
+  const { status } = req.body;
+
+  const review = await Review.findById(req.params.id);
+
+  if (!review) {
+    return next(new ApiError(404, 'Review not found'));
+  }
+
+  const boutique = await Boutique.findById(review.boutiqueId);
+  const isAdmin = req.user.role === 'admin';
+  const isAuthor = review.userId && review.userId.toString() === req.user._id.toString();
+  const isBoutiqueOwner = boutique && boutique.userId && boutique.userId.toString() === req.user._id.toString();
+
+  if (status === 'hidden' && !isAdmin && !isBoutiqueOwner) {
+    return next(new ApiError(403, 'Only admin or boutique owner can hide a review'));
+  }
+  if (status === 'reported' && !isAdmin) {
+    return next(new ApiError(403, 'Only admin can set reported status'));
+  }
+  if (status === 'deleted' && !isAdmin && !isAuthor) {
+    return next(new ApiError(403, 'Only author or admin can delete a review'));
+  }
+  if (status === 'published' && !isAdmin) {
+    return next(new ApiError(403, 'Only admin can republish a review'));
+  }
+
+  const previousStatus = review.status;
+  review.status = status;
+  await review.save();
+
+  if (previousStatus !== status && (previousStatus === 'published' || status === 'published')) {
+    await recalculateBoutiqueRating(review.boutiqueId);
+  }
+
+  const populated = await Review.findById(review._id)
+    .populate('userId', 'firstName lastName')
+    .populate('boutiqueId', 'name slug');
+
+  res.status(200).json({
+    success: true,
+    message: 'Review status updated successfully',
+    data: { review: populated }
+  });
+});
+
+/**
+ * @desc    Delete a review
+ * @route   DELETE /api/reviews/:id
+ * @access  Private (author or admin)
+ */
+exports.delete = asyncHandler(async (req, res, next) => {
+  const review = await Review.findById(req.params.id);
+
+  if (!review) {
+    return next(new ApiError(404, 'Review not found'));
+  }
+
+  const isAuthor = review.userId && review.userId.toString() === req.user._id.toString();
+  const isAdmin = req.user.role === 'admin';
+
+  if (!isAuthor && !isAdmin) {
+    return next(new ApiError(403, 'You can only delete your own review'));
+  }
+
+  const boutiqueId = review.boutiqueId;
+  await Review.findByIdAndDelete(req.params.id);
+
+  await recalculateBoutiqueRating(boutiqueId);
+
+  res.status(200).json({
+    success: true,
+    message: 'Review deleted successfully'
+  });
+});
