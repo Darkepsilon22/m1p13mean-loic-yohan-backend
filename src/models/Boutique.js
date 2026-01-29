@@ -1,0 +1,162 @@
+const mongoose = require('mongoose');
+const slugify = require('slugify');
+
+const openingHoursSchema = new mongoose.Schema({
+  day: {
+    type: Number,
+    required: [true, 'Day is required'],
+    min: 0,
+    max: 6
+  },
+  open: { type: String, trim: true },
+  close: { type: String, trim: true },
+  isClosed: {
+    type: Boolean,
+    required: true,
+    default: true
+  }
+}, { _id: false });
+
+const boutiqueSchema = new mongoose.Schema({
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: [true, 'Owner (userId) is required']
+  },
+  name: {
+    type: String,
+    required: [true, 'Name is required'],
+    trim: true
+  },
+  slug: {
+    type: String,
+    required: true,
+    unique: true,
+    lowercase: true,
+    trim: true
+  },
+  description: {
+    type: String,
+    required: [true, 'Description is required'],
+    maxlength: [2000, 'Description cannot exceed 2000 characters']
+  },
+  shortDescription: {
+    type: String,
+    trim: true,
+    maxlength: [200, 'Short description cannot exceed 200 characters']
+  },
+  categoryId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Category',
+    required: [true, 'Category is required']
+  },
+  logo: {
+    type: String,
+    required: [true, 'Logo URL is required'],
+    trim: true
+  },
+  coverImage: { type: String, trim: true },
+  photos: [{
+    type: String,
+    trim: true
+  }],
+  contact: {
+    phone: {
+      type: String,
+      required: [true, 'Contact phone is required'],
+      trim: true
+    },
+    email: {
+      type: String,
+      required: [true, 'Contact email is required'],
+      trim: true,
+      lowercase: true
+    },
+    website: { type: String, trim: true },
+    facebook: { type: String, trim: true },
+    instagram: { type: String, trim: true }
+  },
+  location: {
+    floor: {
+      type: Number,
+      required: [true, 'Floor is required'],
+      default: 0
+    },
+    zone: {
+      type: String,
+      required: [true, 'Zone is required'],
+      trim: true
+    },
+    number: {
+      type: String,
+      required: [true, 'Location number is required'],
+      trim: true
+    },
+    mapCoordinates: {
+      x: { type: Number },
+      y: { type: Number }
+    }
+  },
+  openingHours: {
+    type: [openingHoursSchema],
+    required: true,
+    validate: {
+      validator: function(v) {
+        return Array.isArray(v) && v.length === 7;
+      },
+      message: 'Opening hours must contain 7 entries (Monday to Sunday)'
+    }
+  },
+  rating: {
+    average: {
+      type: Number,
+      min: 1,
+      max: 5,
+      default: null
+    },
+    count: { type: Number, default: 0 }
+  },
+  stats: {
+    views: { type: Number, default: 0 },
+    favoritesCount: { type: Number, default: 0 }
+  },
+  status: {
+    type: String,
+    enum: {
+      values: ['pending', 'active', 'inactive', 'rejected'],
+      message: 'Status must be pending, active, inactive, or rejected'
+    },
+    required: true,
+    default: 'pending'
+  },
+  rejectionReason: { type: String, trim: true }
+}, {
+  timestamps: true
+});
+
+boutiqueSchema.index({ userId: 1 }, { unique: true });
+boutiqueSchema.index({ name: 'text' });
+boutiqueSchema.index({ categoryId: 1 });
+boutiqueSchema.index({ status: 1 });
+boutiqueSchema.index({ 'rating.average': -1 });
+boutiqueSchema.index({ 'location.floor': 1, 'location.zone': 1 });
+
+boutiqueSchema.pre('validate', function(next) {
+  if (this.photos && this.photos.length > 10) {
+    const err = new Error('Photos array cannot exceed 10 items');
+    return typeof next === 'function' ? next(err) : this.invalidate('photos', err.message);
+  }
+  return typeof next === 'function' ? next() : undefined;
+});
+
+boutiqueSchema.pre('save', function(next) {
+  if (this.isModified('name') && this.name && !this.slug) {
+    this.slug = slugify(this.name, { lower: true, strict: true });
+  }
+  if (this.isModified('name') && this.name && this.slug === '') {
+    this.slug = slugify(this.name, { lower: true, strict: true });
+  }
+  next();
+});
+
+module.exports = mongoose.model('Boutique', boutiqueSchema);
