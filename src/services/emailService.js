@@ -1,26 +1,28 @@
-const nodemailer = require('nodemailer');
+const { google } = require('googleapis');
 
 /**
- * Create email transporter
+ * Create OAuth2 client for Gmail API
  */
-const createTransporter = () => {
-  const port = parseInt(process.env.EMAIL_PORT) || 465;
-  return nodemailer.createTransport({
-    host: process.env.EMAIL_HOST,
-    port: port,
-    secure: port === 465, // true for 465, false for other ports
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS
-    },
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    socketTimeout: 10000
+const createOAuth2Client = () => {
+  const OAuth2 = google.auth.OAuth2;
+  
+  const oauth2Client = new OAuth2(
+    process.env.GMAIL_CLIENT_ID,
+    process.env.GMAIL_CLIENT_SECRET,
+    process.env.NODE_ENV === 'production' 
+      ? process.env.GMAIL_REDIRECT_URI_PROD 
+      : process.env.GMAIL_REDIRECT_URI_LOCAL
+  );
+
+  oauth2Client.setCredentials({
+    refresh_token: process.env.GMAIL_REFRESH_TOKEN
   });
+
+  return oauth2Client;
 };
 
 /**
- * Send email
+ * Send email using Gmail API
  * @param {Object} options - Email options
  * @param {string} options.to - Recipient email
  * @param {string} options.subject - Email subject
@@ -28,23 +30,44 @@ const createTransporter = () => {
  * @param {string} options.text - Plain text content (optional)
  */
 const sendEmail = async (options) => {
-  const transporter = createTransporter();
-
-  const mailOptions = {
-    from: process.env.EMAIL_FROM,
-    to: options.to,
-    subject: options.subject,
-    html: options.html,
-    text: options.text || ''
-  };
-
   try {
-    const info = await transporter.sendMail(mailOptions);
-    console.log('Email sent:', info.messageId);
-    return { success: true, messageId: info.messageId };
+    const oauth2Client = createOAuth2Client();
+    const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+
+    // Create email content in RFC 2822 format
+    const utf8Subject = `=?utf-8?B?${Buffer.from(options.subject).toString('base64')}?=`;
+    const messageParts = [
+      `From: ${process.env.GMAIL_USER}`,
+      `To: ${options.to}`,
+      `Subject: ${utf8Subject}`,
+      'MIME-Version: 1.0',
+      'Content-Type: text/html; charset=utf-8',
+      '',
+      options.html
+    ];
+
+    const message = messageParts.join('\n');
+    
+    // Encode message in base64url format
+    const encodedMessage = Buffer.from(message)
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+
+    // Send email
+    const result = await gmail.users.messages.send({
+      userId: 'me',
+      requestBody: {
+        raw: encodedMessage,
+      },
+    });
+
+    console.log('Email sent via Gmail API:', result.data.id);
+    return { success: true, messageId: result.data.id };
   } catch (error) {
-    console.error('Email error:', error);
-    throw new Error('Failed to send email');
+    console.error('Gmail API error:', error);
+    throw new Error(`Failed to send email: ${error.message}`);
   }
 };
 
