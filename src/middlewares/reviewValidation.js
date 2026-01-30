@@ -64,6 +64,16 @@ const patchStatus = [
   handleValidationErrors
 ];
 
+const reportReview = [
+  body('reason')
+    .trim()
+    .notEmpty()
+    .withMessage('Report reason is required')
+    .isLength({ max: 500 })
+    .withMessage('Reason cannot exceed 500 characters'),
+  handleValidationErrors
+];
+
 const listReviews = [
   query('boutiqueId').notEmpty().withMessage('boutiqueId is required').isMongoId().withMessage('boutiqueId must be a valid ObjectId'),
   query('status').optional().isIn(['published', 'hidden', 'reported', 'deleted']).withMessage('Invalid status'),
@@ -79,5 +89,6 @@ module.exports = {
   updateReview,
   patchResponse,
   patchStatus,
+  reportReview,
   listReviews
 };
