@@ -30,7 +30,6 @@ const boutiqueSchema = new mongoose.Schema({
   },
   slug: {
     type: String,
-    required: true,
     unique: true,
     lowercase: true,
     trim: true
@@ -141,22 +140,19 @@ boutiqueSchema.index({ status: 1 });
 boutiqueSchema.index({ 'rating.average': -1 });
 boutiqueSchema.index({ 'location.floor': 1, 'location.zone': 1 });
 
-boutiqueSchema.pre('validate', function(next) {
-  if (this.photos && this.photos.length > 10) {
-    const err = new Error('Photos array cannot exceed 10 items');
-    return typeof next === 'function' ? next(err) : this.invalidate('photos', err.message);
-  }
-  return typeof next === 'function' ? next() : undefined;
-});
-
-boutiqueSchema.pre('save', function(next) {
+boutiqueSchema.pre('validate', function() {
+  // Generate slug from name before validation
   if (this.isModified('name') && this.name && !this.slug) {
     this.slug = slugify(this.name, { lower: true, strict: true });
   }
   if (this.isModified('name') && this.name && this.slug === '') {
     this.slug = slugify(this.name, { lower: true, strict: true });
   }
-  next();
+
+  // Validate photos array length
+  if (this.photos && this.photos.length > 10) {
+    throw new Error('Photos array cannot exceed 10 items');
+  }
 });
 
 module.exports = mongoose.model('Boutique', boutiqueSchema);
