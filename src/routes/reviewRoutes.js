@@ -9,6 +9,7 @@ const {
   updateReview,
   patchResponse,
   patchStatus,
+  reportReview,
   listReviews
 } = require('../middlewares/reviewValidation');
 
@@ -18,6 +19,7 @@ router.get('/:id', validateReviewId('id'), reviewController.getById);
 router.use(verifyToken);
 
 router.post('/', isAcheteur, createReview, reviewController.create);
+router.post('/:id/report', validateReviewId('id'), reportReview, reviewController.report);
 router.put('/:id', validateReviewId('id'), updateReview, reviewController.update);
 router.patch('/:id/response', validateReviewId('id'), isAdminOrBoutique, patchResponse, reviewController.patchResponse);
 router.patch('/:id/status', validateReviewId('id'), patchStatus, reviewController.patchStatus);

@@ -237,6 +237,53 @@ exports.patchStatus = asyncHandler(async (req, res, next) => {
 });
 
 /**
+ * @desc    Report a review (any authenticated user)
+ * @route   POST /api/reviews/:id/report
+ * @access  Private (any authenticated user)
+ */
+exports.report = asyncHandler(async (req, res, next) => {
+  const { reason } = req.body;
+
+  const review = await Review.findById(req.params.id);
+
+  if (!review) {
+    return next(new ApiError(404, 'Review not found'));
+  }
+
+  // Check if user already reported this review
+  const userId = req.user._id.toString();
+  const alreadyReported = review.reportReasons.some(r => r.startsWith(`[${userId}]`));
+  if (alreadyReported) {
+    return next(new ApiError(400, 'You have already reported this review'));
+  }
+
+  // Add report with user ID prefix for tracking
+  review.reportReasons.push(`[${userId}] ${reason}`);
+  review.reportCount = (review.reportCount || 0) + 1;
+
+  // Auto-set status to 'reported' after 3 reports
+  if (review.reportCount >= 3 && review.status === 'published') {
+    review.status = 'reported';
+  }
+
+  await review.save();
+
+  // Recalculate if status changed to reported
+  if (review.status === 'reported') {
+    await recalculateBoutiqueRating(review.boutiqueId);
+  }
+
+  res.status(200).json({
+    success: true,
+    message: 'Review reported successfully',
+    data: {
+      reportCount: review.reportCount,
+      status: review.status
+    }
+  });
+});
+
+/**
  * @desc    Delete a review
  * @route   DELETE /api/reviews/:id
  * @access  Private (author or admin)
