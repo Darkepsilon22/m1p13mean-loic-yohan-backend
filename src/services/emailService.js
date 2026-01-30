@@ -36,8 +36,9 @@ const sendEmail = async (options) => {
 
     // Create email content in RFC 2822 format
     const utf8Subject = `=?utf-8?B?${Buffer.from(options.subject).toString('base64')}?=`;
+    const senderName = process.env.EMAIL_SENDER_NAME || 'Centre Commercial';
     const messageParts = [
-      `From: ${process.env.GMAIL_USER}`,
+      `From: ${senderName} <${process.env.GMAIL_USER}>`,
       `To: ${options.to}`,
       `Subject: ${utf8Subject}`,
       'MIME-Version: 1.0',
@@ -165,7 +166,7 @@ const sendOTPEmail = async (email, firstName, otp) => {
           </div>
           <p><strong>Ce code expire dans ${expiresIn} minutes.</strong></p>
           <div class="warning">
-            <strong>⚠️ Attention:</strong> Ne partagez jamais ce code avec personne. Notre équipe ne vous demandera jamais votre code.
+            <strong> Attention:</strong> Ne partagez jamais ce code avec personne. Notre équipe ne vous demandera jamais votre code.
           </div>
           <p style="margin-top: 20px;">Si vous n'avez pas tenté de vous connecter, veuillez sécuriser votre compte immédiatement.</p>
         </div>
@@ -210,7 +211,7 @@ const sendWelcomeEmail = async (email, firstName) => {
     <body>
       <div class="container">
         <div class="header">
-          <h1>🎉 Bienvenue!</h1>
+          <h1> Bienvenue!</h1>
           <p>Votre compte est maintenant actif</p>
         </div>
         <div class="content">
@@ -236,7 +237,7 @@ const sendWelcomeEmail = async (email, firstName) => {
 
   await sendEmail({
     to: email,
-    subject: 'Bienvenue sur Centre Commercial! 🎉',
+    subject: 'Bienvenue sur Centre Commercial!',
     html
   });
 };
