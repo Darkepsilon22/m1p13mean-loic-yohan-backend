@@ -68,7 +68,6 @@ categorySchema.virtual('children', {
 });
 
 // Indexes
-categorySchema.index({ slug: 1 }, { unique: true });
 categorySchema.index({ parentId: 1 });
 categorySchema.index({ order: 1 });
 categorySchema.index({ isActive: 1 });
