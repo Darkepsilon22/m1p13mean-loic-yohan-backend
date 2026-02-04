@@ -4,3 +4,4 @@ node_modules
 client_secret.json
 google-auth.js
 /data
+postman_collection.json
