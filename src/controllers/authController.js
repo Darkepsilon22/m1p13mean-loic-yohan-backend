@@ -2,7 +2,7 @@ const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { ApiError, asyncHandler } = require('../middlewares/errorHandler');
-const { sendVerificationEmail, sendOTPEmail, sendWelcomeEmail } = require('../services/emailService');
+const { sendVerificationEmail, sendOTPEmail, sendWelcomeEmail, sendApprovalEmail, sendRejectionEmail, sendPendingApprovalEmail } = require('../services/emailService');
 
 /**
  * Generate JWT Token
@@ -178,11 +178,17 @@ exports.verifyEmail = asyncHandler(async (req, res, next) => {
   user.emailVerificationExpires = undefined;
   await user.save({ validateBeforeSave: false });
 
-  // Send welcome email
+  // Send appropriate email based on role
   try {
-    await sendWelcomeEmail(user.email, user.firstName);
+    if (user.role === 'boutique') {
+      // Boutique accounts need admin approval - send pending email
+      await sendPendingApprovalEmail(user.email, user.firstName);
+    } else {
+      // Acheteur/Admin accounts are active immediately - send welcome email
+      await sendWelcomeEmail(user.email, user.firstName);
+    }
   } catch (error) {
-    console.error('Welcome email failed:', error);
+    console.error('Post-verification email failed:', error);
   }
 
   // Generate token for auto-login
@@ -697,6 +703,23 @@ exports.approveUser = asyncHandler(async (req, res, next) => {
   user.statusReason = undefined;
   await user.save({ validateBeforeSave: false });
 
+  // Send approval notification email
+  try {
+    // Get boutique name if user is a boutique owner
+    let boutiqueName = null;
+    if (user.role === 'boutique') {
+      const Boutique = require('../models/Boutique');
+      const boutique = await Boutique.findOne({ owner: user._id });
+      if (boutique) {
+        boutiqueName = boutique.name;
+      }
+    }
+    await sendApprovalEmail(user.email, user.firstName, boutiqueName);
+  } catch (emailError) {
+    console.error('Failed to send approval email:', emailError);
+    // Don't fail the request if email fails
+  }
+
   res.status(200).json({
     success: true,
     message: 'User approved successfully',
@@ -722,6 +745,14 @@ exports.rejectUser = asyncHandler(async (req, res, next) => {
   user.status = 'inactive';
   user.statusReason = reason || 'Account rejected by administrator';
   await user.save({ validateBeforeSave: false });
+
+  // Send rejection notification email
+  try {
+    await sendRejectionEmail(user.email, user.firstName, reason);
+  } catch (emailError) {
+    console.error('Failed to send rejection email:', emailError);
+    // Don't fail the request if email fails
+  }
 
   res.status(200).json({
     success: true,
