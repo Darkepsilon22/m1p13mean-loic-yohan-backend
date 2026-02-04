@@ -1,4 +1,5 @@
 const { google } = require('googleapis');
+const PDFDocument = require('pdfkit');
 
 /**
  * Create OAuth2 client for Gmail API
@@ -28,27 +29,66 @@ const createOAuth2Client = () => {
  * @param {string} options.subject - Email subject
  * @param {string} options.html - HTML content
  * @param {string} options.text - Plain text content (optional)
+ * @param {Array} options.attachments - Attachments array (optional)
+ * @param {string} options.attachments[].filename - Attachment filename
+ * @param {Buffer} options.attachments[].content - Attachment content as Buffer
+ * @param {string} options.attachments[].contentType - MIME type
  */
 const sendEmail = async (options) => {
   try {
     const oauth2Client = createOAuth2Client();
     const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
 
-    // Create email content in RFC 2822 format
     const utf8Subject = `=?utf-8?B?${Buffer.from(options.subject).toString('base64')}?=`;
     const senderName = process.env.EMAIL_SENDER_NAME || 'Centre Commercial';
-    const messageParts = [
-      `From: ${senderName} <${process.env.GMAIL_USER}>`,
-      `To: ${options.to}`,
-      `Subject: ${utf8Subject}`,
-      'MIME-Version: 1.0',
-      'Content-Type: text/html; charset=utf-8',
-      '',
-      options.html
-    ];
+    const boundary = `boundary_${Date.now().toString(16)}`;
 
-    const message = messageParts.join('\n');
-    
+    let message;
+
+    if (options.attachments && options.attachments.length > 0) {
+      // Email with attachments (multipart/mixed)
+      const messageParts = [
+        `From: ${senderName} <${process.env.GMAIL_USER}>`,
+        `To: ${options.to}`,
+        `Subject: ${utf8Subject}`,
+        'MIME-Version: 1.0',
+        `Content-Type: multipart/mixed; boundary="${boundary}"`,
+        '',
+        `--${boundary}`,
+        'Content-Type: text/html; charset=utf-8',
+        'Content-Transfer-Encoding: base64',
+        '',
+        Buffer.from(options.html).toString('base64'),
+      ];
+
+      // Add attachments
+      for (const attachment of options.attachments) {
+        messageParts.push(
+          `--${boundary}`,
+          `Content-Type: ${attachment.contentType}; name="${attachment.filename}"`,
+          'Content-Transfer-Encoding: base64',
+          `Content-Disposition: attachment; filename="${attachment.filename}"`,
+          '',
+          attachment.content.toString('base64')
+        );
+      }
+
+      messageParts.push(`--${boundary}--`);
+      message = messageParts.join('\r\n');
+    } else {
+      // Simple email without attachments
+      const messageParts = [
+        `From: ${senderName} <${process.env.GMAIL_USER}>`,
+        `To: ${options.to}`,
+        `Subject: ${utf8Subject}`,
+        'MIME-Version: 1.0',
+        'Content-Type: text/html; charset=utf-8',
+        '',
+        options.html
+      ];
+      message = messageParts.join('\n');
+    }
+
     // Encode message in base64url format
     const encodedMessage = Buffer.from(message)
       .toString('base64')
@@ -186,6 +226,390 @@ const sendOTPEmail = async (email, firstName, otp) => {
 };
 
 /**
+ * Generate invoice PDF
+ * @param {Object} order - Order document
+ * @param {Object} payment - Payment document
+ * @returns {Promise<Buffer>} PDF buffer
+ */
+const generateInvoicePDF = (order, payment) => {
+  return new Promise((resolve, reject) => {
+    try {
+      const doc = new PDFDocument({ margin: 50, size: 'A4' });
+      const chunks = [];
+
+      doc.on('data', chunk => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      const formatCurrency = (amount, currency = 'MGA') => {
+        return new Intl.NumberFormat('fr-MG', {
+          style: 'decimal',
+          minimumFractionDigits: 0
+        }).format(amount) + ' ' + currency;
+      };
+
+      const formatDate = (date) => {
+        return new Date(date).toLocaleDateString('fr-FR', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      };
+
+      const paymentMethodLabels = {
+        mvola: 'MVola',
+        orange: 'Orange Money',
+        airtel: 'Airtel Money',
+        card: 'Carte bancaire',
+        cash: 'Paiement à la livraison',
+        bank_transfer: 'Virement bancaire'
+      };
+
+      // Colors
+      const primaryColor = '#667eea';
+      const textColor = '#333333';
+      const lightGray = '#f5f5f5';
+
+      // Header
+      doc.rect(0, 0, doc.page.width, 120).fill(primaryColor);
+      doc.fillColor('white')
+        .fontSize(28)
+        .text('FACTURE', 50, 40, { align: 'center' });
+      doc.fontSize(12)
+        .text('Centre Commercial', 50, 75, { align: 'center' });
+      doc.fontSize(10)
+        .text('Paiement confirmé ✓', 50, 95, { align: 'center' });
+
+      // Reset position
+      doc.fillColor(textColor);
+      let yPos = 140;
+
+      // Invoice info box
+      doc.rect(50, yPos, 495, 80).fill(lightGray);
+      doc.fillColor(textColor).fontSize(10);
+
+      yPos += 15;
+      doc.font('Helvetica-Bold').text('Référence commande:', 60, yPos);
+      doc.font('Helvetica').text(order.orderReference, 200, yPos);
+
+      yPos += 18;
+      doc.font('Helvetica-Bold').text('Référence paiement:', 60, yPos);
+      doc.font('Helvetica').text(payment.reference, 200, yPos);
+
+      yPos += 18;
+      doc.font('Helvetica-Bold').text('Date de commande:', 60, yPos);
+      doc.font('Helvetica').text(formatDate(order.createdAt), 200, yPos);
+
+      yPos += 18;
+      doc.font('Helvetica-Bold').text('Date de paiement:', 60, yPos);
+      doc.font('Helvetica').text(formatDate(payment.completedAt || new Date()), 200, yPos);
+
+      // Items table
+      yPos = 245;
+      doc.font('Helvetica-Bold').fontSize(14).fillColor(primaryColor)
+        .text('Articles commandés', 50, yPos);
+
+      yPos += 25;
+
+      // Table header
+      doc.rect(50, yPos, 495, 25).fill(primaryColor);
+      doc.fillColor('white').fontSize(10).font('Helvetica-Bold');
+      doc.text('Produit', 60, yPos + 8);
+      doc.text('Qté', 320, yPos + 8, { width: 50, align: 'center' });
+      doc.text('Prix unit.', 370, yPos + 8, { width: 80, align: 'right' });
+      doc.text('Total', 460, yPos + 8, { width: 75, align: 'right' });
+
+      yPos += 25;
+      doc.fillColor(textColor).font('Helvetica');
+
+      // Table rows
+      for (const item of order.items) {
+        const rowHeight = 25;
+
+        // Alternate row background
+        if (order.items.indexOf(item) % 2 === 0) {
+          doc.rect(50, yPos, 495, rowHeight).fill('#fafafa');
+        }
+
+        doc.fillColor(textColor).fontSize(9);
+
+        // Truncate product name if too long
+        const productName = item.productName.length > 40
+          ? item.productName.substring(0, 37) + '...'
+          : item.productName;
+
+        doc.text(productName, 60, yPos + 8, { width: 250 });
+        doc.text(item.quantity.toString(), 320, yPos + 8, { width: 50, align: 'center' });
+        doc.text(formatCurrency(item.unitPrice, order.currency), 370, yPos + 8, { width: 80, align: 'right' });
+        doc.text(formatCurrency(item.totalPrice, order.currency), 460, yPos + 8, { width: 75, align: 'right' });
+
+        yPos += rowHeight;
+      }
+
+      // Line after items
+      doc.moveTo(50, yPos).lineTo(545, yPos).stroke('#ddd');
+      yPos += 15;
+
+      // Totals
+      const totalsX = 370;
+      doc.fontSize(10);
+
+      doc.font('Helvetica').text('Sous-total:', totalsX, yPos);
+      doc.text(formatCurrency(order.subtotal, order.currency), 460, yPos, { width: 75, align: 'right' });
+      yPos += 18;
+
+      if (order.shippingFee > 0) {
+        doc.text('Frais de livraison:', totalsX, yPos);
+        doc.text(formatCurrency(order.shippingFee, order.currency), 460, yPos, { width: 75, align: 'right' });
+        yPos += 18;
+      }
+
+      if (order.discount > 0) {
+        doc.text('Remise:', totalsX, yPos);
+        doc.text('-' + formatCurrency(order.discount, order.currency), 460, yPos, { width: 75, align: 'right' });
+        yPos += 18;
+      }
+
+      // Total line
+      doc.moveTo(totalsX, yPos).lineTo(545, yPos).stroke(primaryColor);
+      yPos += 10;
+
+      doc.font('Helvetica-Bold').fontSize(14).fillColor(primaryColor);
+      doc.text('TOTAL:', totalsX, yPos);
+      doc.text(formatCurrency(order.totalAmount, order.currency), 460, yPos, { width: 75, align: 'right' });
+
+      // Payment & Shipping info boxes
+      yPos += 40;
+
+      // Payment info
+      doc.rect(50, yPos, 235, 100).fill('#e8f5e9');
+      doc.fillColor('#2e7d32').font('Helvetica-Bold').fontSize(11)
+        .text('Informations de paiement', 60, yPos + 10);
+
+      doc.fillColor(textColor).font('Helvetica').fontSize(9);
+      doc.text(`Méthode: ${paymentMethodLabels[payment.paymentMethod] || payment.paymentMethod}`, 60, yPos + 35);
+      doc.text('Statut: Payé ✓', 60, yPos + 50);
+      doc.text(`Montant: ${formatCurrency(payment.amount, payment.currency)}`, 60, yPos + 65);
+
+      // Shipping info
+      doc.rect(310, yPos, 235, 100).fill('#fff3e0');
+      doc.fillColor('#ef6c00').font('Helvetica-Bold').fontSize(11)
+        .text('Adresse de livraison', 320, yPos + 10);
+
+      doc.fillColor(textColor).font('Helvetica').fontSize(9);
+      doc.font('Helvetica-Bold').text(order.customerName, 320, yPos + 35);
+      doc.font('Helvetica').text(order.shippingAddress.street, 320, yPos + 50);
+      doc.text(`${order.shippingAddress.city}${order.shippingAddress.postalCode ? ', ' + order.shippingAddress.postalCode : ''}`, 320, yPos + 65);
+      doc.text(`Tél: ${order.customerPhone}`, 320, yPos + 80);
+
+      // Footer
+      yPos = doc.page.height - 80;
+      doc.moveTo(50, yPos).lineTo(545, yPos).stroke('#ddd');
+      yPos += 15;
+
+      doc.fillColor('#666').fontSize(8).font('Helvetica');
+      doc.text(`© ${new Date().getFullYear()} Centre Commercial. Tous droits réservés.`, 50, yPos, { align: 'center' });
+      doc.text('Cette facture a été générée automatiquement.', 50, yPos + 12, { align: 'center' });
+      doc.text(`Document généré le ${formatDate(new Date())}`, 50, yPos + 24, { align: 'center' });
+
+      doc.end();
+    } catch (error) {
+      reject(error);
+    }
+  });
+};
+
+/**
+ * Send invoice/order confirmation email after successful payment
+ * @param {Object} order - Order document
+ * @param {Object} payment - Payment document
+ */
+const sendInvoiceEmail = async (order, payment) => {
+  const orderDate = new Date(order.createdAt).toLocaleDateString('fr-FR', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+
+  const paymentDate = new Date(payment.completedAt || new Date()).toLocaleDateString('fr-FR', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+
+  const paymentMethodLabels = {
+    mvola: 'MVola',
+    orange: 'Orange Money',
+    airtel: 'Airtel Money',
+    card: 'Carte bancaire',
+    cash: 'Paiement à la livraison',
+    bank_transfer: 'Virement bancaire'
+  };
+
+  const formatCurrency = (amount, currency = 'MGA') => {
+    return new Intl.NumberFormat('fr-MG', {
+      style: 'decimal',
+      minimumFractionDigits: 0
+    }).format(amount) + ' ' + currency;
+  };
+
+  // Build items table rows
+  const itemsRows = order.items.map(item => `
+    <tr>
+      <td style="padding: 12px; border-bottom: 1px solid #eee;">
+        ${item.productName}
+      </td>
+      <td style="padding: 12px; border-bottom: 1px solid #eee; text-align: center;">
+        ${item.quantity}
+      </td>
+      <td style="padding: 12px; border-bottom: 1px solid #eee; text-align: right;">
+        ${formatCurrency(item.unitPrice, order.currency)}
+      </td>
+      <td style="padding: 12px; border-bottom: 1px solid #eee; text-align: right;">
+        ${formatCurrency(item.totalPrice, order.currency)}
+      </td>
+    </tr>
+  `).join('');
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+        .container { max-width: 650px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+        .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+        .invoice-box { background: white; padding: 25px; border-radius: 10px; margin: 20px 0; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .invoice-header { display: flex; justify-content: space-between; border-bottom: 2px solid #667eea; padding-bottom: 15px; margin-bottom: 20px; }
+        .order-info { background: #f0f4ff; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+        .order-info p { margin: 5px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th { background: #667eea; color: white; padding: 12px; text-align: left; }
+        th:nth-child(2), th:nth-child(3), th:nth-child(4) { text-align: center; }
+        th:last-child { text-align: right; }
+        .totals { margin-top: 20px; }
+        .totals-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee; }
+        .totals-row.total { font-size: 18px; font-weight: bold; color: #667eea; border-bottom: none; border-top: 2px solid #667eea; padding-top: 15px; margin-top: 10px; }
+        .payment-info { background: #e8f5e9; padding: 15px; border-radius: 8px; margin-top: 20px; }
+        .payment-info h4 { color: #2e7d32; margin-top: 0; }
+        .shipping-info { background: #fff3e0; padding: 15px; border-radius: 8px; margin-top: 20px; }
+        .shipping-info h4 { color: #ef6c00; margin-top: 0; }
+        .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+        .success-badge { display: inline-block; background: #4caf50; color: white; padding: 5px 15px; border-radius: 20px; font-size: 14px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>🧾 Facture</h1>
+          <p>Merci pour votre commande!</p>
+          <span class="success-badge">✓ Paiement confirmé</span>
+        </div>
+        <div class="content">
+          <div class="invoice-box">
+            <div class="order-info">
+              <p><strong>Référence commande:</strong> ${order.orderReference}</p>
+              <p><strong>Référence paiement:</strong> ${payment.reference}</p>
+              <p><strong>Date de commande:</strong> ${orderDate}</p>
+              <p><strong>Date de paiement:</strong> ${paymentDate}</p>
+            </div>
+
+            <h3>📦 Articles commandés</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Produit</th>
+                  <th>Quantité</th>
+                  <th>Prix unitaire</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${itemsRows}
+              </tbody>
+            </table>
+
+            <div class="totals">
+              <div class="totals-row">
+                <span>Sous-total:</span>
+                <span>${formatCurrency(order.subtotal, order.currency)}</span>
+              </div>
+              ${order.shippingFee > 0 ? `
+              <div class="totals-row">
+                <span>Frais de livraison:</span>
+                <span>${formatCurrency(order.shippingFee, order.currency)}</span>
+              </div>
+              ` : ''}
+              ${order.discount > 0 ? `
+              <div class="totals-row">
+                <span>Remise:</span>
+                <span>-${formatCurrency(order.discount, order.currency)}</span>
+              </div>
+              ` : ''}
+              <div class="totals-row total">
+                <span>TOTAL:</span>
+                <span>${formatCurrency(order.totalAmount, order.currency)}</span>
+              </div>
+            </div>
+
+            <div class="payment-info">
+              <h4>💳 Informations de paiement</h4>
+              <p><strong>Méthode:</strong> ${paymentMethodLabels[payment.paymentMethod] || payment.paymentMethod}</p>
+              <p><strong>Statut:</strong> Payé ✓</p>
+              <p><strong>Montant:</strong> ${formatCurrency(payment.amount, payment.currency)}</p>
+            </div>
+
+            <div class="shipping-info">
+              <h4>📍 Adresse de livraison</h4>
+              <p><strong>${order.customerName}</strong></p>
+              <p>${order.shippingAddress.street}</p>
+              <p>${order.shippingAddress.city}${order.shippingAddress.postalCode ? ', ' + order.shippingAddress.postalCode : ''}</p>
+              <p>${order.shippingAddress.country}</p>
+              ${order.shippingAddress.additionalInfo ? `<p><em>${order.shippingAddress.additionalInfo}</em></p>` : ''}
+              <p><strong>Téléphone:</strong> ${order.customerPhone}</p>
+            </div>
+          </div>
+
+          <p style="text-align: center; color: #666;">
+            Vous pouvez suivre votre commande depuis votre espace client.<br>
+            Pour toute question, contactez notre service client.
+          </p>
+        </div>
+        <div class="footer">
+          <p>&copy; ${new Date().getFullYear()} Centre Commercial. Tous droits réservés.</p>
+          <p>Cette facture a été générée automatiquement.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  // Generate PDF invoice
+  const pdfBuffer = await generateInvoicePDF(order, payment);
+
+  await sendEmail({
+    to: order.customerEmail,
+    subject: `Facture - Commande ${order.orderReference} confirmée`,
+    html,
+    attachments: [
+      {
+        filename: `Facture_${order.orderReference}.pdf`,
+        content: pdfBuffer,
+        contentType: 'application/pdf'
+      }
+    ]
+  });
+};
+
+/**
  * Send welcome email after verification
  * @param {string} email - User email
  * @param {string} firstName - User first name
@@ -246,5 +670,6 @@ module.exports = {
   sendEmail,
   sendVerificationEmail,
   sendOTPEmail,
-  sendWelcomeEmail
+  sendWelcomeEmail,
+  sendInvoiceEmail
 };
