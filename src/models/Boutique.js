@@ -21,7 +21,7 @@ const boutiqueSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: [true, 'Owner (userId) is required']
+    default: null
   },
   name: {
     type: String,
@@ -78,17 +78,14 @@ const boutiqueSchema = new mongoose.Schema({
   location: {
     floor: {
       type: Number,
-      required: [true, 'Floor is required'],
       default: 0
     },
     zone: {
       type: String,
-      required: [true, 'Zone is required'],
       trim: true
     },
     number: {
       type: String,
-      required: [true, 'Location number is required'],
       trim: true
     },
     mapCoordinates: {
@@ -128,17 +125,66 @@ const boutiqueSchema = new mongoose.Schema({
     required: true,
     default: 'pending'
   },
-  rejectionReason: { type: String, trim: true }
+  rejectionReason: { type: String, trim: true },
+  // Champs pour la gestion des emplacements (Emplacement = Boutique)
+  price: {
+    type: Number,
+    min: [0, 'Le prix ne peut pas être négatif'],
+    default: null
+  },
+  surface: {
+    type: Number,
+    min: [1, 'La surface doit être positive'],
+    default: null
+  },
+  amenities: [{
+    type: String,
+    trim: true
+  }],
+  emplacementStatus: {
+    type: String,
+    enum: {
+      values: ['libre', 'temporaire', 'occupee'],
+      message: 'Le statut emplacement doit être: libre, temporaire ou occupee'
+    },
+    default: 'libre'
+  },
+  assignee: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  reservationExpires: {
+    type: Date,
+    default: null
+  }
 }, {
   timestamps: true
 });
 
-boutiqueSchema.index({ userId: 1 }, { unique: true });
+boutiqueSchema.index({ userId: 1 }, { sparse: true });
 boutiqueSchema.index({ name: 'text' });
 boutiqueSchema.index({ categoryId: 1 });
 boutiqueSchema.index({ status: 1 });
 boutiqueSchema.index({ 'rating.average': -1 });
 boutiqueSchema.index({ 'location.floor': 1, 'location.zone': 1 });
+boutiqueSchema.index({ emplacementStatus: 1 });
+boutiqueSchema.index({ assignee: 1 });
+boutiqueSchema.index({ reservationExpires: 1 });
+boutiqueSchema.index({ price: 1 });
+
+// Méthode pour vérifier si la réservation a expiré
+boutiqueSchema.methods.isReservationExpired = function() {
+  if (this.emplacementStatus !== 'temporaire' || !this.reservationExpires) {
+    return false;
+  }
+  return new Date() > this.reservationExpires;
+};
+
+// Méthode statique pour obtenir le nombre d'emplacements disponibles
+boutiqueSchema.statics.getAvailableCount = async function() {
+  return this.countDocuments({ emplacementStatus: 'libre' });
+};
 
 boutiqueSchema.pre('validate', function() {
   // Generate slug from name before validation
