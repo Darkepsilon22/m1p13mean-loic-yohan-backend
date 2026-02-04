@@ -1,6 +1,7 @@
 require('dotenv').config();
 const app = require('./src/app');
 const { connectDB } = require('./src/config');
+const { startBoutiqueReservationCronJob } = require('./src/jobs/boutiqueReservationCron');
 
 const PORT = process.env.PORT || 5000;
 
@@ -9,6 +10,9 @@ const startServer = async () => {
   try {
     // Connect to MongoDB
     await connectDB();
+
+    // Start cron jobs
+    startBoutiqueReservationCronJob();
 
     // Start Express server
     app.listen(PORT, () => {

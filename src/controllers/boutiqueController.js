@@ -1,6 +1,8 @@
 const Boutique = require('../models/Boutique');
 const Category = require('../models/Category');
 const User = require('../models/User');
+const ReservationBoutique = require('../models/ReservationBoutique');
+const BoutiqueReservationService = require('../services/boutiqueReservationService');
 const { ApiError, asyncHandler } = require('../middlewares/errorHandler');
 
 const DAYS = [0, 1, 2, 3, 4, 5, 6];
@@ -284,4 +286,259 @@ exports.delete = asyncHandler(async (req, res, next) => {
     success: true,
     message: 'Boutique deleted successfully'
   });
+});
+
+// ==================== RESERVATION / EMPLACEMENT ROUTES ====================
+// Note: Emplacement = Boutique (pas de collection Emplacement séparée)
+
+/**
+ * @desc    Obtenir les boutiques (emplacements) libres
+ * @route   GET /api/boutiques/emplacements/available
+ * @access  Public
+ */
+exports.getAvailableBoutiques = asyncHandler(async (req, res, next) => {
+  const { floor, zone, minPrice, maxPrice, minSurface } = req.query;
+
+  const result = await BoutiqueReservationService.getAvailableBoutiques({
+    floor: floor !== undefined ? parseInt(floor) : undefined,
+    zone,
+    minPrice: minPrice !== undefined ? parseFloat(minPrice) : undefined,
+    maxPrice: maxPrice !== undefined ? parseFloat(maxPrice) : undefined,
+    minSurface: minSurface !== undefined ? parseFloat(minSurface) : undefined
+  });
+
+  res.json({
+    success: true,
+    count: result.data.length,
+    data: result.data
+  });
+});
+
+/**
+ * @desc    Statistiques des emplacements (Admin)
+ * @route   GET /api/boutiques/emplacements/stats
+ * @access  Admin
+ */
+exports.getEmplacementStats = asyncHandler(async (req, res, next) => {
+  const stats = await Boutique.aggregate([
+    {
+      $group: {
+        _id: '$emplacementStatus',
+        count: { $sum: 1 },
+        totalSurface: { $sum: '$surface' },
+        avgPrice: { $avg: '$price' }
+      }
+    }
+  ]);
+
+  const total = await Boutique.countDocuments();
+
+  res.json({
+    success: true,
+    data: {
+      total,
+      byStatus: stats.reduce((acc, s) => {
+        acc[s._id || 'undefined'] = {
+          count: s.count,
+          totalSurface: s.totalSurface || 0,
+          avgPrice: s.avgPrice ? Math.round(s.avgPrice) : 0
+        };
+        return acc;
+      }, {})
+    }
+  });
+});
+
+/**
+ * @desc    Tous les emplacements avec filtres (Admin)
+ * @route   GET /api/boutiques/emplacements/admin/all
+ * @access  Admin
+ */
+exports.getAllEmplacementsAdmin = asyncHandler(async (req, res, next) => {
+  const { emplacementStatus, floor, zone } = req.query;
+  const query = {};
+
+  if (emplacementStatus) query.emplacementStatus = emplacementStatus;
+  if (floor !== undefined) query['location.floor'] = parseInt(floor);
+  if (zone) query['location.zone'] = zone;
+
+  const boutiques = await Boutique.find(query)
+    .populate('assignee', 'firstName lastName email')
+    .populate('userId', 'firstName lastName email')
+    .sort({ 'location.floor': 1, 'location.zone': 1, 'location.number': 1 });
+
+  res.json({
+    success: true,
+    count: boutiques.length,
+    data: boutiques
+  });
+});
+
+/**
+ * @desc    Libérer une boutique occupée (Admin - résiliation)
+ * @route   POST /api/boutiques/:id/release
+ * @access  Admin
+ */
+exports.releaseBoutique = asyncHandler(async (req, res, next) => {
+  const boutique = await Boutique.findById(req.params.id);
+
+  if (!boutique) {
+    return next(new ApiError(404, 'Boutique non trouvée'));
+  }
+
+  const previousAssignee = boutique.assignee;
+
+  boutique.emplacementStatus = 'libre';
+  boutique.assignee = null;
+  boutique.reservationExpires = null;
+  await boutique.save();
+
+  // Mettre à jour l'historique si nécessaire
+  if (previousAssignee) {
+    await ReservationBoutique.findOneAndUpdate(
+      {
+        boutique: req.params.id,
+        user: previousAssignee,
+        status: { $in: ['temporaire', 'confirmee'] }
+      },
+      {
+        status: 'annulee',
+        cancelledAt: new Date(),
+        cancellationReason: req.body.reason || 'Libéré par l\'administrateur'
+      }
+    );
+  }
+
+  res.json({
+    success: true,
+    message: 'Boutique libérée avec succès',
+    data: boutique
+  });
+});
+
+/**
+ * @desc    Réserver temporairement une boutique
+ * @route   POST /api/boutiques/:id/reserve
+ * @access  Boutique (user with role boutique)
+ */
+exports.reserveBoutique = asyncHandler(async (req, res, next) => {
+  try {
+    const result = await BoutiqueReservationService.reserveBoutique(
+      req.params.id,
+      req.user._id
+    );
+
+    res.json(result);
+  } catch (error) {
+    return next(new ApiError(400, error.message));
+  }
+});
+
+/**
+ * @desc    Confirmer une réservation
+ * @route   POST /api/boutiques/:id/confirm
+ * @access  Boutique
+ */
+exports.confirmReservation = asyncHandler(async (req, res, next) => {
+  try {
+    const result = await BoutiqueReservationService.confirmReservation(
+      req.params.id,
+      req.user._id
+    );
+
+    res.json(result);
+  } catch (error) {
+    return next(new ApiError(400, error.message));
+  }
+});
+
+/**
+ * @desc    Annuler une réservation
+ * @route   POST /api/boutiques/:id/cancel
+ * @access  Boutique
+ */
+exports.cancelReservation = asyncHandler(async (req, res, next) => {
+  try {
+    const result = await BoutiqueReservationService.cancelReservation(
+      req.params.id,
+      req.user._id,
+      req.body.reason
+    );
+
+    res.json(result);
+  } catch (error) {
+    return next(new ApiError(400, error.message));
+  }
+});
+
+/**
+ * @desc    Obtenir ma réservation active
+ * @route   GET /api/boutiques/my/reservation
+ * @access  Boutique
+ */
+exports.getMyActiveReservation = asyncHandler(async (req, res, next) => {
+  const result = await BoutiqueReservationService.getUserActiveReservation(req.user._id);
+
+  res.json(result);
+});
+
+/**
+ * @desc    Obtenir mon historique de réservations
+ * @route   GET /api/boutiques/my/history
+ * @access  Boutique
+ */
+exports.getMyReservationHistory = asyncHandler(async (req, res, next) => {
+  const result = await BoutiqueReservationService.getUserReservationHistory(req.user._id);
+
+  res.json(result);
+});
+
+// ==================== ADMIN RESERVATION VALIDATION ROUTES ====================
+
+/**
+ * @desc    Obtenir les réservations en attente de validation
+ * @route   GET /api/boutiques/reservations/pending
+ * @access  Admin
+ */
+exports.getPendingReservations = asyncHandler(async (req, res, next) => {
+  const result = await BoutiqueReservationService.getPendingReservations();
+
+  res.json(result);
+});
+
+/**
+ * @desc    Valider une réservation
+ * @route   POST /api/boutiques/:id/validate
+ * @access  Admin
+ */
+exports.validateReservation = asyncHandler(async (req, res, next) => {
+  try {
+    const result = await BoutiqueReservationService.validateReservation(
+      req.params.id,
+      req.user._id
+    );
+
+    res.json(result);
+  } catch (error) {
+    return next(new ApiError(400, error.message));
+  }
+});
+
+/**
+ * @desc    Refuser une réservation
+ * @route   POST /api/boutiques/:id/reject
+ * @access  Admin
+ */
+exports.rejectReservation = asyncHandler(async (req, res, next) => {
+  try {
+    const result = await BoutiqueReservationService.rejectReservation(
+      req.params.id,
+      req.user._id,
+      req.body.reason
+    );
+
+    res.json(result);
+  } catch (error) {
+    return next(new ApiError(400, error.message));
+  }
 });

@@ -1260,40 +1260,6 @@
               ]
             }
           }
-        },
-        {
-          "name": "[Admin] Get Stock Alerts",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{adminToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/stock/alerts?page=1&limit=50",
-              "host": ["{{baseUrl}}"],
-              "path": ["stock", "alerts"],
-              "query": [
-                {"key": "page", "value": "1"},
-                {"key": "limit", "value": "50"}
-              ]
-            }
-          }
-        },
-        {
-          "name": "[Admin] Get Global Stats",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{adminToken}}"
-              }
-            ],
-            "url": "{{baseUrl}}/stock/stats"
-          }
         }
       ]
     },
@@ -2040,6 +2006,234 @@
       ]
     },
     {
+      "name": "Boutiques - Réservation (Emplacement)",
+      "description": "Gestion des réservations de boutiques (emplacements). Note: Emplacement = Boutique selon l'architecture.",
+      "item": [
+        {
+          "name": "Boutique (Réservation)",
+          "item": [
+            {
+              "name": "[Boutique/Admin] Get Available Boutiques (Emplacements libres)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{boutiqueToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/boutiques/emplacements/available?floor=0&minPrice=1000&maxPrice=50000",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["boutiques", "emplacements", "available"],
+                  "query": [
+                    {"key": "floor", "value": "0", "disabled": true},
+                    {"key": "zone", "value": "A", "disabled": true},
+                    {"key": "minPrice", "value": "1000", "disabled": true},
+                    {"key": "maxPrice", "value": "50000", "disabled": true},
+                    {"key": "minSurface", "value": "20", "disabled": true}
+                  ]
+                },
+                "description": "Obtenir la liste des boutiques (emplacements) disponibles avec filtres optionnels. Accessible par Admin ET Boutique."
+              }
+            },
+            {
+              "name": "[Boutique] Reserve Boutique",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{boutiqueToken}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/boutiques/{{boutiqueId}}/reserve",
+                "description": "Étape 1: Pré-réservation temporaire d'une boutique. Expire après 15 minutes si non confirmée. Bloque l'emplacement pendant ce temps."
+              }
+            },
+            {
+              "name": "[Boutique] Confirm Reservation",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{boutiqueToken}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/boutiques/{{boutiqueId}}/confirm",
+                "description": "Étape 2: Confirmer la pré-réservation (demande ferme). Passe en 'en_attente_validation'. L'admin doit ensuite valider ou refuser."
+              }
+            },
+            {
+              "name": "[Boutique] Cancel Reservation",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{boutiqueToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"reason\": \"Changement de projet\"\n}"
+                },
+                "url": "{{baseUrl}}/boutiques/{{boutiqueId}}/cancel",
+                "description": "Annuler une réservation en cours."
+              }
+            },
+            {
+              "name": "[Boutique] Get My Active Reservation",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{boutiqueToken}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/boutiques/my/reservation",
+                "description": "Obtenir ma réservation active (temporaire ou en_attente_validation)."
+              }
+            },
+            {
+              "name": "[Boutique] Get My Reservation History",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{boutiqueToken}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/boutiques/my/history",
+                "description": "Obtenir l'historique de mes réservations."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin (Emplacements)",
+          "item": [
+            {
+              "name": "[Admin] Get Emplacement Stats",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/boutiques/emplacements/stats",
+                "description": "Statistiques des emplacements (boutiques) par statut."
+              }
+            },
+            {
+              "name": "[Admin] Get All Emplacements",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/boutiques/emplacements/admin/all?emplacementStatus=libre",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["boutiques", "emplacements", "admin", "all"],
+                  "query": [
+                    {"key": "emplacementStatus", "value": "libre", "disabled": true},
+                    {"key": "floor", "value": "0", "disabled": true},
+                    {"key": "zone", "value": "A", "disabled": true}
+                  ]
+                },
+                "description": "Obtenir toutes les boutiques (emplacements) avec filtres. Statuts: libre, temporaire, occupee."
+              }
+            },
+            {
+              "name": "[Admin] Get Pending Reservations",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/boutiques/reservations/pending",
+                "description": "Obtenir la liste des réservations en attente de validation par l'admin."
+              }
+            },
+            {
+              "name": "[Admin] Validate Reservation",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/boutiques/{{boutiqueId}}/validate",
+                "description": "Étape 3a: Valider une réservation en attente. La boutique devient 'occupee' et est assignée au user."
+              }
+            },
+            {
+              "name": "[Admin] Reject Reservation",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"reason\": \"Dossier incomplet ou emplacement réservé pour un autre projet\"\n}"
+                },
+                "url": "{{baseUrl}}/boutiques/{{boutiqueId}}/reject",
+                "description": "Étape 3b: Refuser une réservation en attente. La boutique redevient 'libre'."
+              }
+            },
+            {
+              "name": "[Admin] Release Boutique",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"reason\": \"Résiliation du contrat\"\n}"
+                },
+                "url": "{{baseUrl}}/boutiques/{{boutiqueId}}/release",
+                "description": "Libérer une boutique occupée (résiliation par l'administrateur)."
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "Boutiques",
       "item": [
         {
@@ -2097,7 +2291,56 @@
           "name": "Boutique Owner",
           "item": [
             {
-              "name": "[Boutique] Create Boutique",
+              "name": "[Boutique] Update My Boutique",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{boutiqueToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Ma Boutique Mise a Jour\",\n  \"description\": \"Nouvelle description\",\n  \"logo\": \"https://example.com/new-logo.png\"\n}"
+                },
+                "url": "{{baseUrl}}/boutiques/{{boutiqueId}}",
+                "description": "Modifier les informations de sa propre boutique (nom, description, logo, etc.). Réservé au propriétaire - Admin ne peut PAS modifier."
+              }
+            },
+            {
+              "name": "[Boutique] Update My Boutique Status",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{boutiqueToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"active\"\n}"
+                },
+                "url": "{{baseUrl}}/boutiques/{{boutiqueId}}/status",
+                "description": "Activer/désactiver sa propre boutique"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin",
+          "item": [
+            {
+              "name": "[Admin] Create Boutique (Emplacement)",
               "event": [
                 {
                   "listen": "test",
@@ -2119,7 +2362,7 @@
                 "header": [
                   {
                     "key": "Authorization",
-                    "value": "Bearer {{boutiqueToken}}"
+                    "value": "Bearer {{adminToken}}"
                   },
                   {
                     "key": "Content-Type",
@@ -2128,19 +2371,20 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"name\": \"Ma Nouvelle Boutique\",\n  \"description\": \"Description de ma boutique\",\n  \"shortDescription\": \"Courte description\",\n  \"logo\": \"https://example.com/logo.png\",\n  \"contact\": {\n    \"email\": \"boutique@example.com\",\n    \"phone\": \"+261 34 00 000 00\"\n  },\n  \"location\": {\n    \"floor\": \"1er etage\",\n    \"zone\": \"Zone A\",\n    \"mapCoordinates\": \"A1-15\"\n  }\n}"
+                  "raw": "{\n  \"name\": \"Emplacement A1\",\n  \"description\": \"Emplacement au rez-de-chaussee zone A\",\n  \"shortDescription\": \"Emplacement 50m2\",\n  \"logo\": \"https://example.com/placeholder.png\",\n  \"categoryId\": \"{{categoryId}}\",\n  \"contact\": {\n    \"email\": \"contact@centre.com\",\n    \"phone\": \"+261 34 00 000 00\"\n  },\n  \"location\": {\n    \"floor\": 0,\n    \"zone\": \"A\",\n    \"number\": \"A1\"\n  },\n  \"openingHours\": [\n    {\"day\": 0, \"open\": \"09:00\", \"close\": \"18:00\", \"isClosed\": false},\n    {\"day\": 1, \"open\": \"09:00\", \"close\": \"18:00\", \"isClosed\": false},\n    {\"day\": 2, \"open\": \"09:00\", \"close\": \"18:00\", \"isClosed\": false},\n    {\"day\": 3, \"open\": \"09:00\", \"close\": \"18:00\", \"isClosed\": false},\n    {\"day\": 4, \"open\": \"09:00\", \"close\": \"18:00\", \"isClosed\": false},\n    {\"day\": 5, \"open\": \"09:00\", \"close\": \"18:00\", \"isClosed\": false},\n    {\"day\": 6, \"open\": null, \"close\": null, \"isClosed\": true}\n  ],\n  \"price\": 500000,\n  \"surface\": 50,\n  \"emplacementStatus\": \"libre\"\n}"
                 },
-                "url": "{{baseUrl}}/boutiques"
+                "url": "{{baseUrl}}/boutiques",
+                "description": "Créer une nouvelle boutique (emplacement). Admin seulement."
               }
             },
             {
-              "name": "[Boutique] Update Boutique",
+              "name": "[Admin] Update Boutique Location",
               "request": {
-                "method": "PUT",
+                "method": "PATCH",
                 "header": [
                   {
                     "key": "Authorization",
-                    "value": "Bearer {{boutiqueToken}}"
+                    "value": "Bearer {{adminToken}}"
                   },
                   {
                     "key": "Content-Type",
@@ -2149,22 +2393,46 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"name\": \"Ma Boutique Mise a Jour\",\n  \"description\": \"Nouvelle description\"\n}"
+                  "raw": "{\n  \"floor\": 1,\n  \"zone\": \"B\",\n  \"number\": \"B5\"\n}"
                 },
-                "url": "{{baseUrl}}/boutiques/{{boutiqueId}}"
+                "url": "{{baseUrl}}/boutiques/{{boutiqueId}}/location",
+                "description": "Modifier l'emplacement physique d'une boutique. Admin seulement."
               }
             },
             {
-              "name": "[Boutique] Delete Boutique",
+              "name": "[Admin] Update Boutique Status",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"active\"\n}"
+                },
+                "url": "{{baseUrl}}/boutiques/{{boutiqueId}}/status",
+                "description": "Valider/rejeter une boutique. Admin seulement."
+              }
+            },
+            {
+              "name": "[Admin] Delete Boutique",
               "request": {
                 "method": "DELETE",
                 "header": [
                   {
                     "key": "Authorization",
-                    "value": "Bearer {{boutiqueToken}}"
+                    "value": "Bearer {{adminToken}}"
                   }
                 ],
-                "url": "{{baseUrl}}/boutiques/{{boutiqueId}}"
+                "url": "{{baseUrl}}/boutiques/{{boutiqueId}}",
+                "description": "Supprimer une boutique (emplacement). Admin seulement."
               }
             }
           ]

@@ -1,0 +1,250 @@
+{
+  "info": {
+    "name": "Centre Commercial - Statistics API",
+    "_postman_id": "centre-commercial-stats-api",
+    "description": "Collection des routes de statistiques pour le centre commercial.\n\n## Routes Admin\n- Dashboard global\n- Revenue (CA) du centre\n- Métriques clients\n- Comparaisons périodiques\n\n## Routes Boutique\n- Dashboard boutique\n- Revenue (CA) boutique\n- Tendances de ventes\n- Analyse des marges",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000/api",
+      "type": "string"
+    },
+    {
+      "key": "adminToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "boutiqueToken",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Admin - Statistiques Globales",
+      "item": [
+        {
+          "name": "[Admin] Dashboard Global",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/stats/admin/dashboard",
+            "description": "Vue d'ensemble du centre: revenue total/mensuel/annuel, commandes, clients, boutiques, produits"
+          }
+        },
+        {
+          "name": "[Admin] Revenue Global (CA)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stats/admin/revenue?period=month",
+              "host": ["{{baseUrl}}"],
+              "path": ["stats", "admin", "revenue"],
+              "query": [
+                {
+                  "key": "startDate",
+                  "value": "2024-01-01",
+                  "disabled": true
+                },
+                {
+                  "key": "endDate",
+                  "value": "2024-12-31",
+                  "disabled": true
+                },
+                {
+                  "key": "period",
+                  "value": "month",
+                  "description": "day | week | month"
+                }
+              ]
+            },
+            "description": "Statistiques de revenue: CA total, par période, par boutique, par catégorie"
+          }
+        },
+        {
+          "name": "[Admin] Métriques Clients",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stats/admin/customers?period=month",
+              "host": ["{{baseUrl}}"],
+              "path": ["stats", "admin", "customers"],
+              "query": [
+                {
+                  "key": "startDate",
+                  "value": "2024-01-01",
+                  "disabled": true
+                },
+                {
+                  "key": "endDate",
+                  "value": "2024-12-31",
+                  "disabled": true
+                },
+                {
+                  "key": "period",
+                  "value": "month",
+                  "description": "day | week | month"
+                }
+              ]
+            },
+            "description": "Acquisition clients: par rôle, nouveaux par période, retention, top clients"
+          }
+        },
+        {
+          "name": "[Admin] Comparaison Périodes",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stats/admin/comparison?compareType=month",
+              "host": ["{{baseUrl}}"],
+              "path": ["stats", "admin", "comparison"],
+              "query": [
+                {
+                  "key": "compareType",
+                  "value": "month",
+                  "description": "day | week | month | year"
+                }
+              ]
+            },
+            "description": "Compare période actuelle vs précédente: revenue, commandes, nouveaux clients, nouvelles boutiques"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Boutique - Statistiques Financières",
+      "item": [
+        {
+          "name": "[Boutique] Dashboard",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{boutiqueToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/stats/boutique/dashboard",
+            "description": "Vue d'ensemble boutique: revenue total/mensuel/annuel, commandes, produits, commandes récentes"
+          }
+        },
+        {
+          "name": "[Boutique] Revenue (CA)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{boutiqueToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stats/boutique/revenue?period=month",
+              "host": ["{{baseUrl}}"],
+              "path": ["stats", "boutique", "revenue"],
+              "query": [
+                {
+                  "key": "startDate",
+                  "value": "2024-01-01",
+                  "disabled": true
+                },
+                {
+                  "key": "endDate",
+                  "value": "2024-12-31",
+                  "disabled": true
+                },
+                {
+                  "key": "period",
+                  "value": "month",
+                  "description": "day | week | month"
+                }
+              ]
+            },
+            "description": "Chiffre d'affaires de la boutique: total, par période"
+          }
+        },
+        {
+          "name": "[Boutique] Tendances de Ventes",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{boutiqueToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stats/boutique/trends?months=12",
+              "host": ["{{baseUrl}}"],
+              "path": ["stats", "boutique", "trends"],
+              "query": [
+                {
+                  "key": "months",
+                  "value": "12",
+                  "description": "Nombre de mois à analyser (défaut: 12)"
+                }
+              ]
+            },
+            "description": "Tendances: mensuelles, top produits, ventes par jour de semaine, croissance"
+          }
+        },
+        {
+          "name": "[Boutique] Analyse des Marges",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{boutiqueToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stats/boutique/margins",
+              "host": ["{{baseUrl}}"],
+              "path": ["stats", "boutique", "margins"],
+              "query": [
+                {
+                  "key": "startDate",
+                  "value": "2024-01-01",
+                  "disabled": true
+                },
+                {
+                  "key": "endDate",
+                  "value": "2024-12-31",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Analyse des marges par produit: marge %, profit total, top/low margins"
+          }
+        }
+      ]
+    }
+  ]
+}

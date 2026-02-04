@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const stockController = require('../controllers/stockController');
 const { verifyToken } = require('../middlewares/auth');
-const { isAdmin, isAdminOrBoutique } = require('../middlewares/roles');
+const { isBoutique } = require('../middlewares/roles');
 const {
   validateProductId,
   validateBoutiqueId,
@@ -18,12 +18,9 @@ const {
 // All routes require authentication
 router.use(verifyToken);
 
-// Admin-only routes (supervision)
-router.get('/alerts', isAdmin, stockController.getStockAlerts);
-router.get('/stats', isAdmin, stockController.getGlobalStats);
-
-// Boutique owner routes (stock management)
-router.use(isAdminOrBoutique);
+// Boutique owner only routes (stock management)
+// Admin ne peut PAS voir les stocks et mouvements des boutiques
+router.use(isBoutique);
 
 // Stock operations with productId in body (alternative routes)
 router.post('/add', stockController.addStock);
