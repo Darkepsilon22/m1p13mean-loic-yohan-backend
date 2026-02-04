@@ -112,6 +112,31 @@ const sendEmail = async (options) => {
   }
 };
 
+// Common email styles - Professional minimalist design
+const emailStyles = `
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f5f5f5; }
+  .container { max-width: 600px; margin: 0 auto; padding: 40px 20px; }
+  .card { background: #ffffff; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow: hidden; }
+  .header { background: #1a1a1a; color: #ffffff; padding: 30px; text-align: center; }
+  .header h1 { margin: 0; font-size: 24px; font-weight: 500; }
+  .header p { margin: 10px 0 0; opacity: 0.8; font-size: 14px; }
+  .content { padding: 30px; }
+  .content h2 { margin: 0 0 20px; font-size: 18px; font-weight: 500; color: #1a1a1a; }
+  .content p { margin: 0 0 15px; color: #555; }
+  .button { display: inline-block; background: #1a1a1a; color: #ffffff !important; padding: 12px 28px; text-decoration: none; border-radius: 4px; font-size: 14px; font-weight: 500; margin: 20px 0; }
+  .button:hover { background: #333; }
+  .info-box { background: #f8f9fa; border-left: 3px solid #1a1a1a; padding: 15px; margin: 20px 0; }
+  .warning-box { background: #fff8e6; border-left: 3px solid #f0ad4e; padding: 15px; margin: 20px 0; }
+  .success-box { background: #f0f9f0; border-left: 3px solid #28a745; padding: 15px; margin: 20px 0; }
+  .list { margin: 20px 0; padding: 0; list-style: none; }
+  .list li { padding: 10px 0; border-bottom: 1px solid #eee; color: #555; }
+  .list li:last-child { border-bottom: none; }
+  .footer { text-align: center; padding: 20px; color: #999; font-size: 12px; }
+  .link { color: #1a1a1a; word-break: break-all; }
+  .code-box { background: #f8f9fa; border: 1px solid #e9ecef; padding: 20px; text-align: center; margin: 20px 0; border-radius: 4px; }
+  .code { font-size: 32px; font-weight: 600; letter-spacing: 6px; color: #1a1a1a; }
+`;
+
 /**
  * Send email verification link
  * @param {string} email - User email
@@ -126,34 +151,32 @@ const sendVerificationEmail = async (email, firstName, verificationToken) => {
     <html>
     <head>
       <meta charset="utf-8">
-      <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-        .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
-        .button { display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
-        .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
-      </style>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>${emailStyles}</style>
     </head>
     <body>
       <div class="container">
-        <div class="header">
-          <h1>Centre Commercial</h1>
-          <p>Bienvenue sur notre plateforme!</p>
-        </div>
-        <div class="content">
-          <h2>Bonjour ${firstName},</h2>
-          <p>Merci de vous être inscrit sur Centre Commercial. Pour activer votre compte, veuillez cliquer sur le bouton ci-dessous:</p>
-          <center>
-            <a href="${verificationUrl}" class="button">Vérifier mon email</a>
-          </center>
-          <p>Ou copiez ce lien dans votre navigateur:</p>
-          <p style="word-break: break-all; color: #667eea;">${verificationUrl}</p>
-          <p><strong>Ce lien expire dans 24 heures.</strong></p>
-          <p>Si vous n'avez pas créé de compte, vous pouvez ignorer cet email.</p>
-        </div>
-        <div class="footer">
-          <p>&copy; ${new Date().getFullYear()} Centre Commercial. Tous droits réservés.</p>
+        <div class="card">
+          <div class="header">
+            <h1>Centre Commercial</h1>
+            <p>Verification de votre adresse email</p>
+          </div>
+          <div class="content">
+            <h2>Bonjour ${firstName},</h2>
+            <p>Merci de vous etre inscrit sur Centre Commercial. Pour activer votre compte, veuillez cliquer sur le bouton ci-dessous:</p>
+            <center>
+              <a href="${verificationUrl}" class="button">Verifier mon email</a>
+            </center>
+            <p>Ou copiez ce lien dans votre navigateur:</p>
+            <p class="link">${verificationUrl}</p>
+            <div class="info-box">
+              <strong>Important:</strong> Ce lien expire dans 24 heures.
+            </div>
+            <p>Si vous n'avez pas cree de compte, vous pouvez ignorer cet email.</p>
+          </div>
+          <div class="footer">
+            <p>${new Date().getFullYear()} Centre Commercial. Tous droits reserves.</p>
+          </div>
         </div>
       </div>
     </body>
@@ -162,7 +185,7 @@ const sendVerificationEmail = async (email, firstName, verificationToken) => {
 
   await sendEmail({
     to: email,
-    subject: 'Vérifiez votre adresse email - Centre Commercial',
+    subject: 'Verifiez votre adresse email - Centre Commercial',
     html
   });
 };
@@ -181,37 +204,33 @@ const sendOTPEmail = async (email, firstName, otp) => {
     <html>
     <head>
       <meta charset="utf-8">
-      <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-        .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
-        .otp-box { background: white; border: 2px dashed #667eea; padding: 20px; text-align: center; margin: 20px 0; border-radius: 10px; }
-        .otp-code { font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #667eea; }
-        .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
-        .warning { background: #fff3cd; border: 1px solid #ffc107; padding: 10px; border-radius: 5px; margin-top: 20px; }
-      </style>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>${emailStyles}</style>
     </head>
     <body>
       <div class="container">
-        <div class="header">
-          <h1>Centre Commercial</h1>
-          <p>Code de vérification</p>
-        </div>
-        <div class="content">
-          <h2>Bonjour ${firstName},</h2>
-          <p>Vous avez demandé à vous connecter à votre compte. Voici votre code de vérification:</p>
-          <div class="otp-box">
-            <div class="otp-code">${otp}</div>
+        <div class="card">
+          <div class="header">
+            <h1>Centre Commercial</h1>
+            <p>Code de verification</p>
           </div>
-          <p><strong>Ce code expire dans ${expiresIn} minutes.</strong></p>
-          <div class="warning">
-            <strong> Attention:</strong> Ne partagez jamais ce code avec personne. Notre équipe ne vous demandera jamais votre code.
+          <div class="content">
+            <h2>Bonjour ${firstName},</h2>
+            <p>Vous avez demande a vous connecter a votre compte. Voici votre code de verification:</p>
+            <div class="code-box">
+              <div class="code">${otp}</div>
+            </div>
+            <div class="info-box">
+              <strong>Important:</strong> Ce code expire dans ${expiresIn} minutes.
+            </div>
+            <div class="warning-box">
+              <strong>Securite:</strong> Ne partagez jamais ce code avec personne. Notre equipe ne vous demandera jamais votre code.
+            </div>
+            <p>Si vous n'avez pas tente de vous connecter, veuillez securiser votre compte immediatement.</p>
           </div>
-          <p style="margin-top: 20px;">Si vous n'avez pas tenté de vous connecter, veuillez sécuriser votre compte immédiatement.</p>
-        </div>
-        <div class="footer">
-          <p>&copy; ${new Date().getFullYear()} Centre Commercial. Tous droits réservés.</p>
+          <div class="footer">
+            <p>${new Date().getFullYear()} Centre Commercial. Tous droits reserves.</p>
+          </div>
         </div>
       </div>
     </body>
@@ -275,8 +294,8 @@ const generateInvoicePDF = (order, payment) => {
         bank_transfer: 'Virement bancaire'
       };
 
-      // Colors
-      const primaryColor = '#667eea';
+      // Colors - Professional minimalist
+      const primaryColor = '#1a1a1a';
       const textColor = '#333333';
 
       // Header - compact
@@ -390,8 +409,8 @@ const generateInvoicePDF = (order, payment) => {
       const boxHeight = 70;
 
       // Payment info box
-      doc.rect(margin, yPos, boxWidth, boxHeight).fill('#e8f5e9');
-      doc.fillColor('#2e7d32').font('Helvetica-Bold').fontSize(9);
+      doc.rect(margin, yPos, boxWidth, boxHeight).fill('#f8f9fa');
+      doc.fillColor('#1a1a1a').font('Helvetica-Bold').fontSize(9);
       doc.text('Paiement', margin + 8, yPos + 8, { lineBreak: false });
       doc.fillColor(textColor).font('Helvetica').fontSize(8);
       doc.text(`Methode: ${paymentMethodLabels[payment.paymentMethod] || payment.paymentMethod}`, margin + 8, yPos + 24, { lineBreak: false });
@@ -400,8 +419,8 @@ const generateInvoicePDF = (order, payment) => {
 
       // Shipping info box
       const box2X = margin + boxWidth + 10;
-      doc.rect(box2X, yPos, boxWidth, boxHeight).fill('#fff3e0');
-      doc.fillColor('#ef6c00').font('Helvetica-Bold').fontSize(9);
+      doc.rect(box2X, yPos, boxWidth, boxHeight).fill('#f8f9fa');
+      doc.fillColor('#1a1a1a').font('Helvetica-Bold').fontSize(9);
       doc.text('Livraison', box2X + 8, yPos + 8, { lineBreak: false });
       doc.fillColor(textColor).font('Helvetica').fontSize(8);
       doc.text(order.customerName, box2X + 8, yPos + 24, { lineBreak: false });
@@ -489,52 +508,43 @@ const sendInvoiceEmail = async (order, payment) => {
     <html>
     <head>
       <meta charset="utf-8">
-      <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
-        .container { max-width: 650px; margin: 0 auto; padding: 20px; }
-        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-        .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
-        .invoice-box { background: white; padding: 25px; border-radius: 10px; margin: 20px 0; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .invoice-header { display: flex; justify-content: space-between; border-bottom: 2px solid #667eea; padding-bottom: 15px; margin-bottom: 20px; }
-        .order-info { background: #f0f4ff; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>${emailStyles}
+        .order-info { background: #f8f9fa; padding: 15px; border-radius: 4px; margin-bottom: 20px; }
         .order-info p { margin: 5px 0; }
         table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-        th { background: #667eea; color: white; padding: 12px; text-align: left; }
+        th { background: #1a1a1a; color: white; padding: 12px; text-align: left; font-weight: 500; }
         th:nth-child(2), th:nth-child(3), th:nth-child(4) { text-align: center; }
         th:last-child { text-align: right; }
+        td { padding: 12px; border-bottom: 1px solid #eee; }
         .totals { margin-top: 20px; }
         .totals-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee; }
-        .totals-row.total { font-size: 18px; font-weight: bold; color: #667eea; border-bottom: none; border-top: 2px solid #667eea; padding-top: 15px; margin-top: 10px; }
-        .payment-info { background: #e8f5e9; padding: 15px; border-radius: 8px; margin-top: 20px; }
-        .payment-info h4 { color: #2e7d32; margin-top: 0; }
-        .shipping-info { background: #fff3e0; padding: 15px; border-radius: 8px; margin-top: 20px; }
-        .shipping-info h4 { color: #ef6c00; margin-top: 0; }
-        .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
-        .success-badge { display: inline-block; background: #4caf50; color: white; padding: 5px 15px; border-radius: 20px; font-size: 14px; }
+        .totals-row.total { font-size: 18px; font-weight: 600; color: #1a1a1a; border-bottom: none; border-top: 2px solid #1a1a1a; padding-top: 15px; margin-top: 10px; }
+        .info-section { background: #f8f9fa; padding: 15px; border-radius: 4px; margin-top: 20px; }
+        .info-section h4 { color: #1a1a1a; margin: 0 0 10px; font-weight: 500; }
       </style>
     </head>
     <body>
       <div class="container">
-        <div class="header">
-          <h1>🧾 Facture</h1>
-          <p>Merci pour votre commande!</p>
-          <span class="success-badge">✓ Paiement confirmé</span>
-        </div>
-        <div class="content">
-          <div class="invoice-box">
+        <div class="card">
+          <div class="header">
+            <h1>Facture</h1>
+            <p>Commande confirmee</p>
+          </div>
+          <div class="content">
             <div class="order-info">
-              <p><strong>Référence commande:</strong> ${order.orderReference}</p>
-              <p><strong>Référence paiement:</strong> ${payment.reference}</p>
+              <p><strong>Reference commande:</strong> ${order.orderReference}</p>
+              <p><strong>Reference paiement:</strong> ${payment.reference}</p>
               <p><strong>Date de commande:</strong> ${orderDate}</p>
               <p><strong>Date de paiement:</strong> ${paymentDate}</p>
             </div>
 
-            <h3>📦 Articles commandés</h3>
+            <h3 style="margin: 20px 0 10px; font-weight: 500;">Articles commandes</h3>
             <table>
               <thead>
                 <tr>
                   <th>Produit</th>
-                  <th>Quantité</th>
+                  <th>Quantite</th>
                   <th>Prix unitaire</th>
                   <th>Total</th>
                 </tr>
@@ -567,32 +577,31 @@ const sendInvoiceEmail = async (order, payment) => {
               </div>
             </div>
 
-            <div class="payment-info">
-              <h4>💳 Informations de paiement</h4>
-              <p><strong>Méthode:</strong> ${paymentMethodLabels[payment.paymentMethod] || payment.paymentMethod}</p>
-              <p><strong>Statut:</strong> Payé ✓</p>
+            <div class="info-section">
+              <h4>Informations de paiement</h4>
+              <p><strong>Methode:</strong> ${paymentMethodLabels[payment.paymentMethod] || payment.paymentMethod}</p>
+              <p><strong>Statut:</strong> Paye</p>
               <p><strong>Montant:</strong> ${formatCurrency(payment.amount, payment.currency)}</p>
             </div>
 
-            <div class="shipping-info">
-              <h4>📍 Adresse de livraison</h4>
+            <div class="info-section">
+              <h4>Adresse de livraison</h4>
               <p><strong>${order.customerName}</strong></p>
               <p>${order.shippingAddress.street}</p>
               <p>${order.shippingAddress.city}${order.shippingAddress.postalCode ? ', ' + order.shippingAddress.postalCode : ''}</p>
               <p>${order.shippingAddress.country}</p>
               ${order.shippingAddress.additionalInfo ? `<p><em>${order.shippingAddress.additionalInfo}</em></p>` : ''}
-              <p><strong>Téléphone:</strong> ${order.customerPhone}</p>
+              <p><strong>Telephone:</strong> ${order.customerPhone}</p>
             </div>
-          </div>
 
-          <p style="text-align: center; color: #666;">
-            Vous pouvez suivre votre commande depuis votre espace client.<br>
-            Pour toute question, contactez notre service client.
-          </p>
-        </div>
-        <div class="footer">
-          <p>&copy; ${new Date().getFullYear()} Centre Commercial. Tous droits réservés.</p>
-          <p>Cette facture a été générée automatiquement.</p>
+            <p style="text-align: center; color: #666; margin-top: 20px;">
+              Vous pouvez suivre votre commande depuis votre espace client.<br>
+              Pour toute question, contactez notre service client.
+            </p>
+          </div>
+          <div class="footer">
+            <p>${new Date().getFullYear()} Centre Commercial. Tous droits reserves.</p>
+          </div>
         </div>
       </div>
     </body>
@@ -604,7 +613,7 @@ const sendInvoiceEmail = async (order, payment) => {
 
   await sendEmail({
     to: order.customerEmail,
-    subject: `Facture - Commande ${order.orderReference} confirmée`,
+    subject: `Facture - Commande ${order.orderReference}`,
     html,
     attachments: [
       {
@@ -627,39 +636,32 @@ const sendWelcomeEmail = async (email, firstName) => {
     <html>
     <head>
       <meta charset="utf-8">
-      <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-        .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
-        .button { display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
-        .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
-        .features { background: white; padding: 20px; border-radius: 10px; margin: 20px 0; }
-        .feature { padding: 10px 0; border-bottom: 1px solid #eee; }
-        .feature:last-child { border-bottom: none; }
-      </style>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>${emailStyles}</style>
     </head>
     <body>
       <div class="container">
-        <div class="header">
-          <h1> Bienvenue!</h1>
-          <p>Votre compte est maintenant actif</p>
-        </div>
-        <div class="content">
-          <h2>Félicitations ${firstName}!</h2>
-          <p>Votre adresse email a été vérifiée avec succès. Vous pouvez maintenant profiter de toutes les fonctionnalités de Centre Commercial.</p>
-          <div class="features">
-            <div class="feature">✅ Découvrez toutes les boutiques du centre</div>
-            <div class="feature">✅ Consultez les promotions en cours</div>
-            <div class="feature">✅ Ajoutez vos boutiques favorites</div>
-            <div class="feature">✅ Laissez des avis sur vos expériences</div>
+        <div class="card">
+          <div class="header">
+            <h1>Bienvenue</h1>
+            <p>Votre compte est maintenant actif</p>
           </div>
-          <center>
-            <a href="${process.env.FRONTEND_URL}" class="button">Commencer à explorer</a>
-          </center>
-        </div>
-        <div class="footer">
-          <p>&copy; ${new Date().getFullYear()} Centre Commercial. Tous droits réservés.</p>
+          <div class="content">
+            <h2>Bonjour ${firstName},</h2>
+            <p>Votre adresse email a ete verifiee avec succes. Vous pouvez maintenant profiter de toutes les fonctionnalites de Centre Commercial.</p>
+            <ul class="list">
+              <li>Decouvrez toutes les boutiques du centre</li>
+              <li>Consultez les promotions en cours</li>
+              <li>Ajoutez vos boutiques favorites</li>
+              <li>Laissez des avis sur vos experiences</li>
+            </ul>
+            <center>
+              <a href="${process.env.FRONTEND_URL}" class="button">Commencer</a>
+            </center>
+          </div>
+          <div class="footer">
+            <p>${new Date().getFullYear()} Centre Commercial. Tous droits reserves.</p>
+          </div>
         </div>
       </div>
     </body>
@@ -668,7 +670,183 @@ const sendWelcomeEmail = async (email, firstName) => {
 
   await sendEmail({
     to: email,
-    subject: 'Bienvenue sur Centre Commercial!',
+    subject: 'Bienvenue sur Centre Commercial',
+    html
+  });
+};
+
+/**
+ * Send approval email when admin approves a boutique account
+ * @param {string} email - User email
+ * @param {string} firstName - User first name
+ * @param {string} boutiqueName - Boutique name (optional)
+ */
+const sendApprovalEmail = async (email, firstName, boutiqueName = null) => {
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>${emailStyles}</style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="card">
+          <div class="header">
+            <h1>Compte Approuve</h1>
+            <p>Votre demande a ete acceptee</p>
+          </div>
+          <div class="content">
+            <h2>Bonjour ${firstName},</h2>
+            <div class="success-box">
+              <strong>Bonne nouvelle.</strong> Votre compte${boutiqueName ? ` pour la boutique "${boutiqueName}"` : ''} a ete approuve par notre equipe d'administration.
+            </div>
+            <p>Vous pouvez maintenant vous connecter et acceder a toutes les fonctionnalites de votre espace professionnel.</p>
+            <ul class="list">
+              <li>Gerer votre boutique et vos informations</li>
+              <li>Ajouter et gerer vos produits</li>
+              <li>Creer des promotions et evenements</li>
+              <li>Consulter les avis clients</li>
+              <li>Suivre vos commandes et ventes</li>
+            </ul>
+            <center>
+              <a href="${process.env.FRONTEND_URL}/auth/signin/boutique" class="button">Se connecter</a>
+            </center>
+          </div>
+          <div class="footer">
+            <p>${new Date().getFullYear()} Centre Commercial. Tous droits reserves.</p>
+          </div>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  await sendEmail({
+    to: email,
+    subject: 'Votre compte boutique a ete approuve - Centre Commercial',
+    html
+  });
+};
+
+/**
+ * Send rejection email when admin rejects a boutique account
+ * @param {string} email - User email
+ * @param {string} firstName - User first name
+ * @param {string} reason - Rejection reason
+ */
+const sendRejectionEmail = async (email, firstName, reason = null) => {
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>${emailStyles}</style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="card">
+          <div class="header">
+            <h1>Demande non approuvee</h1>
+            <p>Information importante</p>
+          </div>
+          <div class="content">
+            <h2>Bonjour ${firstName},</h2>
+            <div class="info-box">
+              Nous sommes desoles de vous informer que votre demande de creation de compte boutique n'a pas ete approuvee.
+            </div>
+            ${reason ? `
+            <p><strong>Raison:</strong></p>
+            <div class="info-box">${reason}</div>
+            ` : ''}
+            <p>Si vous pensez qu'il s'agit d'une erreur ou si vous souhaitez soumettre une nouvelle demande avec des informations corrigees, n'hesitez pas a nous contacter.</p>
+            <center>
+              <a href="${process.env.FRONTEND_URL}/contact" class="button">Nous contacter</a>
+            </center>
+          </div>
+          <div class="footer">
+            <p>${new Date().getFullYear()} Centre Commercial. Tous droits reserves.</p>
+          </div>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  await sendEmail({
+    to: email,
+    subject: 'Information concernant votre demande - Centre Commercial',
+    html
+  });
+};
+
+/**
+ * Send pending approval email for boutique accounts after email verification
+ * @param {string} email - User email
+ * @param {string} firstName - User first name
+ */
+const sendPendingApprovalEmail = async (email, firstName) => {
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>${emailStyles}
+        .steps { margin: 20px 0; }
+        .step { display: flex; align-items: center; padding: 12px 0; border-bottom: 1px solid #eee; }
+        .step:last-child { border-bottom: none; }
+        .step-icon { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 12px; font-size: 12px; font-weight: 600; }
+        .step-done { background: #1a1a1a; color: white; }
+        .step-pending { background: #e9ecef; color: #666; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="card">
+          <div class="header">
+            <h1>Email verifie</h1>
+            <p>Compte en attente de validation</p>
+          </div>
+          <div class="content">
+            <h2>Bonjour ${firstName},</h2>
+            <div class="info-box">
+              <strong>Votre adresse email a ete verifiee avec succes.</strong><br>
+              Votre demande de compte boutique est maintenant en cours d'examen par notre equipe.
+            </div>
+
+            <p>Etapes de validation:</p>
+            <div class="steps">
+              <div class="step">
+                <div class="step-icon step-done">1</div>
+                <div><strong>Inscription</strong> - Terminee</div>
+              </div>
+              <div class="step">
+                <div class="step-icon step-done">2</div>
+                <div><strong>Verification email</strong> - Terminee</div>
+              </div>
+              <div class="step">
+                <div class="step-icon step-pending">3</div>
+                <div><strong>Validation admin</strong> - En cours</div>
+              </div>
+            </div>
+
+            <p>Vous recevrez un email de confirmation des que votre compte sera valide. Ce processus prend generalement <strong>24 a 48 heures</strong>.</p>
+          </div>
+          <div class="footer">
+            <p>${new Date().getFullYear()} Centre Commercial. Tous droits reserves.</p>
+          </div>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  await sendEmail({
+    to: email,
+    subject: 'Email verifie - Compte en attente de validation',
     html
   });
 };
@@ -678,5 +856,8 @@ module.exports = {
   sendVerificationEmail,
   sendOTPEmail,
   sendWelcomeEmail,
-  sendInvoiceEmail
+  sendInvoiceEmail,
+  sendApprovalEmail,
+  sendRejectionEmail,
+  sendPendingApprovalEmail
 };
