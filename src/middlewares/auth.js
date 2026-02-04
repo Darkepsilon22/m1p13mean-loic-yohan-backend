@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const Boutique = require('../models/Boutique');
 
 /**
  * Middleware to verify JWT token
@@ -58,8 +59,16 @@ const verifyToken = async (req, res, next) => {
     }
 
     // Attach user to request object
-    req.user = user;
+    req.user = user.toObject();
     req.userId = user._id;
+
+    // If user is a boutique, attach boutiqueId
+    if (user.role === 'boutique') {
+      const boutique = await Boutique.findOne({ userId: user._id }).select('_id');
+      if (boutique) {
+        req.user.boutiqueId = boutique._id;
+      }
+    }
 
     next();
   } catch (error) {

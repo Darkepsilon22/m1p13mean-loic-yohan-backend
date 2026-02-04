@@ -1,0 +1,2409 @@
+{
+  "info": {
+    "name": "Centre Commercial API",
+    "_postman_id": "centre-commercial-api-v3",
+    "description": "API complète pour la gestion du centre commercial.\n\n## Rôles et Tokens\n- **acheteurToken**: Pour les acheteurs (Cart, Orders, Payments, Favorites)\n- **boutiqueToken**: Pour les propriétaires de boutique (Products, Stock, Promotions)\n- **adminToken**: Pour les administrateurs (Users, Events, Stats globales)\n\n## Configuration\n1. Créez un environnement Postman\n2. Lancez les requêtes de login pour chaque rôle\n3. Les tokens seront automatiquement sauvegardés\n\n## Variables automatiques\nLes scripts de test sauvegardent automatiquement les IDs créés.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000/api",
+      "type": "string"
+    },
+    {
+      "key": "acheteurToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "boutiqueToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "adminToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "boutiqueId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "productId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "promotionId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "eventId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "orderId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "orderReference",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "paymentReference",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "categoryId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "reviewId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "verificationToken",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login",
+          "item": [
+            {
+              "name": "Login Acheteur",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.code === 200) {",
+                      "    var jsonData = pm.response.json();",
+                      "    if (jsonData.data && jsonData.data.token) {",
+                      "        pm.collectionVariables.set('acheteurToken', jsonData.data.token);",
+                      "        console.log('Acheteur token saved successfully');",
+                      "    }",
+                      "}"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"acheteur@example.com\",\n  \"password\": \"Password123\"\n}"
+                },
+                "url": "{{baseUrl}}/auth/login",
+                "description": "Login avec un compte acheteur. Le token sera automatiquement sauvegardé dans acheteurToken."
+              }
+            },
+            {
+              "name": "Login Boutique",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.code === 200) {",
+                      "    var jsonData = pm.response.json();",
+                      "    if (jsonData.data && jsonData.data.token) {",
+                      "        pm.collectionVariables.set('boutiqueToken', jsonData.data.token);",
+                      "        if (jsonData.data.user && jsonData.data.user.boutiqueId) {",
+                      "            pm.collectionVariables.set('boutiqueId', jsonData.data.user.boutiqueId);",
+                      "        }",
+                      "        console.log('Boutique token saved successfully');",
+                      "    }",
+                      "}"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"boutique@example.com\",\n  \"password\": \"Password123\"\n}"
+                },
+                "url": "{{baseUrl}}/auth/login",
+                "description": "Login avec un compte boutique. Le token sera automatiquement sauvegardé dans boutiqueToken."
+              }
+            },
+            {
+              "name": "Login Admin",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.code === 200) {",
+                      "    var jsonData = pm.response.json();",
+                      "    if (jsonData.data && jsonData.data.token) {",
+                      "        pm.collectionVariables.set('adminToken', jsonData.data.token);",
+                      "        console.log('Admin token saved successfully');",
+                      "    }",
+                      "}"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"AdminPassword123\"\n}"
+                },
+                "url": "{{baseUrl}}/auth/login",
+                "description": "Login avec un compte admin. Le token sera automatiquement sauvegardé dans adminToken."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register",
+          "item": [
+            {
+              "name": "Register Acheteur",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"acheteur@example.com\",\n  \"password\": \"Password123\",\n  \"firstName\": \"Jean\",\n  \"lastName\": \"Dupont\",\n  \"role\": \"acheteur\",\n  \"phone\": \"+261 34 00 000 00\"\n}"
+                },
+                "url": "{{baseUrl}}/auth/register"
+              }
+            },
+            {
+              "name": "Register Boutique",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"boutique@example.com\",\n  \"password\": \"Password123\",\n  \"firstName\": \"Marie\",\n  \"lastName\": \"Martin\",\n  \"role\": \"boutique\",\n  \"phone\": \"+261 34 11 111 11\",\n  \"boutiqueName\": \"Ma Belle Boutique\"\n}"
+                },
+                "url": "{{baseUrl}}/auth/register"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verification",
+          "item": [
+            {
+              "name": "Verify OTP",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"user@example.com\",\n  \"otp\": \"123456\"\n}"
+                },
+                "url": "{{baseUrl}}/auth/verify-otp"
+              }
+            },
+            {
+              "name": "Resend OTP",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"user@example.com\"\n}"
+                },
+                "url": "{{baseUrl}}/auth/resend-otp"
+              }
+            },
+            {
+              "name": "Verify Email Token",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/auth/verify-email/{{verificationToken}}"
+              }
+            },
+            {
+              "name": "Resend Verification Email",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"user@example.com\"\n}"
+                },
+                "url": "{{baseUrl}}/auth/resend-verification"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Profile",
+          "item": [
+            {
+              "name": "Get Current User (Acheteur)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{acheteurToken}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/auth/me"
+              }
+            },
+            {
+              "name": "Get Current User (Boutique)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{boutiqueToken}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/auth/me"
+              }
+            },
+            {
+              "name": "Verify Token",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{acheteurToken}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/auth/verify"
+              }
+            },
+            {
+              "name": "Update Profile",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{acheteurToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"firstName\": \"Jean\",\n  \"lastName\": \"Dupont Updated\",\n  \"phone\": \"+261 34 22 222 22\"\n}"
+                },
+                "url": "{{baseUrl}}/auth/profile"
+              }
+            },
+            {
+              "name": "Change Password",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{acheteurToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"currentPassword\": \"Password123\",\n  \"newPassword\": \"NewPassword456\",\n  \"confirmPassword\": \"NewPassword456\"\n}"
+                },
+                "url": "{{baseUrl}}/auth/change-password"
+              }
+            },
+            {
+              "name": "Logout",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{acheteurToken}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/auth/logout"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Favorites (Acheteur)",
+          "item": [
+            {
+              "name": "Get My Favorites",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{acheteurToken}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/auth/favorites"
+              }
+            },
+            {
+              "name": "Add Boutique to Favorites",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{acheteurToken}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/auth/favorites/{{boutiqueId}}"
+              }
+            },
+            {
+              "name": "Remove Boutique from Favorites",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{acheteurToken}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/auth/favorites/{{boutiqueId}}"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin - User Management",
+          "item": [
+            {
+              "name": "[Admin] Create Admin User",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"newadmin@example.com\",\n  \"password\": \"AdminPassword123\",\n  \"firstName\": \"Admin\",\n  \"lastName\": \"New\",\n  \"role\": \"admin\"\n}"
+                },
+                "url": "{{baseUrl}}/auth/create-admin"
+              }
+            },
+            {
+              "name": "[Admin] Get All Users",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.code === 200) {",
+                      "    var jsonData = pm.response.json();",
+                      "    if (jsonData.data && jsonData.data.users && jsonData.data.users.length > 0) {",
+                      "        pm.collectionVariables.set('userId', jsonData.data.users[0]._id);",
+                      "    }",
+                      "}"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/auth/users?page=1&limit=20",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["auth", "users"],
+                  "query": [
+                    {"key": "page", "value": "1"},
+                    {"key": "limit", "value": "20"},
+                    {"key": "status", "value": "active", "disabled": true},
+                    {"key": "role", "value": "boutique", "disabled": true}
+                  ]
+                }
+              }
+            },
+            {
+              "name": "[Admin] Get Pending Users",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/auth/users/pending"
+              }
+            },
+            {
+              "name": "[Admin] Update User Status",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"active\",\n  \"reason\": \"Compte approuve\"\n}"
+                },
+                "url": "{{baseUrl}}/auth/users/{{userId}}/status"
+              }
+            },
+            {
+              "name": "[Admin] Approve User",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/auth/users/{{userId}}/approve"
+              }
+            },
+            {
+              "name": "[Admin] Reject User",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"reason\": \"Documents incomplets\"\n}"
+                },
+                "url": "{{baseUrl}}/auth/users/{{userId}}/reject"
+              }
+            },
+            {
+              "name": "[Admin] Block User",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"reason\": \"Violation des conditions d'utilisation\"\n}"
+                },
+                "url": "{{baseUrl}}/auth/users/{{userId}}/block"
+              }
+            },
+            {
+              "name": "[Admin] Unblock User",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/auth/users/{{userId}}/unblock"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Products",
+      "item": [
+        {
+          "name": "Public",
+          "item": [
+            {
+              "name": "Get All Products",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/products?page=1&limit=20",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["products"],
+                  "query": [
+                    {"key": "page", "value": "1"},
+                    {"key": "limit", "value": "20"},
+                    {"key": "availability", "value": "available", "disabled": true},
+                    {"key": "minPrice", "value": "1000", "disabled": true},
+                    {"key": "maxPrice", "value": "50000", "disabled": true},
+                    {"key": "isFeatured", "value": "true", "disabled": true},
+                    {"key": "search", "value": "", "disabled": true}
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Get Featured Products",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/products/featured?limit=10",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["products", "featured"],
+                  "query": [
+                    {"key": "limit", "value": "10"}
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Get Product by ID",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/products/{{productId}}"
+              }
+            },
+            {
+              "name": "Get Product by Slug",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/products/slug/mon-produit"
+              }
+            },
+            {
+              "name": "Get Products by Boutique",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/products/boutique/{{boutiqueId}}?page=1&limit=20",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["products", "boutique", "{{boutiqueId}}"],
+                  "query": [
+                    {"key": "page", "value": "1"},
+                    {"key": "limit", "value": "20"}
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Boutique Owner",
+          "item": [
+            {
+              "name": "[Boutique] Get My Products",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.code === 200) {",
+                      "    var jsonData = pm.response.json();",
+                      "    if (jsonData.data && jsonData.data.products && jsonData.data.products.length > 0) {",
+                      "        pm.collectionVariables.set('productId', jsonData.data.products[0]._id);",
+                      "    }",
+                      "}"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{boutiqueToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/products/my-products?page=1&limit=20",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["products", "my-products"],
+                  "query": [
+                    {"key": "page", "value": "1"},
+                    {"key": "limit", "value": "20"},
+                    {"key": "includeArchived", "value": "false", "disabled": true}
+                  ]
+                }
+              }
+            },
+            {
+              "name": "[Boutique] Get My Products Stats",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{boutiqueToken}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/products/my-products/stats"
+              }
+            },
+            {
+              "name": "[Boutique] Create Product",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.code === 201) {",
+                      "    var jsonData = pm.response.json();",
+                      "    if (jsonData.data && jsonData.data.product) {",
+                      "        pm.collectionVariables.set('productId', jsonData.data.product._id);",
+                      "    }",
+                      "}"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{boutiqueToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"boutiqueId\": \"{{boutiqueId}}\",\n  \"name\": \"T-Shirt Premium Coton Bio\",\n  \"description\": \"T-shirt en coton bio de haute qualite\",\n  \"price\": 25000,\n  \"originalPrice\": 35000,\n  \"photos\": [\n    \"https://example.com/tshirt1.jpg\",\n    \"https://example.com/tshirt2.jpg\"\n  ],\n  \"categoryInternal\": \"Vetements\",\n  \"availability\": \"available\",\n  \"isFeatured\": false,\n  \"stock\": 50,\n  \"lowStockThreshold\": 10\n}"
+                },
+                "url": "{{baseUrl}}/products"
+              }
+            },
+            {
+              "name": "[Boutique] Update Product",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{boutiqueToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"T-Shirt Premium - Edition Limitee\",\n  \"price\": 22000,\n  \"description\": \"Description mise a jour\"\n}"
+                },
+                "url": "{{baseUrl}}/products/{{productId}}"
+              }
+            },
+            {
+              "name": "[Boutique] Update Product Availability",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{boutiqueToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"availability\": \"available\"\n}"
+                },
+                "url": "{{baseUrl}}/products/{{productId}}/availability"
+              }
+            },
+            {
+              "name": "[Boutique] Toggle Featured",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{boutiqueToken}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/products/{{productId}}/featured"
+              }
+            },
+            {
+              "name": "[Boutique] Archive Product",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{boutiqueToken}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/products/{{productId}}/archive"
+              }
+            },
+            {
+              "name": "[Boutique] Restore Product",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{boutiqueToken}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/products/{{productId}}/restore"
+              }
+            },
+            {
+              "name": "[Boutique] Delete Product",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{boutiqueToken}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/products/{{productId}}"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin",
+          "item": [
+            {
+              "name": "[Admin] Get All Products",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/products/admin/all?page=1&limit=50",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["products", "admin", "all"],
+                  "query": [
+                    {"key": "page", "value": "1"},
+                    {"key": "limit", "value": "50"},
+                    {"key": "isArchived", "value": "false", "disabled": true}
+                  ]
+                }
+              }
+            },
+            {
+              "name": "[Admin] Get Products Stats",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/products/admin/stats"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Promotions",
+      "item": [
+        {
+          "name": "Public",
+          "item": [
+            {
+              "name": "Get All Promotions",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/promotions?page=1&limit=20",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["promotions"],
+                  "query": [
+                    {"key": "page", "value": "1"},
+                    {"key": "limit", "value": "20"},
+                    {"key": "status", "value": "active", "disabled": true},
+                    {"key": "activeOnly", "value": "true", "disabled": true}
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Get Promotion by ID",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/promotions/{{promotionId}}"
+              }
+            },
+            {
+              "name": "Get Boutique Promotions",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/promotions/boutique/{{boutiqueId}}"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Boutique Owner",
+          "item": [
+            {
+              "name": "[Boutique] Create Promotion",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.code === 201) {",
+                      "    var jsonData = pm.response.json();",
+                      "    if (jsonData.data && jsonData.data.promotion) {",
+                      "        pm.collectionVariables.set('promotionId', jsonData.data.promotion._id);",
+                      "    }",
+                      "}"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{boutiqueToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"boutiqueId\": \"{{boutiqueId}}\",\n  \"title\": \"Soldes d'ete 2024\",\n  \"description\": \"30% de reduction sur toute la collection ete\",\n  \"type\": \"percentage\",\n  \"value\": 30,\n  \"startDate\": \"2024-06-01T00:00:00.000Z\",\n  \"endDate\": \"2024-06-30T23:59:59.000Z\"\n}"
+                },
+                "url": "{{baseUrl}}/promotions"
+              }
+            },
+            {
+              "name": "[Boutique] Update Promotion",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{boutiqueToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"title\": \"Soldes d'ete 2024 - Prolongation\",\n  \"value\": 35,\n  \"endDate\": \"2024-07-15T23:59:59.000Z\"\n}"
+                },
+                "url": "{{baseUrl}}/promotions/{{promotionId}}"
+              }
+            },
+            {
+              "name": "[Boutique] Cancel Promotion",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{boutiqueToken}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/promotions/{{promotionId}}/cancel"
+              }
+            },
+            {
+              "name": "[Boutique] Delete Promotion",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{boutiqueToken}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/promotions/{{promotionId}}"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Stock (Boutique)",
+      "item": [
+        {
+          "name": "[Boutique] Add Stock (body)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{boutiqueToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"quantity\": 50,\n  \"reason\": \"Reapprovisionnement fournisseur XYZ\",\n  \"reference\": \"BON-LIVRAISON-2024-001\"\n}"
+            },
+            "url": "{{baseUrl}}/stock/add"
+          }
+        },
+        {
+          "name": "[Boutique] Add Stock (URL)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{boutiqueToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": 50,\n  \"reason\": \"Reapprovisionnement\",\n  \"reference\": \"BON-2024-001\"\n}"
+            },
+            "url": "{{baseUrl}}/stock/{{productId}}/add"
+          }
+        },
+        {
+          "name": "[Boutique] Remove Stock (body)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{boutiqueToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"quantity\": 5,\n  \"reason\": \"Vente en magasin\",\n  \"reference\": \"VENTE-2024-001\"\n}"
+            },
+            "url": "{{baseUrl}}/stock/remove"
+          }
+        },
+        {
+          "name": "[Boutique] Remove Stock (URL)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{boutiqueToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": 5,\n  \"reason\": \"Vente en magasin\"\n}"
+            },
+            "url": "{{baseUrl}}/stock/{{productId}}/remove"
+          }
+        },
+        {
+          "name": "[Boutique] Adjust Stock (body)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{boutiqueToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"newStock\": 45,\n  \"reason\": \"Inventaire mensuel - correction\",\n  \"reference\": \"INV-2024-01\"\n}"
+            },
+            "url": "{{baseUrl}}/stock/adjust"
+          }
+        },
+        {
+          "name": "[Boutique] Adjust Stock (URL)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{boutiqueToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"newStock\": 45,\n  \"reason\": \"Inventaire mensuel\"\n}"
+            },
+            "url": "{{baseUrl}}/stock/{{productId}}/adjust"
+          }
+        },
+        {
+          "name": "[Boutique] Set Initial Stock",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{boutiqueToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stock\": 100,\n  \"reason\": \"Stock initial du produit\"\n}"
+            },
+            "url": "{{baseUrl}}/stock/{{productId}}/initial"
+          }
+        },
+        {
+          "name": "[Boutique] Get Product History",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{boutiqueToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stock/{{productId}}/history?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["stock", "{{productId}}", "history"],
+              "query": [
+                {"key": "page", "value": "1"},
+                {"key": "limit", "value": "20"}
+              ]
+            }
+          }
+        },
+        {
+          "name": "[Boutique] Get My Boutique Stock",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{boutiqueToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stock/boutique/{{boutiqueId}}?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["stock", "boutique", "{{boutiqueId}}"],
+              "query": [
+                {"key": "page", "value": "1"},
+                {"key": "limit", "value": "20"},
+                {"key": "lowStock", "value": "true", "disabled": true},
+                {"key": "outOfStock", "value": "true", "disabled": true}
+              ]
+            }
+          }
+        },
+        {
+          "name": "[Boutique] Get My Boutique Movements",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{boutiqueToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stock/boutique/{{boutiqueId}}/movements?page=1&limit=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["stock", "boutique", "{{boutiqueId}}", "movements"],
+              "query": [
+                {"key": "page", "value": "1"},
+                {"key": "limit", "value": "50"},
+                {"key": "type", "value": "in", "disabled": true},
+                {"key": "startDate", "value": "2024-01-01", "disabled": true},
+                {"key": "endDate", "value": "2024-12-31", "disabled": true}
+              ]
+            }
+          }
+        },
+        {
+          "name": "[Admin] Get Stock Alerts",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stock/alerts?page=1&limit=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["stock", "alerts"],
+              "query": [
+                {"key": "page", "value": "1"},
+                {"key": "limit", "value": "50"}
+              ]
+            }
+          }
+        },
+        {
+          "name": "[Admin] Get Global Stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/stock/stats"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Events (Admin)",
+      "item": [
+        {
+          "name": "Get All Events (Public)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/events?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["events"],
+              "query": [
+                {"key": "page", "value": "1"},
+                {"key": "limit", "value": "20"},
+                {"key": "status", "value": "published", "disabled": true}
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Featured Events (Public)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/events/featured"
+          }
+        },
+        {
+          "name": "Get Event by ID (Public)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/events/{{eventId}}"
+          }
+        },
+        {
+          "name": "Get Event by Slug (Public)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/events/slug/grande-braderie-noel-2024"
+          }
+        },
+        {
+          "name": "[Admin] Create Event",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    var jsonData = pm.response.json();",
+                  "    if (jsonData.data && jsonData.data.event) {",
+                  "        pm.collectionVariables.set('eventId', jsonData.data.event._id);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Grande Braderie de Noel 2024\",\n  \"description\": \"Profitez de reductions exceptionnelles dans toutes les boutiques\",\n  \"shortDescription\": \"Reductions jusqu'a -70%\",\n  \"startDate\": \"2024-12-15T08:00:00.000Z\",\n  \"endDate\": \"2024-12-24T20:00:00.000Z\",\n  \"image\": \"https://example.com/event-noel.jpg\",\n  \"visibility\": \"public\",\n  \"isFeatured\": true,\n  \"status\": \"draft\"\n}"
+            },
+            "url": "{{baseUrl}}/events"
+          }
+        },
+        {
+          "name": "[Admin] Update Event",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Grande Braderie de Noel 2024 - Prolongation\",\n  \"endDate\": \"2024-12-31T20:00:00.000Z\",\n  \"status\": \"published\"\n}"
+            },
+            "url": "{{baseUrl}}/events/{{eventId}}"
+          }
+        },
+        {
+          "name": "[Admin] Publish Event",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/events/{{eventId}}/publish"
+          }
+        },
+        {
+          "name": "[Admin] Cancel Event",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/events/{{eventId}}/cancel"
+          }
+        },
+        {
+          "name": "[Admin] Delete Event",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/events/{{eventId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Cart (Acheteur)",
+      "item": [
+        {
+          "name": "[Acheteur] Get My Cart",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acheteurToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/cart"
+          }
+        },
+        {
+          "name": "[Acheteur] Get Cart Summary",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acheteurToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/cart/summary"
+          }
+        },
+        {
+          "name": "[Acheteur] Validate Cart",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acheteurToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/cart/validate"
+          }
+        },
+        {
+          "name": "[Acheteur] Add Item to Cart",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acheteurToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"quantity\": 2\n}"
+            },
+            "url": "{{baseUrl}}/cart/items"
+          }
+        },
+        {
+          "name": "[Acheteur] Update Cart Item Quantity",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acheteurToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": 3\n}"
+            },
+            "url": "{{baseUrl}}/cart/items/{{productId}}"
+          }
+        },
+        {
+          "name": "[Acheteur] Remove Item from Cart",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acheteurToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/cart/items/{{productId}}"
+          }
+        },
+        {
+          "name": "[Acheteur] Clear Cart",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acheteurToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/cart"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Orders",
+      "item": [
+        {
+          "name": "Acheteur",
+          "item": [
+            {
+              "name": "[Acheteur] Create Order",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.code === 201) {",
+                      "    var jsonData = pm.response.json();",
+                      "    if (jsonData.data && jsonData.data.order) {",
+                      "        pm.collectionVariables.set('orderId', jsonData.data.order._id);",
+                      "        pm.collectionVariables.set('orderReference', jsonData.data.order.orderReference);",
+                      "    }",
+                      "}"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{acheteurToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"shippingAddress\": {\n    \"street\": \"123 Rue Principale\",\n    \"city\": \"Antananarivo\",\n    \"postalCode\": \"101\",\n    \"country\": \"Madagascar\"\n  },\n  \"paymentMethod\": \"mvola\",\n  \"customerNotes\": \"Livraison le matin de preference\"\n}"
+                },
+                "url": "{{baseUrl}}/orders"
+              }
+            },
+            {
+              "name": "[Acheteur] Get My Orders",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{acheteurToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/orders/my-orders?page=1&limit=10",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["orders", "my-orders"],
+                  "query": [
+                    {"key": "page", "value": "1"},
+                    {"key": "limit", "value": "10"},
+                    {"key": "status", "value": "pending", "disabled": true}
+                  ]
+                }
+              }
+            },
+            {
+              "name": "[Acheteur] Get Order by ID",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{acheteurToken}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/orders/{{orderId}}"
+              }
+            },
+            {
+              "name": "[Acheteur] Get Order by Reference",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{acheteurToken}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/orders/reference/{{orderReference}}"
+              }
+            },
+            {
+              "name": "[Acheteur] Cancel Order",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{acheteurToken}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/orders/{{orderId}}/cancel"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Boutique",
+          "item": [
+            {
+              "name": "[Boutique] Get My Boutique Orders",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{boutiqueToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/orders/boutique?page=1&limit=20",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["orders", "boutique"],
+                  "query": [
+                    {"key": "page", "value": "1"},
+                    {"key": "limit", "value": "20"},
+                    {"key": "status", "value": "pending", "disabled": true},
+                    {"key": "paymentStatus", "value": "success", "disabled": true}
+                  ]
+                }
+              }
+            },
+            {
+              "name": "[Boutique] Get Boutique Order by ID",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{boutiqueToken}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/orders/boutique/{{orderId}}"
+              }
+            },
+            {
+              "name": "[Boutique] Get Boutique Order Stats",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{boutiqueToken}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/orders/boutique/stats"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin",
+          "item": [
+            {
+              "name": "[Admin] Get All Orders",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/orders/admin?page=1&limit=50",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["orders", "admin"],
+                  "query": [
+                    {"key": "page", "value": "1"},
+                    {"key": "limit", "value": "50"},
+                    {"key": "status", "value": "", "disabled": true},
+                    {"key": "paymentStatus", "value": "", "disabled": true},
+                    {"key": "search", "value": "", "disabled": true}
+                  ]
+                }
+              }
+            },
+            {
+              "name": "[Admin] Get Order Stats",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/orders/admin/stats",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["orders", "admin", "stats"],
+                  "query": [
+                    {"key": "startDate", "value": "2024-01-01", "disabled": true},
+                    {"key": "endDate", "value": "2024-12-31", "disabled": true}
+                  ]
+                }
+              }
+            },
+            {
+              "name": "[Admin] Update Order Status",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"confirmed\",\n  \"trackingNumber\": \"TRK-123456\",\n  \"carrier\": \"DHL\",\n  \"adminNotes\": \"Commande confirmee et en preparation\"\n}"
+                },
+                "url": "{{baseUrl}}/orders/admin/{{orderId}}/status"
+              }
+            },
+            {
+              "name": "[Admin] Expire Pending Orders",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/orders/admin/expire-pending"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Payments",
+      "item": [
+        {
+          "name": "Public",
+          "item": [
+            {
+              "name": "Get Payment Methods",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/payments/methods?location=MG",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["payments", "methods"],
+                  "query": [
+                    {"key": "location", "value": "MG"}
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Payment Webhook",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"reference\": \"{{paymentReference}}\",\n  \"status\": \"SUCCESS\",\n  \"providerReference\": \"PROV-123456\",\n  \"providerData\": {\n    \"message\": \"Payment successful\"\n  }\n}"
+                },
+                "url": "{{baseUrl}}/payments/webhook"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Acheteur",
+          "item": [
+            {
+              "name": "[Acheteur] Initialize Payment",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.code === 201 || pm.response.code === 200) {",
+                      "    var jsonData = pm.response.json();",
+                      "    if (jsonData.data && jsonData.data.payment) {",
+                      "        pm.collectionVariables.set('paymentReference', jsonData.data.payment.reference);",
+                      "    }",
+                      "}"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{acheteurToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"orderId\": \"{{orderId}}\",\n  \"paymentMethod\": \"mvola\"\n}"
+                },
+                "url": "{{baseUrl}}/payments/initialize"
+              }
+            },
+            {
+              "name": "[Acheteur] Get Payment Status",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{acheteurToken}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/payments/{{paymentReference}}"
+              }
+            },
+            {
+              "name": "[Acheteur] Get Payment History",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{acheteurToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/payments/history?page=1&limit=20",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["payments", "history"],
+                  "query": [
+                    {"key": "page", "value": "1"},
+                    {"key": "limit", "value": "20"},
+                    {"key": "status", "value": "success", "disabled": true}
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin",
+          "item": [
+            {
+              "name": "[Admin] Get All Payments",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/payments/admin/all?page=1&limit=50",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["payments", "admin", "all"],
+                  "query": [
+                    {"key": "page", "value": "1"},
+                    {"key": "limit", "value": "50"},
+                    {"key": "status", "value": "", "disabled": true},
+                    {"key": "paymentMethod", "value": "", "disabled": true},
+                    {"key": "search", "value": "", "disabled": true}
+                  ]
+                }
+              }
+            },
+            {
+              "name": "[Admin] Get Payment Stats",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/payments/admin/stats",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["payments", "admin", "stats"],
+                  "query": [
+                    {"key": "startDate", "value": "2024-01-01", "disabled": true},
+                    {"key": "endDate", "value": "2024-12-31", "disabled": true}
+                  ]
+                }
+              }
+            },
+            {
+              "name": "[Admin] Confirm Payment",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"providerReference\": \"MANUAL-CONFIRM-123\",\n  \"notes\": \"Paiement confirme manuellement\"\n}"
+                },
+                "url": "{{baseUrl}}/payments/{{paymentReference}}/confirm"
+              }
+            },
+            {
+              "name": "[Admin] Fail Payment",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"reason\": \"Paiement rejete - fonds insuffisants\"\n}"
+                },
+                "url": "{{baseUrl}}/payments/{{paymentReference}}/fail"
+              }
+            },
+            {
+              "name": "[Admin] Refund Payment",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"amount\": 25000,\n  \"reason\": \"Remboursement suite a annulation\"\n}"
+                },
+                "url": "{{baseUrl}}/payments/{{paymentReference}}/refund"
+              }
+            },
+            {
+              "name": "[Admin] Expire Pending Payments",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/payments/admin/expire-pending"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Boutiques",
+      "item": [
+        {
+          "name": "Public",
+          "item": [
+            {
+              "name": "Get All Boutiques",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.code === 200) {",
+                      "    var jsonData = pm.response.json();",
+                      "    if (jsonData.data && jsonData.data.boutiques && jsonData.data.boutiques.length > 0) {",
+                      "        pm.collectionVariables.set('boutiqueId', jsonData.data.boutiques[0]._id);",
+                      "    }",
+                      "}"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/boutiques?page=1&limit=20",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["boutiques"],
+                  "query": [
+                    {"key": "page", "value": "1"},
+                    {"key": "limit", "value": "20"},
+                    {"key": "status", "value": "active", "disabled": true}
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Get Boutique by ID",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/boutiques/{{boutiqueId}}"
+              }
+            },
+            {
+              "name": "Get Boutique by Slug",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/boutiques/slug/ma-boutique"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Boutique Owner",
+          "item": [
+            {
+              "name": "[Boutique] Create Boutique",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.code === 201) {",
+                      "    var jsonData = pm.response.json();",
+                      "    if (jsonData.data && jsonData.data.boutique) {",
+                      "        pm.collectionVariables.set('boutiqueId', jsonData.data.boutique._id);",
+                      "    }",
+                      "}"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{boutiqueToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Ma Nouvelle Boutique\",\n  \"description\": \"Description de ma boutique\",\n  \"shortDescription\": \"Courte description\",\n  \"logo\": \"https://example.com/logo.png\",\n  \"contact\": {\n    \"email\": \"boutique@example.com\",\n    \"phone\": \"+261 34 00 000 00\"\n  },\n  \"location\": {\n    \"floor\": \"1er etage\",\n    \"zone\": \"Zone A\",\n    \"mapCoordinates\": \"A1-15\"\n  }\n}"
+                },
+                "url": "{{baseUrl}}/boutiques"
+              }
+            },
+            {
+              "name": "[Boutique] Update Boutique",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{boutiqueToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Ma Boutique Mise a Jour\",\n  \"description\": \"Nouvelle description\"\n}"
+                },
+                "url": "{{baseUrl}}/boutiques/{{boutiqueId}}"
+              }
+            },
+            {
+              "name": "[Boutique] Delete Boutique",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{boutiqueToken}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/boutiques/{{boutiqueId}}"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Categories (Admin)",
+      "item": [
+        {
+          "name": "Get All Categories (Public)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    if (jsonData.data && jsonData.data.categories && jsonData.data.categories.length > 0) {",
+                  "        pm.collectionVariables.set('categoryId', jsonData.data.categories[0]._id);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/categories"
+          }
+        },
+        {
+          "name": "Get Category by ID (Public)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/categories/{{categoryId}}"
+          }
+        },
+        {
+          "name": "[Admin] Create Category",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    var jsonData = pm.response.json();",
+                  "    if (jsonData.data && jsonData.data.category) {",
+                  "        pm.collectionVariables.set('categoryId', jsonData.data.category._id);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Mode\",\n  \"description\": \"Vetements et accessoires de mode\",\n  \"icon\": \"fashion\"\n}"
+            },
+            "url": "{{baseUrl}}/categories"
+          }
+        },
+        {
+          "name": "[Admin] Update Category",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Mode & Accessoires\",\n  \"description\": \"Vetements, chaussures et accessoires\"\n}"
+            },
+            "url": "{{baseUrl}}/categories/{{categoryId}}"
+          }
+        },
+        {
+          "name": "[Admin] Delete Category",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/categories/{{categoryId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reviews",
+      "item": [
+        {
+          "name": "Get Boutique Reviews (Public)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    if (jsonData.data && jsonData.data.reviews && jsonData.data.reviews.length > 0) {",
+                  "        pm.collectionVariables.set('reviewId', jsonData.data.reviews[0]._id);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/reviews/boutique/{{boutiqueId}}?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["reviews", "boutique", "{{boutiqueId}}"],
+              "query": [
+                {"key": "page", "value": "1"},
+                {"key": "limit", "value": "20"}
+              ]
+            }
+          }
+        },
+        {
+          "name": "[Acheteur] Create Review",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    var jsonData = pm.response.json();",
+                  "    if (jsonData.data && jsonData.data.review) {",
+                  "        pm.collectionVariables.set('reviewId', jsonData.data.review._id);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acheteurToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"boutiqueId\": \"{{boutiqueId}}\",\n  \"rating\": 5,\n  \"comment\": \"Excellente boutique, service impeccable!\"\n}"
+            },
+            "url": "{{baseUrl}}/reviews"
+          }
+        },
+        {
+          "name": "[Acheteur] Update Review",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acheteurToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rating\": 4,\n  \"comment\": \"Tres bonne boutique\"\n}"
+            },
+            "url": "{{baseUrl}}/reviews/{{reviewId}}"
+          }
+        },
+        {
+          "name": "[Acheteur] Delete Review",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acheteurToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/reviews/{{reviewId}}"
+          }
+        },
+        {
+          "name": "[Acheteur] Report Review",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acheteurToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Contenu inapproprie\"\n}"
+            },
+            "url": "{{baseUrl}}/reviews/{{reviewId}}/report"
+          }
+        }
+      ]
+    }
+  ]
+}

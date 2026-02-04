@@ -556,3 +556,241 @@ exports.verifyToken = asyncHandler(async (req, res, next) => {
     data: { user: req.user }
   });
 });
+
+/**
+ * @desc    Get all users (with optional filters)
+ * @route   GET /api/auth/users
+ * @access  Private (Admin only)
+ */
+exports.getAllUsers = asyncHandler(async (req, res, next) => {
+  const { status, role, search, page = 1, limit = 20 } = req.query;
+
+  // Build filter
+  const filter = {};
+
+  if (status) {
+    filter.status = status;
+  }
+
+  if (role) {
+    filter.role = role;
+  }
+
+  if (search) {
+    filter.$or = [
+      { firstName: { $regex: search, $options: 'i' } },
+      { lastName: { $regex: search, $options: 'i' } },
+      { email: { $regex: search, $options: 'i' } }
+    ];
+  }
+
+  const skip = (parseInt(page) - 1) * parseInt(limit);
+
+  const [users, total] = await Promise.all([
+    User.find(filter)
+      .select('-password')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit)),
+    User.countDocuments(filter)
+  ]);
+
+  res.status(200).json({
+    success: true,
+    data: {
+      users,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / parseInt(limit))
+      }
+    }
+  });
+});
+
+/**
+ * @desc    Get pending users (boutiques awaiting approval)
+ * @route   GET /api/auth/users/pending
+ * @access  Private (Admin only)
+ */
+exports.getPendingUsers = asyncHandler(async (req, res, next) => {
+  const users = await User.find({
+    status: 'pending',
+    isEmailVerified: true
+  })
+    .select('-password')
+    .sort({ createdAt: -1 });
+
+  res.status(200).json({
+    success: true,
+    count: users.length,
+    data: { users }
+  });
+});
+
+/**
+ * @desc    Update user status (approve, reject, block, activate)
+ * @route   PATCH /api/auth/users/:userId/status
+ * @access  Private (Admin only)
+ */
+exports.updateUserStatus = asyncHandler(async (req, res, next) => {
+  const { userId } = req.params;
+  const { status, reason } = req.body;
+
+  const validStatuses = ['active', 'inactive', 'blocked', 'pending'];
+  if (!validStatuses.includes(status)) {
+    return next(new ApiError(400, `Invalid status. Must be one of: ${validStatuses.join(', ')}`));
+  }
+
+  const user = await User.findById(userId);
+
+  if (!user) {
+    return next(new ApiError(404, 'User not found'));
+  }
+
+  // Prevent admin from changing their own status
+  if (user._id.toString() === req.user._id.toString()) {
+    return next(new ApiError(400, 'You cannot change your own status'));
+  }
+
+  const previousStatus = user.status;
+  user.status = status;
+
+  // If rejecting/blocking, optionally store the reason
+  if ((status === 'blocked' || status === 'inactive') && reason) {
+    user.statusReason = reason;
+  }
+
+  await user.save({ validateBeforeSave: false });
+
+  res.status(200).json({
+    success: true,
+    message: `User status updated from '${previousStatus}' to '${status}'`,
+    data: { user }
+  });
+});
+
+/**
+ * @desc    Approve a boutique account
+ * @route   PATCH /api/auth/users/:userId/approve
+ * @access  Private (Admin only)
+ */
+exports.approveUser = asyncHandler(async (req, res, next) => {
+  const { userId } = req.params;
+
+  const user = await User.findById(userId);
+
+  if (!user) {
+    return next(new ApiError(404, 'User not found'));
+  }
+
+  if (user.status === 'active') {
+    return next(new ApiError(400, 'User is already active'));
+  }
+
+  if (!user.isEmailVerified) {
+    return next(new ApiError(400, 'User has not verified their email yet'));
+  }
+
+  user.status = 'active';
+  user.statusReason = undefined;
+  await user.save({ validateBeforeSave: false });
+
+  res.status(200).json({
+    success: true,
+    message: 'User approved successfully',
+    data: { user }
+  });
+});
+
+/**
+ * @desc    Reject a boutique account
+ * @route   PATCH /api/auth/users/:userId/reject
+ * @access  Private (Admin only)
+ */
+exports.rejectUser = asyncHandler(async (req, res, next) => {
+  const { userId } = req.params;
+  const { reason } = req.body;
+
+  const user = await User.findById(userId);
+
+  if (!user) {
+    return next(new ApiError(404, 'User not found'));
+  }
+
+  user.status = 'inactive';
+  user.statusReason = reason || 'Account rejected by administrator';
+  await user.save({ validateBeforeSave: false });
+
+  res.status(200).json({
+    success: true,
+    message: 'User rejected successfully',
+    data: { user }
+  });
+});
+
+/**
+ * @desc    Block a user account
+ * @route   PATCH /api/auth/users/:userId/block
+ * @access  Private (Admin only)
+ */
+exports.blockUser = asyncHandler(async (req, res, next) => {
+  const { userId } = req.params;
+  const { reason } = req.body;
+
+  const user = await User.findById(userId);
+
+  if (!user) {
+    return next(new ApiError(404, 'User not found'));
+  }
+
+  // Prevent admin from blocking themselves
+  if (user._id.toString() === req.user._id.toString()) {
+    return next(new ApiError(400, 'You cannot block your own account'));
+  }
+
+  // Prevent blocking other admins
+  if (user.role === 'admin') {
+    return next(new ApiError(400, 'Cannot block an admin account'));
+  }
+
+  user.status = 'blocked';
+  user.statusReason = reason || 'Account blocked by administrator';
+  await user.save({ validateBeforeSave: false });
+
+  res.status(200).json({
+    success: true,
+    message: 'User blocked successfully',
+    data: { user }
+  });
+});
+
+/**
+ * @desc    Unblock a user account
+ * @route   PATCH /api/auth/users/:userId/unblock
+ * @access  Private (Admin only)
+ */
+exports.unblockUser = asyncHandler(async (req, res, next) => {
+  const { userId } = req.params;
+
+  const user = await User.findById(userId);
+
+  if (!user) {
+    return next(new ApiError(404, 'User not found'));
+  }
+
+  if (user.status !== 'blocked') {
+    return next(new ApiError(400, 'User is not blocked'));
+  }
+
+  user.status = 'active';
+  user.statusReason = undefined;
+  await user.save({ validateBeforeSave: false });
+
+  res.status(200).json({
+    success: true,
+    message: 'User unblocked successfully',
+    data: { user }
+  });
+});

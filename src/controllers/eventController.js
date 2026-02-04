@@ -153,3 +153,159 @@ exports.delete = asyncHandler(async (req, res, next) => {
     message: 'Event deleted successfully'
   });
 });
+
+/**
+ * @desc    Update event statuses (cron job endpoint)
+ * @route   POST /api/events/update-statuses
+ * @access  Private (Admin only)
+ */
+exports.updateStatuses = asyncHandler(async (req, res) => {
+  await Event.updateStatuses();
+
+  res.status(200).json({
+    success: true,
+    message: 'Event statuses updated successfully'
+  });
+});
+
+/**
+ * @desc    Get upcoming events
+ * @route   GET /api/events/upcoming
+ * @access  Public
+ */
+exports.getUpcoming = asyncHandler(async (req, res) => {
+  const { limit = 5 } = req.query;
+  const now = new Date();
+
+  const events = await Event.find({
+    status: 'published',
+    visibility: 'public',
+    startDate: { $gte: now }
+  })
+    .sort('startDate')
+    .limit(parseInt(limit))
+    .lean();
+
+  res.status(200).json({
+    success: true,
+    data: events
+  });
+});
+
+/**
+ * @desc    Get current/ongoing events
+ * @route   GET /api/events/current
+ * @access  Public
+ */
+exports.getCurrent = asyncHandler(async (req, res) => {
+  const { limit = 10 } = req.query;
+  const now = new Date();
+
+  const events = await Event.find({
+    status: 'published',
+    visibility: 'public',
+    startDate: { $lte: now },
+    endDate: { $gte: now }
+  })
+    .sort('-startDate')
+    .limit(parseInt(limit))
+    .lean();
+
+  res.status(200).json({
+    success: true,
+    data: events
+  });
+});
+
+/**
+ * @desc    Publish event (admin only)
+ * @route   PATCH /api/events/:id/publish
+ * @access  Private (admin)
+ */
+exports.publish = asyncHandler(async (req, res, next) => {
+  const event = await Event.findById(req.params.id);
+
+  if (!event) {
+    return next(new ApiError(404, 'Event not found'));
+  }
+
+  if (event.status === 'published') {
+    return next(new ApiError(400, 'Event is already published'));
+  }
+
+  if (event.status === 'cancelled') {
+    return next(new ApiError(400, 'Cannot publish a cancelled event'));
+  }
+
+  if (event.status === 'ended') {
+    return next(new ApiError(400, 'Cannot publish an ended event'));
+  }
+
+  event.status = 'published';
+  await event.save();
+
+  await event.populate('createdBy', 'firstName lastName email');
+
+  res.status(200).json({
+    success: true,
+    message: 'Event published successfully',
+    data: { event }
+  });
+});
+
+/**
+ * @desc    Cancel event (admin only)
+ * @route   PATCH /api/events/:id/cancel
+ * @access  Private (admin)
+ */
+exports.cancel = asyncHandler(async (req, res, next) => {
+  const event = await Event.findById(req.params.id);
+
+  if (!event) {
+    return next(new ApiError(404, 'Event not found'));
+  }
+
+  if (event.status === 'cancelled') {
+    return next(new ApiError(400, 'Event is already cancelled'));
+  }
+
+  if (event.status === 'ended') {
+    return next(new ApiError(400, 'Cannot cancel an ended event'));
+  }
+
+  event.status = 'cancelled';
+  await event.save();
+
+  await event.populate('createdBy', 'firstName lastName email');
+
+  res.status(200).json({
+    success: true,
+    message: 'Event cancelled successfully',
+    data: { event }
+  });
+});
+
+/**
+ * @desc    Get featured events
+ * @route   GET /api/events/featured
+ * @access  Public
+ */
+exports.getFeatured = asyncHandler(async (req, res) => {
+  const { limit = 5 } = req.query;
+  const now = new Date();
+
+  const events = await Event.find({
+    status: 'published',
+    visibility: 'public',
+    isFeatured: true,
+    endDate: { $gte: now }
+  })
+    .sort('-startDate')
+    .limit(parseInt(limit))
+    .lean();
+
+  res.status(200).json({
+    success: true,
+    data: { events }
+  });
+});

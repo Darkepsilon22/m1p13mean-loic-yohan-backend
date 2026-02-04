@@ -73,22 +73,49 @@ eventSchema.index({ visibility: 1 });
 eventSchema.index({ startDate: 1, endDate: 1 });
 eventSchema.index({ isFeatured: -1 });
 
-eventSchema.pre('validate', function(next) {
+eventSchema.pre('validate', function() {
+  // Generate slug from title if not provided
+  if (this.title && (!this.slug || this.slug === '')) {
+    this.slug = slugify(this.title, { lower: true, strict: true });
+  }
+
+  // Validate dates
   if (this.startDate && this.endDate && this.endDate < this.startDate) {
-    next(new Error('End date must be after start date'));
-  } else {
-    next();
+    throw new Error('End date must be after start date');
   }
 });
 
-eventSchema.pre('save', function(next) {
-  if (this.isModified('title') && this.title && (!this.slug || this.slug === '')) {
-    this.slug = slugify(this.title, { lower: true, strict: true });
-  }
-  if (this.isModified('title') && this.title && this.slug === '') {
-    this.slug = slugify(this.title, { lower: true, strict: true });
-  }
-  next();
-});
+// Static method to update event statuses (called by cron job)
+eventSchema.statics.updateStatuses = async function() {
+  const now = new Date();
+
+  // Publish draft events that have started
+  await this.updateMany(
+    {
+      status: 'draft',
+      startDate: { $lte: now },
+      endDate: { $gt: now }
+    },
+    { status: 'published' }
+  );
+
+  // End published events that have expired
+  await this.updateMany(
+    {
+      status: 'published',
+      endDate: { $lte: now }
+    },
+    { status: 'ended' }
+  );
+
+  // Also end draft events that have passed without being published
+  await this.updateMany(
+    {
+      status: 'draft',
+      endDate: { $lte: now }
+    },
+    { status: 'ended' }
+  );
+};
 
 module.exports = mongoose.model('Event', eventSchema);
