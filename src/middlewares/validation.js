@@ -128,6 +128,50 @@ const updateProfileValidation = [
 ];
 
 /**
+ * Validation for forgot password (request reset link)
+ */
+const forgotPasswordValidation = [
+  body('email')
+    .isEmail()
+    .withMessage('Please provide a valid email address')
+    .normalizeEmail()
+    .toLowerCase(),
+
+  handleValidationErrors
+];
+
+/**
+ * Validation for reset password (with token from email)
+ */
+const resetPasswordValidation = [
+  body('token')
+    .notEmpty()
+    .withMessage('Reset token is required'),
+
+  body('newPassword')
+    .isLength({ min: 8 })
+    .withMessage('New password must be at least 8 characters long')
+    .matches(/[a-z]/)
+    .withMessage('New password must contain at least one lowercase letter')
+    .matches(/[A-Z]/)
+    .withMessage('New password must contain at least one uppercase letter')
+    .matches(/[0-9]/)
+    .withMessage('New password must contain at least one number'),
+
+  body('confirmPassword')
+    .notEmpty()
+    .withMessage('Password confirmation is required')
+    .custom((value, { req }) => {
+      if (value !== req.body.newPassword) {
+        throw new Error('Password confirmation does not match');
+      }
+      return true;
+    }),
+
+  handleValidationErrors
+];
+
+/**
  * Validation rules for password change
  */
 const changePasswordValidation = [
@@ -204,6 +248,8 @@ module.exports = {
   registerValidation,
   loginValidation,
   updateProfileValidation,
+  forgotPasswordValidation,
+  resetPasswordValidation,
   changePasswordValidation,
   validateObjectId,
   paginationValidation

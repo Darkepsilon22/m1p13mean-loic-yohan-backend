@@ -191,6 +191,59 @@ const sendVerificationEmail = async (email, firstName, verificationToken) => {
 };
 
 /**
+ * Send password reset link
+ * @param {string} email - User email
+ * @param {string} firstName - User first name
+ * @param {string} resetToken - Reset token (raw, will be in URL)
+ */
+const sendPasswordResetEmail = async (email, firstName, resetToken) => {
+  const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:4200'}/auth/reset-password?token=${resetToken}`;
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>${emailStyles}</style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="card">
+          <div class="header">
+            <h1>Centre Commercial</h1>
+            <p>Reinitialisation du mot de passe</p>
+          </div>
+          <div class="content">
+            <h2>Bonjour ${firstName},</h2>
+            <p>Vous avez demande a reinitialiser le mot de passe de votre compte. Cliquez sur le bouton ci-dessous pour definir un nouveau mot de passe:</p>
+            <center>
+              <a href="${resetUrl}" class="button">Reinitialiser mon mot de passe</a>
+            </center>
+            <p>Ou copiez ce lien dans votre navigateur:</p>
+            <p class="link">${resetUrl}</p>
+            <div class="info-box">
+              <strong>Important:</strong> Ce lien expire dans 1 heure.
+            </div>
+            <p>Si vous n'avez pas demande cette reinitialisation, vous pouvez ignorer cet email. Votre mot de passe restera inchange.</p>
+          </div>
+          <div class="footer">
+            <p>${new Date().getFullYear()} Centre Commercial. Tous droits reserves.</p>
+          </div>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  await sendEmail({
+    to: email,
+    subject: 'Reinitialisation du mot de passe - Centre Commercial',
+    html
+  });
+};
+
+/**
  * Send OTP for login
  * @param {string} email - User email
  * @param {string} firstName - User first name
@@ -854,6 +907,7 @@ const sendPendingApprovalEmail = async (email, firstName) => {
 module.exports = {
   sendEmail,
   sendVerificationEmail,
+  sendPasswordResetEmail,
   sendOTPEmail,
   sendWelcomeEmail,
   sendInvoiceEmail,
