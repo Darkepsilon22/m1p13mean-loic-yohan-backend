@@ -7,6 +7,8 @@ const {
   registerValidation,
   loginValidation,
   updateProfileValidation,
+  forgotPasswordValidation,
+  resetPasswordValidation,
   changePasswordValidation,
   validateObjectId
 } = require('../middlewares/validation');
@@ -18,6 +20,10 @@ router.post('/login', loginValidation, authController.login);
 // Email verification routes (public)
 router.get('/verify-email/:token', authController.verifyEmail);
 router.post('/resend-verification', authController.resendVerification);
+
+// Password reset routes (public)
+router.post('/forgot-password', forgotPasswordValidation, authController.forgotPassword);
+router.post('/reset-password', resetPasswordValidation, authController.resetPassword);
 
 // OTP verification routes (public)
 router.post('/verify-otp', authController.verifyOTP);

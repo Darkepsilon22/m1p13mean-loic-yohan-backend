@@ -82,6 +82,16 @@ const userSchema = new mongoose.Schema({
     default: 0
   },
 
+  // Password reset (forgot password)
+  resetPasswordToken: {
+    type: String,
+    default: null
+  },
+  resetPasswordExpires: {
+    type: Date,
+    default: null
+  },
+
   // Login security fields
   loginAttempts: {
     type: Number,
@@ -103,6 +113,7 @@ const userSchema = new mongoose.Schema({
 userSchema.index({ role: 1 });
 userSchema.index({ status: 1 });
 userSchema.index({ emailVerificationToken: 1 });
+userSchema.index({ resetPasswordToken: 1 });
 
 // Virtual for full name
 userSchema.virtual('fullName').get(function() {
@@ -139,6 +150,21 @@ userSchema.methods.generateVerificationToken = function() {
 
   // Token expires in 24 hours
   this.emailVerificationExpires = Date.now() + 24 * 60 * 60 * 1000;
+
+  return token;
+};
+
+// Method to generate password reset token
+userSchema.methods.generateResetPasswordToken = function() {
+  const token = crypto.randomBytes(32).toString('hex');
+
+  this.resetPasswordToken = crypto
+    .createHash('sha256')
+    .update(token)
+    .digest('hex');
+
+  // Token expires in 1 hour
+  this.resetPasswordExpires = Date.now() + 60 * 60 * 1000;
 
   return token;
 };
@@ -216,6 +242,8 @@ userSchema.methods.toJSON = function() {
   delete user.lockUntil;
   delete user.emailVerificationToken;
   delete user.emailVerificationExpires;
+  delete user.resetPasswordToken;
+  delete user.resetPasswordExpires;
   delete user.otp;
   delete user.otpExpires;
   delete user.otpAttempts;

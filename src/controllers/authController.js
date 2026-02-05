@@ -2,7 +2,7 @@ const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { ApiError, asyncHandler } = require('../middlewares/errorHandler');
-const { sendVerificationEmail, sendOTPEmail, sendWelcomeEmail, sendApprovalEmail, sendRejectionEmail, sendPendingApprovalEmail } = require('../services/emailService');
+const { sendVerificationEmail, sendPasswordResetEmail, sendOTPEmail, sendWelcomeEmail, sendApprovalEmail, sendRejectionEmail, sendPendingApprovalEmail } = require('../services/emailService');
 
 /**
  * Generate JWT Token
@@ -234,6 +234,84 @@ exports.resendVerification = asyncHandler(async (req, res, next) => {
   res.status(200).json({
     success: true,
     message: 'Verification email sent successfully'
+  });
+});
+
+/**
+ * @desc    Forgot password - send reset link by email
+ * @route   POST /api/auth/forgot-password
+ * @access  Public
+ */
+exports.forgotPassword = asyncHandler(async (req, res, next) => {
+  const { email } = req.body;
+
+  const user = await User.findOne({ email: email.toLowerCase() });
+
+  // Always return success to avoid revealing whether email exists
+  if (!user) {
+    return res.status(200).json({
+      success: true,
+      message: 'If an account exists with this email, you will receive a password reset link.'
+    });
+  }
+
+  // Blocked users cannot reset password
+  if (user.status === 'blocked') {
+    return res.status(200).json({
+      success: true,
+      message: 'If an account exists with this email, you will receive a password reset link.'
+    });
+  }
+
+  const resetToken = user.generateResetPasswordToken();
+  await user.save({ validateBeforeSave: false });
+
+  try {
+    await sendPasswordResetEmail(user.email, user.firstName, resetToken);
+  } catch (err) {
+    user.resetPasswordToken = null;
+    user.resetPasswordExpires = null;
+    await user.save({ validateBeforeSave: false });
+    console.error('Password reset email failed:', err);
+    return next(new ApiError(500, 'Failed to send reset email. Please try again later.'));
+  }
+
+  res.status(200).json({
+    success: true,
+    message: 'If an account exists with this email, you will receive a password reset link.'
+  });
+});
+
+/**
+ * @desc    Reset password with token from email
+ * @route   POST /api/auth/reset-password
+ * @access  Public
+ */
+exports.resetPassword = asyncHandler(async (req, res, next) => {
+  const { token, newPassword } = req.body;
+
+  const hashedToken = crypto
+    .createHash('sha256')
+    .update(token)
+    .digest('hex');
+
+  const user = await User.findOne({
+    resetPasswordToken: hashedToken,
+    resetPasswordExpires: { $gt: Date.now() }
+  }).select('+password');
+
+  if (!user) {
+    return next(new ApiError(400, 'Invalid or expired reset token. Please request a new password reset.'));
+  }
+
+  user.password = newPassword;
+  user.resetPasswordToken = null;
+  user.resetPasswordExpires = null;
+  await user.save();
+
+  res.status(200).json({
+    success: true,
+    message: 'Password reset successfully. You can now log in with your new password.'
   });
 });
 
