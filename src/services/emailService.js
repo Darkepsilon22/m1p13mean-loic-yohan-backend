@@ -226,12 +226,12 @@ const sendPasswordResetEmail = async (email, firstName, resetToken) => {
       <div class="container">
         <div class="card">
           <div class="header">
-            <h1>Centre Commercial</h1>
-            <p>Reinitialisation de mot de passe</p>
+            <h1>Reinitialisation du mot de passe</h1>
+            <p>Vous avez demande a reinitialiser votre mot de passe</p>
           </div>
           <div class="content">
             <h2>Bonjour ${firstName},</h2>
-            <p>Nous avons recu une demande de reinitialisation de mot de passe pour votre compte. Cliquez sur le bouton ci-dessous pour definir un nouveau mot de passe:</p>
+            <p>Vous avez demande a reinitialiser votre mot de passe. Cliquez sur le bouton ci-dessous pour creer un nouveau mot de passe:</p>
             <center>
               <a href="${resetUrl}" class="button">Reinitialiser mon mot de passe</a>
             </center>
@@ -240,7 +240,7 @@ const sendPasswordResetEmail = async (email, firstName, resetToken) => {
             <div class="warning-box">
               <strong>Attention:</strong> Ce lien expire dans ${expiresIn} minutes.
             </div>
-            <p>Si vous n'avez pas demande de reinitialisation, ignorez cet email. Votre mot de passe actuel reste inchange.</p>
+            <p>Si vous n'avez pas demande cette reinitialisation, ignorez cet email. Votre mot de passe restera inchange.</p>
           </div>
           <div class="footer">
             <p>${new Date().getFullYear()} Centre Commercial. Tous droits reserves.</p>
@@ -259,13 +259,109 @@ const sendPasswordResetEmail = async (email, firstName, resetToken) => {
 };
 
 /**
+ * Generate invoice PDF
+ * @param {Object} invoiceData - Invoice data
+ * @returns {Promise<Buffer>} PDF buffer
+ */
+const generateInvoicePDF = (invoiceData) => {
+  return new Promise((resolve, reject) => {
+    try {
+      const doc = new PDFDocument({ margin: 50 });
+      const chunks = [];
+
+      doc.on('data', (chunk) => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      // Header
+      doc.fontSize(20).text('FACTURE', { align: 'center' });
+      doc.moveDown();
+
+      // Invoice details
+      doc.fontSize(12);
+      doc.text(`Numero de facture: ${invoiceData.invoiceNumber}`);
+      doc.text(`Date: ${new Date(invoiceData.date).toLocaleDateString('fr-FR')}`);
+      doc.moveDown();
+
+      // Customer info
+      doc.fontSize(14).text('Client:', { underline: true });
+      doc.fontSize(12);
+      doc.text(invoiceData.customerName);
+      doc.text(invoiceData.customerEmail);
+      if (invoiceData.customerAddress) {
+        doc.text(invoiceData.customerAddress);
+      }
+      doc.moveDown();
+
+      // Items table
+      doc.fontSize(14).text('Details de la commande:', { underline: true });
+      doc.moveDown(0.5);
+
+      // Table header
+      const tableTop = doc.y;
+      doc.fontSize(10);
+      doc.text('Description', 50, tableTop, { width: 200 });
+      doc.text('Quantite', 270, tableTop, { width: 80, align: 'right' });
+      doc.text('Prix unitaire', 360, tableTop, { width: 80, align: 'right' });
+      doc.text('Total', 450, tableTop, { width: 100, align: 'right' });
+
+      // Draw line
+      doc.moveTo(50, tableTop + 15).lineTo(550, tableTop + 15).stroke();
+
+      // Table items
+      let yPosition = tableTop + 25;
+      invoiceData.items.forEach((item) => {
+        doc.text(item.description, 50, yPosition, { width: 200 });
+        doc.text(item.quantity.toString(), 270, yPosition, { width: 80, align: 'right' });
+        doc.text(`${item.unitPrice.toFixed(2)} €`, 360, yPosition, { width: 80, align: 'right' });
+        doc.text(`${item.total.toFixed(2)} €`, 450, yPosition, { width: 100, align: 'right' });
+        yPosition += 20;
+      });
+
+      // Draw line before totals
+      doc.moveTo(50, yPosition).lineTo(550, yPosition).stroke();
+      yPosition += 10;
+
+      // Subtotal
+      doc.fontSize(12);
+      doc.text('Sous-total:', 350, yPosition);
+      doc.text(`${invoiceData.subtotal.toFixed(2)} €`, 450, yPosition, { width: 100, align: 'right' });
+      yPosition += 20;
+
+      // Tax
+      if (invoiceData.tax) {
+        doc.text(`TVA (${invoiceData.taxRate}%):`, 350, yPosition);
+        doc.text(`${invoiceData.tax.toFixed(2)} €`, 450, yPosition, { width: 100, align: 'right' });
+        yPosition += 20;
+      }
+
+      // Total
+      doc.fontSize(14).font('Helvetica-Bold');
+      doc.text('Total:', 350, yPosition);
+      doc.text(`${invoiceData.total.toFixed(2)} €`, 450, yPosition, { width: 100, align: 'right' });
+
+      // Footer
+      doc.fontSize(10).font('Helvetica');
+      doc.moveDown(3);
+      doc.text('Merci pour votre achat!', { align: 'center' });
+      doc.text('Centre Commercial', { align: 'center' });
+
+      doc.end();
+    } catch (error) {
+      reject(error);
+    }
+  });
+};
+
+/**
  * Send invoice email with PDF attachment
  * @param {string} email - User email
  * @param {string} firstName - User first name
  * @param {Object} invoiceData - Invoice data
- * @param {Buffer} pdfBuffer - PDF invoice buffer
  */
-const sendInvoiceEmail = async (email, firstName, invoiceData, pdfBuffer) => {
+const sendInvoiceEmail = async (email, firstName, invoiceData) => {
+  const pdfBuffer = await generateInvoicePDF(invoiceData);
+
   const html = `
     <!DOCTYPE html>
     <html>
@@ -278,18 +374,24 @@ const sendInvoiceEmail = async (email, firstName, invoiceData, pdfBuffer) => {
       <div class="container">
         <div class="card">
           <div class="header">
-            <h1>Centre Commercial</h1>
-            <p>Votre facture</p>
+            <h1>Votre Facture</h1>
+            <p>Merci pour votre achat</p>
           </div>
           <div class="content">
             <h2>Bonjour ${firstName},</h2>
-            <p>Merci pour votre achat. Vous trouverez votre facture en piece jointe.</p>
+            <p>Merci pour votre achat chez Centre Commercial. Vous trouverez ci-joint votre facture.</p>
+            
             <div class="info-box">
-              <strong>Facture N°:</strong> ${invoiceData.invoiceNumber}<br>
-              <strong>Date:</strong> ${new Date(invoiceData.date).toLocaleDateString('fr-FR')}<br>
-              <strong>Montant total:</strong> ${invoiceData.totalAmount} Ar
+              <p style="margin: 0;"><strong>Numero de facture:</strong> ${invoiceData.invoiceNumber}</p>
+              <p style="margin: 10px 0 0;"><strong>Date:</strong> ${new Date(invoiceData.date).toLocaleDateString('fr-FR')}</p>
+              <p style="margin: 10px 0 0;"><strong>Montant total:</strong> ${invoiceData.total.toFixed(2)} €</p>
             </div>
-            <p>Pour toute question concernant cette facture, n'hesitez pas a nous contacter.</p>
+
+            <p>Si vous avez des questions concernant cette facture, n'hesitez pas a nous contacter.</p>
+            
+            <center>
+              <a href="${process.env.FRONTEND_URL}/account/orders" class="button">Voir mes commandes</a>
+            </center>
           </div>
           <div class="footer">
             <p>${new Date().getFullYear()} Centre Commercial. Tous droits reserves.</p>
@@ -315,7 +417,7 @@ const sendInvoiceEmail = async (email, firstName, invoiceData, pdfBuffer) => {
 };
 
 /**
- * Send welcome email after email verification
+ * Send welcome email after successful verification
  * @param {string} email - User email
  * @param {string} firstName - User first name
  */
