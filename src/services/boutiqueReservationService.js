@@ -293,7 +293,9 @@ class BoutiqueReservationService {
   }
 
   /**
-   * Annuler une réservation (temporaire ou en attente de validation)
+   * Annuler une réservation (temporaire, en attente de validation OU confirmée)
+   * FIX CRITIQUE: Gérer aussi l'annulation des réservations confirmées (résiliation)
+   * NOUVEAU FIX: Réinitialiser toutes les données utilisateur lors de la résiliation
    */
   static async cancelReservation(boutiqueId, userId, reason = null) {
     const session = await mongoose.startSession();
@@ -306,32 +308,85 @@ class BoutiqueReservationService {
         throw new Error('Boutique non trouvée');
       }
 
-      if (boutique.assignee?.toString() !== userId.toString()) {
+      // FIX: Chercher la réservation active (temporaire, en_attente_validation OU confirmee)
+      const reservation = await ReservationBoutique.findOne({
+        boutique: boutiqueId,
+        user: userId,
+        status: { $in: ['temporaire', 'en_attente_validation', 'confirmee'] }
+      }).session(session);
+
+      if (!reservation) {
+        throw new Error('Aucune réservation active trouvée');
+      }
+
+      // Vérifier que c'est bien l'utilisateur qui possède la réservation
+      if (reservation.user.toString() !== userId.toString()) {
         throw new Error('Cette réservation ne vous appartient pas');
       }
 
-      // Libérer la boutique
+      // FIX CRITIQUE: Libérer complètement la boutique ET réinitialiser les données utilisateur
       boutique.emplacementStatus = 'libre';
       boutique.assignee = null;
+      boutique.userId = null;
       boutique.reservationExpires = null;
+      boutique.name=null;
+      
+      // NOUVEAU: Réinitialiser toutes les données modifiables par l'utilisateur
+      // On garde uniquement les données de base de l'emplacement (créées par l'admin)
+      boutique.slug = null; // Le slug sera regénéré si un nouvel utilisateur prend l'emplacement
+      boutique.description = boutique.shortDescription || 'Emplacement disponible';
+      boutique.shortDescription = boutique.shortDescription || 'Emplacement disponible';
+      boutique.logo = null;
+      boutique.coverImage = null;
+      boutique.photos = [];
+      
+      // Réinitialiser les informations de contact
+      boutique.contact = {
+        phone: '',
+        email: '',
+        website: null,
+        facebook: null,
+        instagram: null
+      };
+      
+      // Réinitialiser les horaires d'ouverture (tous fermés par défaut)
+      boutique.openingHours = [
+        { day: 0, open: null, close: null, isClosed: true },
+        { day: 1, open: null, close: null, isClosed: true },
+        { day: 2, open: null, close: null, isClosed: true },
+        { day: 3, open: null, close: null, isClosed: true },
+        { day: 4, open: null, close: null, isClosed: true },
+        { day: 5, open: null, close: null, isClosed: true },
+        { day: 6, open: null, close: null, isClosed: true }
+      ];
+      
+      // Réinitialiser les statistiques
+      boutique.rating = {
+        average: null,
+        count: 0
+      };
+      boutique.stats = {
+        views: 0,
+        favoritesCount: 0
+      };
+      
+      // Remettre le statut à pending (en attente d'un nouveau locataire)
+      boutique.status = 'pending';
+      boutique.rejectionReason = undefined;
+      
       await boutique.save({ session });
 
-      // Mettre à jour l'historique (temporaire ou en_attente_validation)
-      const reservation = await ReservationBoutique.findOneAndUpdate(
-        { boutique: boutiqueId, user: userId, status: { $in: ['temporaire', 'en_attente_validation'] } },
-        {
-          status: 'annulee',
-          cancelledAt: new Date(),
-          cancellationReason: reason || 'Annulé par l\'utilisateur'
-        },
-        { new: true, session }
-      );
+      // Mettre à jour l'historique
+      reservation.status = 'annulee';
+      reservation.cancelledAt = new Date();
+      reservation.cancellationReason = reason || 'Annulé par l\'utilisateur';
+      await reservation.save({ session });
 
       await session.commitTransaction();
 
       return {
         success: true,
-        message: 'Réservation annulée',
+        message: 'Réservation annulée et emplacement réinitialisé',
         data: { boutique, reservation }
       };
     } catch (error) {
@@ -423,6 +478,7 @@ class BoutiqueReservationService {
     }
 
     const boutiques = await Boutique.find(query)
+      .populate('categoryId', 'name slug')
       .sort({ price: 1 });
 
     return {
@@ -441,22 +497,50 @@ class BoutiqueReservationService {
 
     return {
       success: true,
-      data: reservations
+      data: {
+        reservations
+      }
     };
   }
 
   /**
-   * Obtenir la réservation active d'un utilisateur (temporaire ou en attente)
+   * Obtenir la réservation active d'un utilisateur
+   * FIX CRITIQUE: Ne retourner QUE les réservations avec statut actif (pas annulee, refusee, expiree)
    */
   static async getUserActiveReservation(userId) {
+    // FIX: Filtrer uniquement les statuts actifs
+    const activeStatuses = ['temporaire', 'en_attente_validation', 'confirmee'];
+    
     const reservation = await ReservationBoutique.findOne({
       user: userId,
-      status: { $in: ['temporaire', 'en_attente_validation'] }
-    }).populate('boutique');
+      status: { $in: activeStatuses }  // ← CORRECTION: Filtrer par statuts actifs uniquement
+    })
+    .populate('boutique')
+    .sort({ createdAt: -1 });  // La plus récente en premier
 
+    if (!reservation) {
+      return {
+        success: true,
+        data: null
+      };
+    }
+
+    // Retourner la structure attendue par le frontend
     return {
       success: true,
-      data: reservation
+      data: {
+        reservation: {
+          _id: reservation._id,
+          status: reservation.status,
+          createdAt: reservation.createdAt,
+          expiresAt: reservation.expiresAt,
+          requestedAt: reservation.requestedAt,
+          confirmedAt: reservation.confirmedAt,
+          rejectionReason: reservation.rejectionReason,
+          cancellationReason: reservation.cancellationReason
+        },
+        boutique: reservation.boutique
+      }
     };
   }
 }

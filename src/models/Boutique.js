@@ -25,18 +25,19 @@ const boutiqueSchema = new mongoose.Schema({
   },
   name: {
     type: String,
-    required: [true, 'Name is required'],
+    required: false,
     trim: true
   },
   slug: {
     type: String,
     unique: true,
+    sparse: true, // Permet plusieurs valeurs null/undefined
     lowercase: true,
     trim: true
   },
   description: {
     type: String,
-    required: [true, 'Description is required'],
+    required: false,
     maxlength: [2000, 'Description cannot exceed 2000 characters']
   },
   shortDescription: {
@@ -51,7 +52,7 @@ const boutiqueSchema = new mongoose.Schema({
   },
   logo: {
     type: String,
-    required: [true, 'Logo URL is required'],
+    required: false,
     trim: true
   },
   coverImage: { type: String, trim: true },
@@ -62,12 +63,12 @@ const boutiqueSchema = new mongoose.Schema({
   contact: {
     phone: {
       type: String,
-      required: [true, 'Contact phone is required'],
+      required: false,
       trim: true
     },
     email: {
       type: String,
-      required: [true, 'Contact email is required'],
+      required: false,
       trim: true,
       lowercase: true
     },
