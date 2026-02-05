@@ -40,16 +40,14 @@ const createBoutique = [
     .withMessage('userId must be a valid MongoDB ObjectId'),
 
   body('name')
+    .optional()
     .trim()
-    .notEmpty()
-    .withMessage('Name is required')
     .isLength({ max: 200 })
     .withMessage('Name cannot exceed 200 characters'),
 
   body('description')
+    .optional()
     .trim()
-    .notEmpty()
-    .withMessage('Description is required')
     .isLength({ max: 2000 })
     .withMessage('Description cannot exceed 2000 characters'),
 
@@ -64,9 +62,8 @@ const createBoutique = [
     .withMessage('categoryId must be a valid MongoDB ObjectId'),
 
   body('logo')
-    .trim()
-    .notEmpty()
-    .withMessage('Logo URL is required'),
+    .optional()
+    .trim(),
 
   body('coverImage')
     .optional()
@@ -81,14 +78,12 @@ const createBoutique = [
     .trim(),
 
   body('contact.phone')
-    .trim()
-    .notEmpty()
-    .withMessage('Contact phone is required'),
+    .optional()
+    .trim(),
 
   body('contact.email')
+    .optional()
     .trim()
-    .notEmpty()
-    .withMessage('Contact email is required')
     .isEmail()
     .withMessage('Contact email must be valid'),
 
