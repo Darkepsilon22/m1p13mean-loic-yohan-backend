@@ -259,6 +259,13 @@ const sendPasswordResetEmail = async (email, firstName, resetToken) => {
 };
 
 /**
+ * Format number with space as thousands separator (e.g. 15 000 Ar)
+ */
+const formatMGA = (amount) => {
+  return Math.round(amount).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' Ar';
+};
+
+/**
  * Generate invoice PDF
  * @param {Object} invoiceData - Invoice data
  * @returns {Promise<Buffer>} PDF buffer
@@ -266,85 +273,109 @@ const sendPasswordResetEmail = async (email, firstName, resetToken) => {
 const generateInvoicePDF = (invoiceData) => {
   return new Promise((resolve, reject) => {
     try {
-      const doc = new PDFDocument({ margin: 50 });
+      const doc = new PDFDocument({ margin: 50, size: 'A4' });
       const chunks = [];
 
       doc.on('data', (chunk) => chunks.push(chunk));
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
 
-      // Header
-      doc.fontSize(20).text('FACTURE', { align: 'center' });
-      doc.moveDown();
+      const pageWidth = doc.page.width - 100; // 50 margin each side
 
-      // Invoice details
-      doc.fontSize(12);
-      doc.text(`Numero de facture: ${invoiceData.invoiceNumber}`);
-      doc.text(`Date: ${new Date(invoiceData.date).toLocaleDateString('fr-FR')}`);
-      doc.moveDown();
+      // ===== HEADER =====
+      doc.rect(50, 50, pageWidth, 70).fill('#1a1a1a');
+      doc.fontSize(24).fill('#ffffff').text("Smar'ket", 70, 65, { width: pageWidth - 40 });
+      doc.fontSize(10).fill('#cccccc').text('Centre Commercial en ligne', 70, 95);
+      doc.fontSize(18).fill('#ffffff').text('FACTURE', 350, 72, { width: 180, align: 'right' });
 
-      // Customer info
-      doc.fontSize(14).text('Client:', { underline: true });
-      doc.fontSize(12);
-      doc.text(invoiceData.customerName);
-      doc.text(invoiceData.customerEmail);
+      // ===== INVOICE INFO =====
+      doc.fill('#333333');
+      const infoY = 145;
+      doc.fontSize(10).fill('#888888').text('Numero de facture', 50, infoY);
+      doc.fontSize(11).fill('#1a1a1a').text(invoiceData.invoiceNumber, 50, infoY + 15);
+
+      doc.fontSize(10).fill('#888888').text('Date', 250, infoY);
+      doc.fontSize(11).fill('#1a1a1a').text(new Date(invoiceData.date).toLocaleDateString('fr-FR'), 250, infoY + 15);
+
+      doc.fontSize(10).fill('#888888').text('Statut', 420, infoY);
+      doc.fontSize(11).fill('#28a745').text('PAYEE', 420, infoY + 15);
+
+      // Separator
+      doc.moveTo(50, infoY + 45).lineTo(50 + pageWidth, infoY + 45).lineWidth(0.5).strokeColor('#e0e0e0').stroke();
+
+      // ===== CLIENT INFO =====
+      const clientY = infoY + 60;
+      doc.fontSize(10).fill('#888888').text('Facture a', 50, clientY);
+      doc.fontSize(11).fill('#1a1a1a');
+      doc.text(invoiceData.customerName, 50, clientY + 15);
+      doc.fontSize(10).fill('#555555');
+      doc.text(invoiceData.customerEmail, 50, clientY + 30);
       if (invoiceData.customerAddress) {
-        doc.text(invoiceData.customerAddress);
+        doc.text(invoiceData.customerAddress, 50, clientY + 45);
       }
-      doc.moveDown();
 
-      // Items table
-      doc.fontSize(14).text('Details de la commande:', { underline: true });
-      doc.moveDown(0.5);
+      // ===== TABLE =====
+      const tableTop = clientY + 75;
 
-      // Table header
-      const tableTop = doc.y;
-      doc.fontSize(10);
-      doc.text('Description', 50, tableTop, { width: 200 });
-      doc.text('Quantite', 270, tableTop, { width: 80, align: 'right' });
-      doc.text('Prix unitaire', 360, tableTop, { width: 80, align: 'right' });
-      doc.text('Total', 450, tableTop, { width: 100, align: 'right' });
+      // Table header background
+      doc.rect(50, tableTop, pageWidth, 25).fill('#f5f5f5');
 
-      // Draw line
-      doc.moveTo(50, tableTop + 15).lineTo(550, tableTop + 15).stroke();
+      // Table header text
+      doc.fontSize(9).fill('#666666');
+      doc.text('DESCRIPTION', 60, tableTop + 8, { width: 220 });
+      doc.text('QTE', 290, tableTop + 8, { width: 50, align: 'center' });
+      doc.text('PRIX UNITAIRE', 350, tableTop + 8, { width: 90, align: 'right' });
+      doc.text('TOTAL', 450, tableTop + 8, { width: 90, align: 'right' });
 
       // Table items
-      let yPosition = tableTop + 25;
-      invoiceData.items.forEach((item) => {
-        doc.text(item.description, 50, yPosition, { width: 200 });
-        doc.text(item.quantity.toString(), 270, yPosition, { width: 80, align: 'right' });
-        doc.text(`${item.unitPrice.toFixed(2)} €`, 360, yPosition, { width: 80, align: 'right' });
-        doc.text(`${item.total.toFixed(2)} €`, 450, yPosition, { width: 100, align: 'right' });
-        yPosition += 20;
+      let yPosition = tableTop + 35;
+      doc.fontSize(10).fill('#333333');
+      invoiceData.items.forEach((item, index) => {
+        // Alternate row background
+        if (index % 2 === 1) {
+          doc.rect(50, yPosition - 5, pageWidth, 22).fill('#fafafa');
+          doc.fill('#333333');
+        }
+        doc.text(item.description, 60, yPosition, { width: 220 });
+        doc.text(item.quantity.toString(), 290, yPosition, { width: 50, align: 'center' });
+        doc.text(formatMGA(item.unitPrice), 350, yPosition, { width: 90, align: 'right' });
+        doc.text(formatMGA(item.total), 450, yPosition, { width: 90, align: 'right' });
+        yPosition += 22;
       });
 
-      // Draw line before totals
-      doc.moveTo(50, yPosition).lineTo(550, yPosition).stroke();
-      yPosition += 10;
+      // Line after items
+      doc.moveTo(50, yPosition + 5).lineTo(50 + pageWidth, yPosition + 5).lineWidth(0.5).strokeColor('#e0e0e0').stroke();
+      yPosition += 20;
 
       // Subtotal
-      doc.fontSize(12);
-      doc.text('Sous-total:', 350, yPosition);
-      doc.text(`${invoiceData.subtotal.toFixed(2)} €`, 450, yPosition, { width: 100, align: 'right' });
+      doc.fontSize(10).fill('#666666');
+      doc.text('Sous-total', 350, yPosition, { width: 90, align: 'right' });
+      doc.fill('#333333').text(formatMGA(invoiceData.subtotal), 450, yPosition, { width: 90, align: 'right' });
       yPosition += 20;
 
       // Tax
-      if (invoiceData.tax) {
-        doc.text(`TVA (${invoiceData.taxRate}%):`, 350, yPosition);
-        doc.text(`${invoiceData.tax.toFixed(2)} €`, 450, yPosition, { width: 100, align: 'right' });
+      if (invoiceData.tax > 0) {
+        doc.fill('#666666').text(`TVA (${invoiceData.taxRate}%)`, 350, yPosition, { width: 90, align: 'right' });
+        doc.fill('#333333').text(formatMGA(invoiceData.tax), 450, yPosition, { width: 90, align: 'right' });
         yPosition += 20;
       }
 
-      // Total
-      doc.fontSize(14).font('Helvetica-Bold');
-      doc.text('Total:', 350, yPosition);
-      doc.text(`${invoiceData.total.toFixed(2)} €`, 450, yPosition, { width: 100, align: 'right' });
+      // Total line
+      doc.moveTo(350, yPosition).lineTo(50 + pageWidth, yPosition).lineWidth(1).strokeColor('#1a1a1a').stroke();
+      yPosition += 10;
 
-      // Footer
-      doc.fontSize(10).font('Helvetica');
-      doc.moveDown(3);
-      doc.text('Merci pour votre achat!', { align: 'center' });
-      doc.text('Centre Commercial', { align: 'center' });
+      // Total
+      doc.fontSize(13).font('Helvetica-Bold').fill('#1a1a1a');
+      doc.text('TOTAL', 350, yPosition, { width: 90, align: 'right' });
+      doc.text(formatMGA(invoiceData.total), 450, yPosition, { width: 90, align: 'right' });
+
+      // ===== FOOTER =====
+      doc.font('Helvetica');
+      const footerY = doc.page.height - 100;
+      doc.moveTo(50, footerY).lineTo(50 + pageWidth, footerY).lineWidth(0.5).strokeColor('#e0e0e0').stroke();
+      doc.fontSize(9).fill('#999999');
+      doc.text('Merci pour votre confiance !', 50, footerY + 15, { align: 'center', width: pageWidth });
+      doc.text("Smar'ket - Centre Commercial en ligne | Madagascar", 50, footerY + 30, { align: 'center', width: pageWidth });
 
       doc.end();
     } catch (error) {
@@ -362,6 +393,16 @@ const generateInvoicePDF = (invoiceData) => {
 const sendInvoiceEmail = async (email, firstName, invoiceData) => {
   const pdfBuffer = await generateInvoicePDF(invoiceData);
 
+  // Build items HTML table for email
+  const itemsHtml = invoiceData.items.map(item => `
+    <tr>
+      <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333;">${item.description}</td>
+      <td style="padding: 10px 0; border-bottom: 1px solid #eee; text-align: center; color: #555;">${item.quantity}</td>
+      <td style="padding: 10px 0; border-bottom: 1px solid #eee; text-align: right; color: #555;">${formatMGA(item.unitPrice)}</td>
+      <td style="padding: 10px 0; border-bottom: 1px solid #eee; text-align: right; font-weight: 500; color: #333;">${formatMGA(item.total)}</td>
+    </tr>
+  `).join('');
+
   const html = `
     <!DOCTYPE html>
     <html>
@@ -374,27 +415,65 @@ const sendInvoiceEmail = async (email, firstName, invoiceData) => {
       <div class="container">
         <div class="card">
           <div class="header">
-            <h1>Votre Facture</h1>
-            <p>Merci pour votre achat</p>
+            <h1>Confirmation de paiement</h1>
+            <p>Votre commande a ete payee avec succes</p>
           </div>
           <div class="content">
             <h2>Bonjour ${firstName},</h2>
-            <p>Merci pour votre achat chez Centre Commercial. Vous trouverez ci-joint votre facture.</p>
-            
-            <div class="info-box">
-              <p style="margin: 0;"><strong>Numero de facture:</strong> ${invoiceData.invoiceNumber}</p>
-              <p style="margin: 10px 0 0;"><strong>Date:</strong> ${new Date(invoiceData.date).toLocaleDateString('fr-FR')}</p>
-              <p style="margin: 10px 0 0;"><strong>Montant total:</strong> ${invoiceData.total.toFixed(2)} €</p>
+            <p>Merci pour votre achat. Votre paiement a ete confirme et votre commande est en cours de traitement.</p>
+
+            <div class="success-box">
+              <strong>Paiement confirme</strong>
+              <p style="margin: 5px 0 0; font-size: 13px;">Votre facture est jointe a cet email au format PDF.</p>
             </div>
 
-            <p>Si vous avez des questions concernant cette facture, n'hesitez pas a nous contacter.</p>
-            
+            <table style="width: 100%; margin: 20px 0; font-size: 13px;">
+              <tr>
+                <td style="padding: 5px 0; color: #888;">Numero de facture</td>
+                <td style="padding: 5px 0; text-align: right; font-weight: 500;">${invoiceData.invoiceNumber}</td>
+              </tr>
+              <tr>
+                <td style="padding: 5px 0; color: #888;">Date</td>
+                <td style="padding: 5px 0; text-align: right;">${new Date(invoiceData.date).toLocaleDateString('fr-FR')}</td>
+              </tr>
+              <tr>
+                <td style="padding: 5px 0; color: #888;">Montant total</td>
+                <td style="padding: 5px 0; text-align: right; font-weight: 600; font-size: 15px; color: #1a1a1a;">${formatMGA(invoiceData.total)}</td>
+              </tr>
+            </table>
+
+            <h3 style="font-size: 14px; margin: 25px 0 10px; color: #1a1a1a;">Detail de la commande</h3>
+            <table style="width: 100%; font-size: 12px; border-collapse: collapse;">
+              <thead>
+                <tr style="background: #f8f9fa;">
+                  <th style="padding: 8px; text-align: left; color: #666; font-weight: 500;">Article</th>
+                  <th style="padding: 8px; text-align: center; color: #666; font-weight: 500;">Qte</th>
+                  <th style="padding: 8px; text-align: right; color: #666; font-weight: 500;">Prix</th>
+                  <th style="padding: 8px; text-align: right; color: #666; font-weight: 500;">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${itemsHtml}
+              </tbody>
+            </table>
+
+            <table style="width: 100%; margin-top: 15px; font-size: 13px;">
+              <tr>
+                <td style="padding: 5px 0; color: #888;">Sous-total</td>
+                <td style="padding: 5px 0; text-align: right;">${formatMGA(invoiceData.subtotal)}</td>
+              </tr>
+              <tr style="border-top: 2px solid #1a1a1a;">
+                <td style="padding: 10px 0; font-weight: 600; font-size: 15px;">Total paye</td>
+                <td style="padding: 10px 0; text-align: right; font-weight: 600; font-size: 15px; color: #1a1a1a;">${formatMGA(invoiceData.total)}</td>
+              </tr>
+            </table>
+
             <center>
-              <a href="${process.env.FRONTEND_URL}/account/orders" class="button">Voir mes commandes</a>
+              <a href="${process.env.FRONTEND_URL}/home" class="button">Continuer mes achats</a>
             </center>
           </div>
           <div class="footer">
-            <p>${new Date().getFullYear()} Centre Commercial. Tous droits reserves.</p>
+            <p>${new Date().getFullYear()} Smar'ket. Tous droits reserves.</p>
           </div>
         </div>
       </div>
@@ -404,7 +483,7 @@ const sendInvoiceEmail = async (email, firstName, invoiceData) => {
 
   await sendEmail({
     to: email,
-    subject: `Facture ${invoiceData.invoiceNumber} - Centre Commercial`,
+    subject: `Facture ${invoiceData.invoiceNumber} - Smar'ket`,
     html,
     attachments: [
       {
@@ -642,6 +721,85 @@ const sendPendingApprovalEmail = async (email, firstName) => {
   });
 };
 
+/**
+ * Send low stock alert email to boutique owner
+ * @param {string} email - Boutique owner email
+ * @param {string} firstName - Boutique owner first name
+ * @param {Object} alertData - Alert data
+ * @param {string} alertData.productName - Product name
+ * @param {number} alertData.currentStock - Current stock level
+ * @param {number} alertData.threshold - Low stock threshold
+ * @param {string} alertData.boutiqueName - Boutique name
+ */
+const sendLowStockAlertEmail = async (email, firstName, alertData) => {
+  const isOutOfStock = alertData.currentStock === 0;
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>${emailStyles}</style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="card">
+          <div class="header">
+            <h1>${isOutOfStock ? 'Rupture de stock' : 'Alerte stock bas'}</h1>
+            <p>Un de vos produits necessite votre attention</p>
+          </div>
+          <div class="content">
+            <h2>Bonjour ${firstName},</h2>
+            <div class="${isOutOfStock ? 'warning-box' : 'info-box'}">
+              <strong>${isOutOfStock ? 'Rupture de stock !' : 'Stock bas !'}</strong><br>
+              Le produit <strong>"${alertData.productName}"</strong> de votre boutique <strong>"${alertData.boutiqueName}"</strong>
+              ${isOutOfStock
+                ? ' est en <strong>rupture de stock</strong>.'
+                : ` a atteint le seuil d'alerte (${alertData.threshold} unites).`
+              }
+            </div>
+
+            <table style="width: 100%; margin: 20px 0; font-size: 13px;">
+              <tr>
+                <td style="padding: 8px 0; color: #888; border-bottom: 1px solid #eee;">Produit</td>
+                <td style="padding: 8px 0; text-align: right; font-weight: 500; border-bottom: 1px solid #eee;">${alertData.productName}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; color: #888; border-bottom: 1px solid #eee;">Boutique</td>
+                <td style="padding: 8px 0; text-align: right; border-bottom: 1px solid #eee;">${alertData.boutiqueName}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; color: #888; border-bottom: 1px solid #eee;">Stock actuel</td>
+                <td style="padding: 8px 0; text-align: right; font-weight: 600; color: ${isOutOfStock ? '#dc3545' : '#f0ad4e'}; border-bottom: 1px solid #eee;">${alertData.currentStock} unite(s)</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; color: #888;">Seuil d'alerte</td>
+                <td style="padding: 8px 0; text-align: right;">${alertData.threshold} unite(s)</td>
+              </tr>
+            </table>
+
+            <p>Nous vous recommandons de reapprovisionner ce produit rapidement pour ne pas perdre de ventes.</p>
+            <center>
+              <a href="${process.env.FRONTEND_URL}/products/my-products" class="button">Gerer mes produits</a>
+            </center>
+          </div>
+          <div class="footer">
+            <p>${new Date().getFullYear()} Smar'ket. Tous droits reserves.</p>
+          </div>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  await sendEmail({
+    to: email,
+    subject: `${isOutOfStock ? 'Rupture de stock' : 'Alerte stock bas'} - ${alertData.productName} - Smar'ket`,
+    html
+  });
+};
+
 module.exports = {
   sendEmail,
   sendVerificationEmail,
@@ -651,5 +809,6 @@ module.exports = {
   sendInvoiceEmail,
   sendApprovalEmail,
   sendRejectionEmail,
-  sendPendingApprovalEmail
+  sendPendingApprovalEmail,
+  sendLowStockAlertEmail
 };

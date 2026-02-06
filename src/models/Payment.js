@@ -25,7 +25,7 @@ const paymentSchema = new mongoose.Schema({
   },
   currency: {
     type: String,
-    enum: ['MGA', 'EUR'],
+    enum: ['MGA'],
     default: 'MGA'
   },
   originalAmount: {
@@ -42,7 +42,7 @@ const paymentSchema = new mongoose.Schema({
   paymentMethod: {
     type: String,
     enum: {
-      values: ['mvola', 'orange', 'airtel', 'card', 'cash', 'bank_transfer'],
+      values: ['cash', 'card', 'stripe'],
       message: 'Invalid payment method'
     },
     required: [true, 'Payment method is required']
@@ -187,10 +187,31 @@ paymentSchema.methods.markAsSuccess = async function(providerData = {}) {
   await this.save();
 
   // Send invoice email
-  if (order) {
+  if (order && order.customerEmail) {
     try {
       const { sendInvoiceEmail } = require('../services/emailService');
-      await sendInvoiceEmail(order, this);
+
+      const invoiceData = {
+        invoiceNumber: this.reference,
+        date: this.completedAt || new Date(),
+        customerName: order.customerName || 'Client',
+        customerEmail: order.customerEmail,
+        customerAddress: order.shippingAddress
+          ? `${order.shippingAddress.street}, ${order.shippingAddress.city} ${order.shippingAddress.postalCode || ''}, ${order.shippingAddress.country || ''}`
+          : '',
+        items: (order.items || []).map(item => ({
+          description: item.productName,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          total: item.totalPrice || (item.unitPrice * item.quantity)
+        })),
+        subtotal: order.subtotal || order.totalAmount,
+        tax: 0,
+        taxRate: 0,
+        total: order.totalAmount
+      };
+
+      await sendInvoiceEmail(order.customerEmail, order.customerName || 'Client', invoiceData);
       console.log('📧 Invoice email sent for order:', order.orderReference);
     } catch (emailError) {
       console.error('❌ Failed to send invoice email:', emailError.message);
