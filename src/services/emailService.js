@@ -1,29 +1,14 @@
-const { google } = require('googleapis');
+const axios = require('axios');
 const PDFDocument = require('pdfkit');
 
 /**
- * Create OAuth2 client for Gmail API
+ * Brevo API Configuration
  */
-const createOAuth2Client = () => {
-  const OAuth2 = google.auth.OAuth2;
-  
-  const oauth2Client = new OAuth2(
-    process.env.GMAIL_CLIENT_ID,
-    process.env.GMAIL_CLIENT_SECRET,
-    process.env.NODE_ENV === 'production' 
-      ? process.env.GMAIL_REDIRECT_URI_PROD 
-      : process.env.GMAIL_REDIRECT_URI_LOCAL
-  );
-
-  oauth2Client.setCredentials({
-    refresh_token: process.env.GMAIL_REFRESH_TOKEN
-  });
-
-  return oauth2Client;
-};
+const BREVO_API_KEY = process.env.BREVO_API_KEY;
+const BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email';
 
 /**
- * Send email using Gmail API
+ * Send email using Brevo API
  * @param {Object} options - Email options
  * @param {string} options.to - Recipient email
  * @param {string} options.subject - Email subject
@@ -36,79 +21,57 @@ const createOAuth2Client = () => {
  */
 const sendEmail = async (options) => {
   try {
-    const oauth2Client = createOAuth2Client();
-    const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
-
-    const utf8Subject = `=?utf-8?B?${Buffer.from(options.subject).toString('base64')}?=`;
     const senderName = process.env.EMAIL_SENDER_NAME || 'Centre Commercial';
-    const boundary = `boundary_${Date.now().toString(16)}`;
+    const senderEmail = process.env.BREVO_SENDER_EMAIL || 'noreply@centrecommercial.com';
 
-    let message;
-
+    // Prepare attachments in Brevo format
+    let attachments = [];
     if (options.attachments && options.attachments.length > 0) {
-      // Email with attachments (multipart/mixed)
-      const messageParts = [
-        `From: ${senderName} <${process.env.GMAIL_USER}>`,
-        `To: ${options.to}`,
-        `Subject: ${utf8Subject}`,
-        'MIME-Version: 1.0',
-        `Content-Type: multipart/mixed; boundary="${boundary}"`,
-        '',
-        `--${boundary}`,
-        'Content-Type: text/html; charset=utf-8',
-        'Content-Transfer-Encoding: base64',
-        '',
-        Buffer.from(options.html).toString('base64'),
-      ];
-
-      // Add attachments
-      for (const attachment of options.attachments) {
-        messageParts.push(
-          `--${boundary}`,
-          `Content-Type: ${attachment.contentType}; name="${attachment.filename}"`,
-          'Content-Transfer-Encoding: base64',
-          `Content-Disposition: attachment; filename="${attachment.filename}"`,
-          '',
-          attachment.content.toString('base64')
-        );
-      }
-
-      messageParts.push(`--${boundary}--`);
-      message = messageParts.join('\r\n');
-    } else {
-      // Simple email without attachments
-      const messageParts = [
-        `From: ${senderName} <${process.env.GMAIL_USER}>`,
-        `To: ${options.to}`,
-        `Subject: ${utf8Subject}`,
-        'MIME-Version: 1.0',
-        'Content-Type: text/html; charset=utf-8',
-        '',
-        options.html
-      ];
-      message = messageParts.join('\n');
+      attachments = options.attachments.map(att => ({
+        name: att.filename,
+        content: att.content.toString('base64')
+      }));
     }
 
-    // Encode message in base64url format
-    const encodedMessage = Buffer.from(message)
-      .toString('base64')
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=+$/, '');
-
-    // Send email
-    const result = await gmail.users.messages.send({
-      userId: 'me',
-      requestBody: {
-        raw: encodedMessage,
+    // Prepare Brevo API request payload
+    const payload = {
+      sender: {
+        name: senderName,
+        email: senderEmail
       },
+      to: [
+        {
+          email: options.to
+        }
+      ],
+      subject: options.subject,
+      htmlContent: options.html
+    };
+
+    // Add attachments if present
+    if (attachments.length > 0) {
+      payload.attachment = attachments;
+    }
+
+    // Add plain text if provided
+    if (options.text) {
+      payload.textContent = options.text;
+    }
+
+    // Send email via Brevo API
+    const response = await axios.post(BREVO_API_URL, payload, {
+      headers: {
+        'accept': 'application/json',
+        'api-key': BREVO_API_KEY,
+        'content-type': 'application/json'
+      }
     });
 
-    console.log('Email sent via Gmail API:', result.data.id);
-    return { success: true, messageId: result.data.id };
+    console.log('Email sent via Brevo API:', response.data.messageId);
+    return { success: true, messageId: response.data.messageId };
   } catch (error) {
-    console.error('Gmail API error:', error);
-    throw new Error(`Failed to send email: ${error.message}`);
+    console.error('Brevo API error:', error.response?.data || error.message);
+    throw new Error(`Failed to send email: ${error.response?.data?.message || error.message}`);
   }
 };
 
@@ -191,59 +154,6 @@ const sendVerificationEmail = async (email, firstName, verificationToken) => {
 };
 
 /**
- * Send password reset link
- * @param {string} email - User email
- * @param {string} firstName - User first name
- * @param {string} resetToken - Reset token (raw, will be in URL)
- */
-const sendPasswordResetEmail = async (email, firstName, resetToken) => {
-  const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:4200'}/auth/reset-password?token=${resetToken}`;
-
-  const html = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="utf-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <style>${emailStyles}</style>
-    </head>
-    <body>
-      <div class="container">
-        <div class="card">
-          <div class="header">
-            <h1>Centre Commercial</h1>
-            <p>Reinitialisation du mot de passe</p>
-          </div>
-          <div class="content">
-            <h2>Bonjour ${firstName},</h2>
-            <p>Vous avez demande a reinitialiser le mot de passe de votre compte. Cliquez sur le bouton ci-dessous pour definir un nouveau mot de passe:</p>
-            <center>
-              <a href="${resetUrl}" class="button">Reinitialiser mon mot de passe</a>
-            </center>
-            <p>Ou copiez ce lien dans votre navigateur:</p>
-            <p class="link">${resetUrl}</p>
-            <div class="info-box">
-              <strong>Important:</strong> Ce lien expire dans 1 heure.
-            </div>
-            <p>Si vous n'avez pas demande cette reinitialisation, vous pouvez ignorer cet email. Votre mot de passe restera inchange.</p>
-          </div>
-          <div class="footer">
-            <p>${new Date().getFullYear()} Centre Commercial. Tous droits reserves.</p>
-          </div>
-        </div>
-      </div>
-    </body>
-    </html>
-  `;
-
-  await sendEmail({
-    to: email,
-    subject: 'Reinitialisation du mot de passe - Centre Commercial',
-    html
-  });
-};
-
-/**
  * Send OTP for login
  * @param {string} email - User email
  * @param {string} firstName - User first name
@@ -276,10 +186,7 @@ const sendOTPEmail = async (email, firstName, otp) => {
             <div class="info-box">
               <strong>Important:</strong> Ce code expire dans ${expiresIn} minutes.
             </div>
-            <div class="warning-box">
-              <strong>Securite:</strong> Ne partagez jamais ce code avec personne. Notre equipe ne vous demandera jamais votre code.
-            </div>
-            <p>Si vous n'avez pas tente de vous connecter, veuillez securiser votre compte immediatement.</p>
+            <p>Si vous n'avez pas demande ce code, ignorez cet email et assurez-vous que votre compte est securise.</p>
           </div>
           <div class="footer">
             <p>${new Date().getFullYear()} Centre Commercial. Tous droits reserves.</p>
@@ -292,269 +199,20 @@ const sendOTPEmail = async (email, firstName, otp) => {
 
   await sendEmail({
     to: email,
-    subject: `${otp} - Votre code de connexion Centre Commercial`,
+    subject: 'Votre code de verification - Centre Commercial',
     html
   });
 };
 
 /**
- * Generate invoice PDF
- * @param {Object} order - Order document
- * @param {Object} payment - Payment document
- * @returns {Promise<Buffer>} PDF buffer
+ * Send password reset email
+ * @param {string} email - User email
+ * @param {string} firstName - User first name
+ * @param {string} resetToken - Reset token
  */
-const generateInvoicePDF = (order, payment) => {
-  return new Promise((resolve, reject) => {
-    try {
-      const doc = new PDFDocument({
-        margin: 40,
-        size: 'A4',
-        bufferPages: true,
-        autoFirstPage: true
-      });
-      const chunks = [];
-
-      doc.on('data', chunk => chunks.push(chunk));
-      doc.on('end', () => resolve(Buffer.concat(chunks)));
-      doc.on('error', reject);
-
-      const pageWidth = doc.page.width;
-      const pageHeight = doc.page.height;
-      const margin = 40;
-      const contentWidth = pageWidth - (margin * 2);
-
-      const formatCurrency = (amount, currency = 'MGA') => {
-        return new Intl.NumberFormat('fr-MG', {
-          style: 'decimal',
-          minimumFractionDigits: 0
-        }).format(amount) + ' ' + currency;
-      };
-
-      const formatDate = (date) => {
-        return new Date(date).toLocaleDateString('fr-FR', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric'
-        });
-      };
-
-      const paymentMethodLabels = {
-        mvola: 'MVola',
-        orange: 'Orange Money',
-        airtel: 'Airtel Money',
-        card: 'Carte bancaire',
-        cash: 'Paiement à la livraison',
-        bank_transfer: 'Virement bancaire'
-      };
-
-      // Colors - Professional minimalist
-      const primaryColor = '#1a1a1a';
-      const textColor = '#333333';
-
-      // Header - compact
-      doc.rect(0, 0, pageWidth, 70).fill(primaryColor);
-      doc.fillColor('white').fontSize(22).font('Helvetica-Bold');
-      doc.text('FACTURE', margin, 20, { width: contentWidth, align: 'center', lineBreak: false });
-      doc.fontSize(10).font('Helvetica');
-      doc.text('Centre Commercial - Paiement confirme', margin, 48, { width: contentWidth, align: 'center', lineBreak: false });
-
-      // Invoice info - compact
-      let yPos = 85;
-      doc.fillColor(textColor).fontSize(9);
-
-      doc.font('Helvetica-Bold').text('Ref commande: ', margin, yPos, { continued: true, lineBreak: false });
-      doc.font('Helvetica').text(order.orderReference, { lineBreak: false });
-
-      doc.font('Helvetica-Bold').text('Ref paiement: ', margin + 250, yPos, { continued: true, lineBreak: false });
-      doc.font('Helvetica').text(payment.reference, { lineBreak: false });
-
-      yPos += 14;
-      doc.font('Helvetica-Bold').text('Date commande: ', margin, yPos, { continued: true, lineBreak: false });
-      doc.font('Helvetica').text(formatDate(order.createdAt), { lineBreak: false });
-
-      doc.font('Helvetica-Bold').text('Date paiement: ', margin + 250, yPos, { continued: true, lineBreak: false });
-      doc.font('Helvetica').text(formatDate(payment.completedAt || new Date()), { lineBreak: false });
-
-      // Items table - compact
-      yPos += 25;
-      doc.font('Helvetica-Bold').fontSize(11).fillColor(primaryColor);
-      doc.text('Articles commandes', margin, yPos, { lineBreak: false });
-
-      yPos += 18;
-      const col1 = margin;
-      const col2 = margin + 280;
-      const col3 = margin + 330;
-      const col4 = margin + 420;
-      const rowHeight = 18;
-
-      // Table header
-      doc.rect(margin, yPos, contentWidth, 20).fill(primaryColor);
-      doc.fillColor('white').fontSize(9).font('Helvetica-Bold');
-      doc.text('Produit', col1 + 5, yPos + 6, { lineBreak: false });
-      doc.text('Qte', col2, yPos + 6, { lineBreak: false });
-      doc.text('Prix unit.', col3, yPos + 6, { lineBreak: false });
-      doc.text('Total', col4, yPos + 6, { lineBreak: false });
-
-      yPos += 20;
-      doc.fillColor(textColor).font('Helvetica').fontSize(8);
-
-      // Limit items to fit on one page (max 10 items displayed)
-      const maxItems = Math.min(order.items.length, 10);
-      for (let i = 0; i < maxItems; i++) {
-        const item = order.items[i];
-
-        if (i % 2 === 0) {
-          doc.rect(margin, yPos, contentWidth, rowHeight).fill('#f9f9f9');
-        }
-        doc.fillColor(textColor);
-
-        const productName = item.productName.length > 45
-          ? item.productName.substring(0, 42) + '...'
-          : item.productName;
-
-        doc.text(productName, col1 + 5, yPos + 5, { lineBreak: false });
-        doc.text(item.quantity.toString(), col2, yPos + 5, { lineBreak: false });
-        doc.text(formatCurrency(item.unitPrice, order.currency), col3, yPos + 5, { lineBreak: false });
-        doc.text(formatCurrency(item.totalPrice, order.currency), col4, yPos + 5, { lineBreak: false });
-
-        yPos += rowHeight;
-      }
-
-      // If more items, show count
-      if (order.items.length > maxItems) {
-        doc.fontSize(8).fillColor('#666');
-        doc.text(`... et ${order.items.length - maxItems} autre(s) article(s)`, col1 + 5, yPos + 2, { lineBreak: false });
-        yPos += 15;
-      }
-
-      // Totals section
-      yPos += 10;
-      doc.moveTo(margin, yPos).lineTo(margin + contentWidth, yPos).stroke('#ddd');
-      yPos += 10;
-
-      doc.fontSize(9).font('Helvetica').fillColor(textColor);
-      doc.text('Sous-total:', col3, yPos, { lineBreak: false });
-      doc.text(formatCurrency(order.subtotal, order.currency), col4, yPos, { lineBreak: false });
-      yPos += 14;
-
-      if (order.shippingFee > 0) {
-        doc.text('Livraison:', col3, yPos, { lineBreak: false });
-        doc.text(formatCurrency(order.shippingFee, order.currency), col4, yPos, { lineBreak: false });
-        yPos += 14;
-      }
-
-      if (order.discount > 0) {
-        doc.text('Remise:', col3, yPos, { lineBreak: false });
-        doc.text('-' + formatCurrency(order.discount, order.currency), col4, yPos, { lineBreak: false });
-        yPos += 14;
-      }
-
-      doc.moveTo(col3, yPos).lineTo(margin + contentWidth, yPos).stroke(primaryColor);
-      yPos += 8;
-
-      doc.font('Helvetica-Bold').fontSize(12).fillColor(primaryColor);
-      doc.text('TOTAL:', col3, yPos, { lineBreak: false });
-      doc.text(formatCurrency(order.totalAmount, order.currency), col4, yPos, { lineBreak: false });
-
-      // Payment & Shipping info - side by side, compact
-      yPos += 30;
-      const boxWidth = (contentWidth - 10) / 2;
-      const boxHeight = 70;
-
-      // Payment info box
-      doc.rect(margin, yPos, boxWidth, boxHeight).fill('#f8f9fa');
-      doc.fillColor('#1a1a1a').font('Helvetica-Bold').fontSize(9);
-      doc.text('Paiement', margin + 8, yPos + 8, { lineBreak: false });
-      doc.fillColor(textColor).font('Helvetica').fontSize(8);
-      doc.text(`Methode: ${paymentMethodLabels[payment.paymentMethod] || payment.paymentMethod}`, margin + 8, yPos + 24, { lineBreak: false });
-      doc.text('Statut: Paye', margin + 8, yPos + 38, { lineBreak: false });
-      doc.text(`Montant: ${formatCurrency(payment.amount, payment.currency)}`, margin + 8, yPos + 52, { lineBreak: false });
-
-      // Shipping info box
-      const box2X = margin + boxWidth + 10;
-      doc.rect(box2X, yPos, boxWidth, boxHeight).fill('#f8f9fa');
-      doc.fillColor('#1a1a1a').font('Helvetica-Bold').fontSize(9);
-      doc.text('Livraison', box2X + 8, yPos + 8, { lineBreak: false });
-      doc.fillColor(textColor).font('Helvetica').fontSize(8);
-      doc.text(order.customerName, box2X + 8, yPos + 24, { lineBreak: false });
-      const addressLine = order.shippingAddress.street.length > 35
-        ? order.shippingAddress.street.substring(0, 32) + '...'
-        : order.shippingAddress.street;
-      doc.text(addressLine, box2X + 8, yPos + 38, { lineBreak: false });
-      doc.text(`${order.shippingAddress.city} - Tel: ${order.customerPhone}`, box2X + 8, yPos + 52, { lineBreak: false });
-
-      // Footer - at bottom
-      const footerY = pageHeight - 50;
-      doc.moveTo(margin, footerY).lineTo(margin + contentWidth, footerY).stroke('#ddd');
-      doc.fillColor('#666').fontSize(7).font('Helvetica');
-      doc.text(`${new Date().getFullYear()} Centre Commercial - Facture generee automatiquement`, margin, footerY + 10, {
-        width: contentWidth,
-        align: 'center',
-        lineBreak: false
-      });
-
-      doc.end();
-    } catch (error) {
-      reject(error);
-    }
-  });
-};
-
-/**
- * Send invoice/order confirmation email after successful payment
- * @param {Object} order - Order document
- * @param {Object} payment - Payment document
- */
-const sendInvoiceEmail = async (order, payment) => {
-  const orderDate = new Date(order.createdAt).toLocaleDateString('fr-FR', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
-
-  const paymentDate = new Date(payment.completedAt || new Date()).toLocaleDateString('fr-FR', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
-
-  const paymentMethodLabels = {
-    mvola: 'MVola',
-    orange: 'Orange Money',
-    airtel: 'Airtel Money',
-    card: 'Carte bancaire',
-    cash: 'Paiement à la livraison',
-    bank_transfer: 'Virement bancaire'
-  };
-
-  const formatCurrency = (amount, currency = 'MGA') => {
-    return new Intl.NumberFormat('fr-MG', {
-      style: 'decimal',
-      minimumFractionDigits: 0
-    }).format(amount) + ' ' + currency;
-  };
-
-  // Build items table rows
-  const itemsRows = order.items.map(item => `
-    <tr>
-      <td style="padding: 12px; border-bottom: 1px solid #eee;">
-        ${item.productName}
-      </td>
-      <td style="padding: 12px; border-bottom: 1px solid #eee; text-align: center;">
-        ${item.quantity}
-      </td>
-      <td style="padding: 12px; border-bottom: 1px solid #eee; text-align: right;">
-        ${formatCurrency(item.unitPrice, order.currency)}
-      </td>
-      <td style="padding: 12px; border-bottom: 1px solid #eee; text-align: right;">
-        ${formatCurrency(item.totalPrice, order.currency)}
-      </td>
-    </tr>
-  `).join('');
+const sendPasswordResetEmail = async (email, firstName, resetToken) => {
+  const resetUrl = `${process.env.FRONTEND_URL}/auth/reset-password?token=${resetToken}`;
+  const expiresIn = process.env.PASSWORD_RESET_EXPIRES_IN || 60;
 
   const html = `
     <!DOCTYPE html>
@@ -562,95 +220,27 @@ const sendInvoiceEmail = async (order, payment) => {
     <head>
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <style>${emailStyles}
-        .order-info { background: #f8f9fa; padding: 15px; border-radius: 4px; margin-bottom: 20px; }
-        .order-info p { margin: 5px 0; }
-        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-        th { background: #1a1a1a; color: white; padding: 12px; text-align: left; font-weight: 500; }
-        th:nth-child(2), th:nth-child(3), th:nth-child(4) { text-align: center; }
-        th:last-child { text-align: right; }
-        td { padding: 12px; border-bottom: 1px solid #eee; }
-        .totals { margin-top: 20px; }
-        .totals-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee; }
-        .totals-row.total { font-size: 18px; font-weight: 600; color: #1a1a1a; border-bottom: none; border-top: 2px solid #1a1a1a; padding-top: 15px; margin-top: 10px; }
-        .info-section { background: #f8f9fa; padding: 15px; border-radius: 4px; margin-top: 20px; }
-        .info-section h4 { color: #1a1a1a; margin: 0 0 10px; font-weight: 500; }
-      </style>
+      <style>${emailStyles}</style>
     </head>
     <body>
       <div class="container">
         <div class="card">
           <div class="header">
-            <h1>Facture</h1>
-            <p>Commande confirmee</p>
+            <h1>Reinitialisation du mot de passe</h1>
+            <p>Vous avez demande a reinitialiser votre mot de passe</p>
           </div>
           <div class="content">
-            <div class="order-info">
-              <p><strong>Reference commande:</strong> ${order.orderReference}</p>
-              <p><strong>Reference paiement:</strong> ${payment.reference}</p>
-              <p><strong>Date de commande:</strong> ${orderDate}</p>
-              <p><strong>Date de paiement:</strong> ${paymentDate}</p>
+            <h2>Bonjour ${firstName},</h2>
+            <p>Vous avez demande a reinitialiser votre mot de passe. Cliquez sur le bouton ci-dessous pour creer un nouveau mot de passe:</p>
+            <center>
+              <a href="${resetUrl}" class="button">Reinitialiser mon mot de passe</a>
+            </center>
+            <p>Ou copiez ce lien dans votre navigateur:</p>
+            <p class="link">${resetUrl}</p>
+            <div class="warning-box">
+              <strong>Attention:</strong> Ce lien expire dans ${expiresIn} minutes.
             </div>
-
-            <h3 style="margin: 20px 0 10px; font-weight: 500;">Articles commandes</h3>
-            <table>
-              <thead>
-                <tr>
-                  <th>Produit</th>
-                  <th>Quantite</th>
-                  <th>Prix unitaire</th>
-                  <th>Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${itemsRows}
-              </tbody>
-            </table>
-
-            <div class="totals">
-              <div class="totals-row">
-                <span>Sous-total:</span>
-                <span>${formatCurrency(order.subtotal, order.currency)}</span>
-              </div>
-              ${order.shippingFee > 0 ? `
-              <div class="totals-row">
-                <span>Frais de livraison:</span>
-                <span>${formatCurrency(order.shippingFee, order.currency)}</span>
-              </div>
-              ` : ''}
-              ${order.discount > 0 ? `
-              <div class="totals-row">
-                <span>Remise:</span>
-                <span>-${formatCurrency(order.discount, order.currency)}</span>
-              </div>
-              ` : ''}
-              <div class="totals-row total">
-                <span>TOTAL:</span>
-                <span>${formatCurrency(order.totalAmount, order.currency)}</span>
-              </div>
-            </div>
-
-            <div class="info-section">
-              <h4>Informations de paiement</h4>
-              <p><strong>Methode:</strong> ${paymentMethodLabels[payment.paymentMethod] || payment.paymentMethod}</p>
-              <p><strong>Statut:</strong> Paye</p>
-              <p><strong>Montant:</strong> ${formatCurrency(payment.amount, payment.currency)}</p>
-            </div>
-
-            <div class="info-section">
-              <h4>Adresse de livraison</h4>
-              <p><strong>${order.customerName}</strong></p>
-              <p>${order.shippingAddress.street}</p>
-              <p>${order.shippingAddress.city}${order.shippingAddress.postalCode ? ', ' + order.shippingAddress.postalCode : ''}</p>
-              <p>${order.shippingAddress.country}</p>
-              ${order.shippingAddress.additionalInfo ? `<p><em>${order.shippingAddress.additionalInfo}</em></p>` : ''}
-              <p><strong>Telephone:</strong> ${order.customerPhone}</p>
-            </div>
-
-            <p style="text-align: center; color: #666; margin-top: 20px;">
-              Vous pouvez suivre votre commande depuis votre espace client.<br>
-              Pour toute question, contactez notre service client.
-            </p>
+            <p>Si vous n'avez pas demande cette reinitialisation, ignorez cet email. Votre mot de passe restera inchange.</p>
           </div>
           <div class="footer">
             <p>${new Date().getFullYear()} Centre Commercial. Tous droits reserves.</p>
@@ -661,16 +251,243 @@ const sendInvoiceEmail = async (order, payment) => {
     </html>
   `;
 
-  // Generate PDF invoice
-  const pdfBuffer = await generateInvoicePDF(order, payment);
+  await sendEmail({
+    to: email,
+    subject: 'Reinitialisation de votre mot de passe - Centre Commercial',
+    html
+  });
+};
+
+/**
+ * Format number with space as thousands separator (e.g. 15 000 Ar)
+ */
+const formatMGA = (amount) => {
+  return Math.round(amount).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' Ar';
+};
+
+/**
+ * Generate invoice PDF
+ * @param {Object} invoiceData - Invoice data
+ * @returns {Promise<Buffer>} PDF buffer
+ */
+const generateInvoicePDF = (invoiceData) => {
+  return new Promise((resolve, reject) => {
+    try {
+      const doc = new PDFDocument({ margin: 50, size: 'A4' });
+      const chunks = [];
+
+      doc.on('data', (chunk) => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      const pageWidth = doc.page.width - 100; // 50 margin each side
+
+      // ===== HEADER =====
+      doc.rect(50, 50, pageWidth, 70).fill('#1a1a1a');
+      doc.fontSize(24).fill('#ffffff').text("Smar'ket", 70, 65, { width: pageWidth - 40 });
+      doc.fontSize(10).fill('#cccccc').text('Centre Commercial en ligne', 70, 95);
+      doc.fontSize(18).fill('#ffffff').text('FACTURE', 350, 72, { width: 180, align: 'right' });
+
+      // ===== INVOICE INFO =====
+      doc.fill('#333333');
+      const infoY = 145;
+      doc.fontSize(10).fill('#888888').text('Numero de facture', 50, infoY);
+      doc.fontSize(11).fill('#1a1a1a').text(invoiceData.invoiceNumber, 50, infoY + 15);
+
+      doc.fontSize(10).fill('#888888').text('Date', 250, infoY);
+      doc.fontSize(11).fill('#1a1a1a').text(new Date(invoiceData.date).toLocaleDateString('fr-FR'), 250, infoY + 15);
+
+      doc.fontSize(10).fill('#888888').text('Statut', 420, infoY);
+      doc.fontSize(11).fill('#28a745').text('PAYEE', 420, infoY + 15);
+
+      // Separator
+      doc.moveTo(50, infoY + 45).lineTo(50 + pageWidth, infoY + 45).lineWidth(0.5).strokeColor('#e0e0e0').stroke();
+
+      // ===== CLIENT INFO =====
+      const clientY = infoY + 60;
+      doc.fontSize(10).fill('#888888').text('Facture a', 50, clientY);
+      doc.fontSize(11).fill('#1a1a1a');
+      doc.text(invoiceData.customerName, 50, clientY + 15);
+      doc.fontSize(10).fill('#555555');
+      doc.text(invoiceData.customerEmail, 50, clientY + 30);
+      if (invoiceData.customerAddress) {
+        doc.text(invoiceData.customerAddress, 50, clientY + 45);
+      }
+
+      // ===== TABLE =====
+      const tableTop = clientY + 75;
+
+      // Table header background
+      doc.rect(50, tableTop, pageWidth, 25).fill('#f5f5f5');
+
+      // Table header text
+      doc.fontSize(9).fill('#666666');
+      doc.text('DESCRIPTION', 60, tableTop + 8, { width: 220 });
+      doc.text('QTE', 290, tableTop + 8, { width: 50, align: 'center' });
+      doc.text('PRIX UNITAIRE', 350, tableTop + 8, { width: 90, align: 'right' });
+      doc.text('TOTAL', 450, tableTop + 8, { width: 90, align: 'right' });
+
+      // Table items
+      let yPosition = tableTop + 35;
+      doc.fontSize(10).fill('#333333');
+      invoiceData.items.forEach((item, index) => {
+        // Alternate row background
+        if (index % 2 === 1) {
+          doc.rect(50, yPosition - 5, pageWidth, 22).fill('#fafafa');
+          doc.fill('#333333');
+        }
+        doc.text(item.description, 60, yPosition, { width: 220 });
+        doc.text(item.quantity.toString(), 290, yPosition, { width: 50, align: 'center' });
+        doc.text(formatMGA(item.unitPrice), 350, yPosition, { width: 90, align: 'right' });
+        doc.text(formatMGA(item.total), 450, yPosition, { width: 90, align: 'right' });
+        yPosition += 22;
+      });
+
+      // Line after items
+      doc.moveTo(50, yPosition + 5).lineTo(50 + pageWidth, yPosition + 5).lineWidth(0.5).strokeColor('#e0e0e0').stroke();
+      yPosition += 20;
+
+      // Subtotal
+      doc.fontSize(10).fill('#666666');
+      doc.text('Sous-total', 350, yPosition, { width: 90, align: 'right' });
+      doc.fill('#333333').text(formatMGA(invoiceData.subtotal), 450, yPosition, { width: 90, align: 'right' });
+      yPosition += 20;
+
+      // Tax
+      if (invoiceData.tax > 0) {
+        doc.fill('#666666').text(`TVA (${invoiceData.taxRate}%)`, 350, yPosition, { width: 90, align: 'right' });
+        doc.fill('#333333').text(formatMGA(invoiceData.tax), 450, yPosition, { width: 90, align: 'right' });
+        yPosition += 20;
+      }
+
+      // Total line
+      doc.moveTo(350, yPosition).lineTo(50 + pageWidth, yPosition).lineWidth(1).strokeColor('#1a1a1a').stroke();
+      yPosition += 10;
+
+      // Total
+      doc.fontSize(13).font('Helvetica-Bold').fill('#1a1a1a');
+      doc.text('TOTAL', 350, yPosition, { width: 90, align: 'right' });
+      doc.text(formatMGA(invoiceData.total), 450, yPosition, { width: 90, align: 'right' });
+
+      // ===== FOOTER =====
+      doc.font('Helvetica');
+      const footerY = doc.page.height - 100;
+      doc.moveTo(50, footerY).lineTo(50 + pageWidth, footerY).lineWidth(0.5).strokeColor('#e0e0e0').stroke();
+      doc.fontSize(9).fill('#999999');
+      doc.text('Merci pour votre confiance !', 50, footerY + 15, { align: 'center', width: pageWidth });
+      doc.text("Smar'ket - Centre Commercial en ligne | Madagascar", 50, footerY + 30, { align: 'center', width: pageWidth });
+
+      doc.end();
+    } catch (error) {
+      reject(error);
+    }
+  });
+};
+
+/**
+ * Send invoice email with PDF attachment
+ * @param {string} email - User email
+ * @param {string} firstName - User first name
+ * @param {Object} invoiceData - Invoice data
+ */
+const sendInvoiceEmail = async (email, firstName, invoiceData) => {
+  const pdfBuffer = await generateInvoicePDF(invoiceData);
+
+  // Build items HTML table for email
+  const itemsHtml = invoiceData.items.map(item => `
+    <tr>
+      <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #333;">${item.description}</td>
+      <td style="padding: 10px 0; border-bottom: 1px solid #eee; text-align: center; color: #555;">${item.quantity}</td>
+      <td style="padding: 10px 0; border-bottom: 1px solid #eee; text-align: right; color: #555;">${formatMGA(item.unitPrice)}</td>
+      <td style="padding: 10px 0; border-bottom: 1px solid #eee; text-align: right; font-weight: 500; color: #333;">${formatMGA(item.total)}</td>
+    </tr>
+  `).join('');
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>${emailStyles}</style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="card">
+          <div class="header">
+            <h1>Confirmation de paiement</h1>
+            <p>Votre commande a ete payee avec succes</p>
+          </div>
+          <div class="content">
+            <h2>Bonjour ${firstName},</h2>
+            <p>Merci pour votre achat. Votre paiement a ete confirme et votre commande est en cours de traitement.</p>
+
+            <div class="success-box">
+              <strong>Paiement confirme</strong>
+              <p style="margin: 5px 0 0; font-size: 13px;">Votre facture est jointe a cet email au format PDF.</p>
+            </div>
+
+            <table style="width: 100%; margin: 20px 0; font-size: 13px;">
+              <tr>
+                <td style="padding: 5px 0; color: #888;">Numero de facture</td>
+                <td style="padding: 5px 0; text-align: right; font-weight: 500;">${invoiceData.invoiceNumber}</td>
+              </tr>
+              <tr>
+                <td style="padding: 5px 0; color: #888;">Date</td>
+                <td style="padding: 5px 0; text-align: right;">${new Date(invoiceData.date).toLocaleDateString('fr-FR')}</td>
+              </tr>
+              <tr>
+                <td style="padding: 5px 0; color: #888;">Montant total</td>
+                <td style="padding: 5px 0; text-align: right; font-weight: 600; font-size: 15px; color: #1a1a1a;">${formatMGA(invoiceData.total)}</td>
+              </tr>
+            </table>
+
+            <h3 style="font-size: 14px; margin: 25px 0 10px; color: #1a1a1a;">Detail de la commande</h3>
+            <table style="width: 100%; font-size: 12px; border-collapse: collapse;">
+              <thead>
+                <tr style="background: #f8f9fa;">
+                  <th style="padding: 8px; text-align: left; color: #666; font-weight: 500;">Article</th>
+                  <th style="padding: 8px; text-align: center; color: #666; font-weight: 500;">Qte</th>
+                  <th style="padding: 8px; text-align: right; color: #666; font-weight: 500;">Prix</th>
+                  <th style="padding: 8px; text-align: right; color: #666; font-weight: 500;">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${itemsHtml}
+              </tbody>
+            </table>
+
+            <table style="width: 100%; margin-top: 15px; font-size: 13px;">
+              <tr>
+                <td style="padding: 5px 0; color: #888;">Sous-total</td>
+                <td style="padding: 5px 0; text-align: right;">${formatMGA(invoiceData.subtotal)}</td>
+              </tr>
+              <tr style="border-top: 2px solid #1a1a1a;">
+                <td style="padding: 10px 0; font-weight: 600; font-size: 15px;">Total paye</td>
+                <td style="padding: 10px 0; text-align: right; font-weight: 600; font-size: 15px; color: #1a1a1a;">${formatMGA(invoiceData.total)}</td>
+              </tr>
+            </table>
+
+            <center>
+              <a href="${process.env.FRONTEND_URL}/home" class="button">Continuer mes achats</a>
+            </center>
+          </div>
+          <div class="footer">
+            <p>${new Date().getFullYear()} Smar'ket. Tous droits reserves.</p>
+          </div>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
 
   await sendEmail({
-    to: order.customerEmail,
-    subject: `Facture - Commande ${order.orderReference}`,
+    to: email,
+    subject: `Facture ${invoiceData.invoiceNumber} - Smar'ket`,
     html,
     attachments: [
       {
-        filename: `Facture_${order.orderReference}.pdf`,
+        filename: `facture-${invoiceData.invoiceNumber}.pdf`,
         content: pdfBuffer,
         contentType: 'application/pdf'
       }
@@ -679,7 +496,7 @@ const sendInvoiceEmail = async (order, payment) => {
 };
 
 /**
- * Send welcome email after verification
+ * Send welcome email after successful verification
  * @param {string} email - User email
  * @param {string} firstName - User first name
  */
@@ -904,14 +721,94 @@ const sendPendingApprovalEmail = async (email, firstName) => {
   });
 };
 
+/**
+ * Send low stock alert email to boutique owner
+ * @param {string} email - Boutique owner email
+ * @param {string} firstName - Boutique owner first name
+ * @param {Object} alertData - Alert data
+ * @param {string} alertData.productName - Product name
+ * @param {number} alertData.currentStock - Current stock level
+ * @param {number} alertData.threshold - Low stock threshold
+ * @param {string} alertData.boutiqueName - Boutique name
+ */
+const sendLowStockAlertEmail = async (email, firstName, alertData) => {
+  const isOutOfStock = alertData.currentStock === 0;
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>${emailStyles}</style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="card">
+          <div class="header">
+            <h1>${isOutOfStock ? 'Rupture de stock' : 'Alerte stock bas'}</h1>
+            <p>Un de vos produits necessite votre attention</p>
+          </div>
+          <div class="content">
+            <h2>Bonjour ${firstName},</h2>
+            <div class="${isOutOfStock ? 'warning-box' : 'info-box'}">
+              <strong>${isOutOfStock ? 'Rupture de stock !' : 'Stock bas !'}</strong><br>
+              Le produit <strong>"${alertData.productName}"</strong> de votre boutique <strong>"${alertData.boutiqueName}"</strong>
+              ${isOutOfStock
+                ? ' est en <strong>rupture de stock</strong>.'
+                : ` a atteint le seuil d'alerte (${alertData.threshold} unites).`
+              }
+            </div>
+
+            <table style="width: 100%; margin: 20px 0; font-size: 13px;">
+              <tr>
+                <td style="padding: 8px 0; color: #888; border-bottom: 1px solid #eee;">Produit</td>
+                <td style="padding: 8px 0; text-align: right; font-weight: 500; border-bottom: 1px solid #eee;">${alertData.productName}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; color: #888; border-bottom: 1px solid #eee;">Boutique</td>
+                <td style="padding: 8px 0; text-align: right; border-bottom: 1px solid #eee;">${alertData.boutiqueName}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; color: #888; border-bottom: 1px solid #eee;">Stock actuel</td>
+                <td style="padding: 8px 0; text-align: right; font-weight: 600; color: ${isOutOfStock ? '#dc3545' : '#f0ad4e'}; border-bottom: 1px solid #eee;">${alertData.currentStock} unite(s)</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; color: #888;">Seuil d'alerte</td>
+                <td style="padding: 8px 0; text-align: right;">${alertData.threshold} unite(s)</td>
+              </tr>
+            </table>
+
+            <p>Nous vous recommandons de reapprovisionner ce produit rapidement pour ne pas perdre de ventes.</p>
+            <center>
+              <a href="${process.env.FRONTEND_URL}/products/my-products" class="button">Gerer mes produits</a>
+            </center>
+          </div>
+          <div class="footer">
+            <p>${new Date().getFullYear()} Smar'ket. Tous droits reserves.</p>
+          </div>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  await sendEmail({
+    to: email,
+    subject: `${isOutOfStock ? 'Rupture de stock' : 'Alerte stock bas'} - ${alertData.productName} - Smar'ket`,
+    html
+  });
+};
+
 module.exports = {
   sendEmail,
   sendVerificationEmail,
-  sendPasswordResetEmail,
   sendOTPEmail,
+  sendPasswordResetEmail,
   sendWelcomeEmail,
   sendInvoiceEmail,
   sendApprovalEmail,
   sendRejectionEmail,
-  sendPendingApprovalEmail
+  sendPendingApprovalEmail,
+  sendLowStockAlertEmail
 };

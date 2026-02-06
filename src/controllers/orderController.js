@@ -2,7 +2,10 @@ const Order = require('../models/Order');
 const Cart = require('../models/Cart');
 const Product = require('../models/Product');
 const Payment = require('../models/Payment');
+const Boutique = require('../models/Boutique');
+const User = require('../models/User');
 const { ApiError, asyncHandler } = require('../middlewares/errorHandler');
+const { sendLowStockAlertEmail } = require('../services/emailService');
 
 /**
  * @desc    Create order from cart
@@ -55,6 +58,27 @@ exports.createOrder = asyncHandler(async (req, res, next) => {
     // Reserve stock (deduct from available)
     product.stock -= item.quantity;
     await product.save();
+
+    // Check low stock alert
+    if (product.stock <= product.lowStockThreshold) {
+      try {
+        const boutique = await Boutique.findById(product.boutiqueId);
+        if (boutique && boutique.userId) {
+          const owner = await User.findById(boutique.userId);
+          if (owner && owner.email) {
+            await sendLowStockAlertEmail(owner.email, owner.firstName || 'Gerant', {
+              productName: product.name,
+              currentStock: product.stock,
+              threshold: product.lowStockThreshold,
+              boutiqueName: boutique.name || 'Votre boutique'
+            });
+            console.log(`📧 Low stock alert sent for "${product.name}" (stock: ${product.stock})`);
+          }
+        }
+      } catch (emailError) {
+        console.error('❌ Failed to send low stock alert:', emailError.message);
+      }
+    }
 
     orderItems.push({
       productId: item.productId,

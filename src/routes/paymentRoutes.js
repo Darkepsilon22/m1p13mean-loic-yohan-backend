@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const paymentController = require('../controllers/paymentController');
+const stripeController = require('../controllers/stripeController');
 const { verifyToken } = require('../middlewares/auth');
 const { isAcheteur, isAdmin } = require('../middlewares/roles');
 const { body, param, query, validationResult } = require('express-validator');
@@ -35,6 +36,44 @@ router.get('/methods', paymentController.getPaymentMethods);
  * @access  Public (signature verification required)
  */
 router.post('/webhook', paymentController.handleWebhook);
+
+// ==================== STRIPE ROUTES ====================
+
+/**
+ * @route   GET /api/payments/stripe/config
+ * @desc    Get Stripe publishable key
+ * @access  Public
+ */
+router.get('/stripe/config', stripeController.getStripeConfig);
+
+/**
+ * @route   POST /api/payments/stripe/create-checkout-session
+ * @desc    Create Stripe Checkout Session
+ * @access  Private (acheteur)
+ */
+router.post('/stripe/create-checkout-session',
+  verifyToken,
+  isAcheteur,
+  [
+    body('orderId').notEmpty().withMessage('Order ID is required'),
+    handleValidationErrors
+  ],
+  stripeController.createCheckoutSession
+);
+
+/**
+ * @route   GET /api/payments/stripe/verify/:sessionId
+ * @desc    Verify Stripe payment
+ * @access  Private (acheteur)
+ */
+router.get('/stripe/verify/:sessionId', verifyToken, isAcheteur, stripeController.verifyPayment);
+
+/**
+ * @route   POST /api/payments/stripe/webhook
+ * @desc    Stripe Webhook (needs raw body)
+ * @access  Public
+ */
+router.post('/stripe/webhook', express.raw({ type: 'application/json' }), stripeController.stripeWebhook);
 
 // ==================== ACHETEUR ROUTES ====================
 

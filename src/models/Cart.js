@@ -50,7 +50,7 @@ const cartSchema = new mongoose.Schema({
   items: [cartItemSchema],
   currency: {
     type: String,
-    enum: ['MGA', 'EUR'],
+    enum: ['MGA'],
     default: 'MGA'
   },
   expiresAt: {

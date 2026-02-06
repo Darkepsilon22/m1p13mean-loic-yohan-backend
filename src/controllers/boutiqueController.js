@@ -310,7 +310,9 @@ exports.getAvailableBoutiques = asyncHandler(async (req, res, next) => {
   res.json({
     success: true,
     count: result.data.length,
-    data: result.data
+    data: {
+      boutiques: result.data
+    }
   });
 });
 
