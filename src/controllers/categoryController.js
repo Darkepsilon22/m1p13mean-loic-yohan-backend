@@ -12,12 +12,17 @@ exports.getAll = asyncHandler(async (req, res, next) => {
     active,
     parent,
     root,
+    search,
     page = 1,
     limit = 50,
     sort = 'order'
   } = req.query;
 
   const filter = {};
+
+  if (search && String(search).trim()) {
+    filter.name = new RegExp(String(search).trim(), 'i');
+  }
 
   // Filter by active status
   if (active !== undefined) {
