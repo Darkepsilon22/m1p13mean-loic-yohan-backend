@@ -2,6 +2,7 @@ const Product = require('../models/Product');
 const StockMovement = require('../models/StockMovement');
 const Boutique = require('../models/Boutique');
 const { asyncHandler, ApiError } = require('../middlewares/errorHandler');
+const stockExportService = require('../services/stockExportService');
 
 /**
  * @desc    Add stock to a product (entrée de stock)
@@ -568,4 +569,78 @@ exports.getGlobalStats = asyncHandler(async (req, res) => {
       activeBoutiquesCount: activeBoutiques.length
     }
   });
+});
+
+/**
+ * @desc    Export stock movements as PDF (boutique owner)
+ * @route   GET /api/stock/export/pdf
+ * @query   dateDebut (YYYY-MM-DD), dateFin (YYYY-MM-DD), productIds (optional, comma-separated), category (optional)
+ * @access  Private (Boutique)
+ */
+exports.exportStockPDF = asyncHandler(async (req, res, next) => {
+  const boutique = await Boutique.findOne({ userId: req.user._id });
+  if (!boutique) {
+    return next(new ApiError(404, 'Boutique not found'));
+  }
+
+  const { dateDebut, dateFin, productIds: productIdsParam, category } = req.query;
+  if (!dateDebut || !dateFin) {
+    return next(new ApiError(400, 'dateDebut and dateFin are required (YYYY-MM-DD)'));
+  }
+
+  const productIds = productIdsParam && productIdsParam.trim()
+    ? productIdsParam.split(',').map(id => id.trim()).filter(Boolean)
+    : null;
+
+  const movements = await stockExportService.getMovementsForExport(
+    boutique._id,
+    dateDebut,
+    dateFin,
+    productIds,
+    category || null
+  );
+
+  const pdfBuffer = await stockExportService.generateStockPDF(movements, boutique.name);
+
+  const filename = `export-stock-${boutique.name.replace(/\s+/g, '-')}-${dateDebut}-${dateFin}.pdf`;
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.send(pdfBuffer);
+});
+
+/**
+ * @desc    Export stock movements as Excel (boutique owner)
+ * @route   GET /api/stock/export/excel
+ * @query   dateDebut, dateFin, productIds (optional), category (optional)
+ * @access  Private (Boutique)
+ */
+exports.exportStockExcel = asyncHandler(async (req, res, next) => {
+  const boutique = await Boutique.findOne({ userId: req.user._id });
+  if (!boutique) {
+    return next(new ApiError(404, 'Boutique not found'));
+  }
+
+  const { dateDebut, dateFin, productIds: productIdsParam, category } = req.query;
+  if (!dateDebut || !dateFin) {
+    return next(new ApiError(400, 'dateDebut and dateFin are required (YYYY-MM-DD)'));
+  }
+
+  const productIds = productIdsParam && productIdsParam.trim()
+    ? productIdsParam.split(',').map(id => id.trim()).filter(Boolean)
+    : null;
+
+  const movements = await stockExportService.getMovementsForExport(
+    boutique._id,
+    dateDebut,
+    dateFin,
+    productIds,
+    category || null
+  );
+
+  const excelBuffer = await stockExportService.generateStockExcel(movements, boutique.name);
+
+  const filename = `export-stock-${boutique.name.replace(/\s+/g, '-')}-${dateDebut}-${dateFin}.xlsx`;
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.send(excelBuffer);
 });
