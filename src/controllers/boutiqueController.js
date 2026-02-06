@@ -40,10 +40,13 @@ const canEditBoutique = (boutique, userId, userRole) => {
  * @access  Public
  */
 exports.getAll = asyncHandler(async (req, res, next) => {
-  const { category, status, floor, zone, page = 1, limit = 20, sort = '-createdAt' } = req.query;
+  const { category, status, floor, zone, search, page = 1, limit = 20, sort = '-createdAt' } = req.query;
 
   const filter = {};
 
+  if (search && String(search).trim()) {
+    filter.name = new RegExp(String(search).trim(), 'i');
+  }
   if (category) filter.categoryId = category;
   if (status) filter.status = status;
   if (floor !== undefined && floor !== '') filter['location.floor'] = Number(floor);
