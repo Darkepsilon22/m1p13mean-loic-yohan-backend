@@ -104,7 +104,7 @@ const orderSchema = new mongoose.Schema({
   },
   currency: {
     type: String,
-    enum: ['MGA', 'EUR'],
+    enum: ['MGA'],
     default: 'MGA'
   },
 
@@ -129,7 +129,7 @@ const orderSchema = new mongoose.Schema({
   },
   paymentMethod: {
     type: String,
-    enum: ['mvola', 'orange', 'airtel', 'card', 'cash', 'pending'],
+    enum: ['cash', 'card', 'stripe', 'pending'],
     default: 'pending'
   },
   paymentId: {
