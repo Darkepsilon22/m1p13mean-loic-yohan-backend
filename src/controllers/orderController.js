@@ -4,6 +4,7 @@ const Product = require('../models/Product');
 const Payment = require('../models/Payment');
 const Boutique = require('../models/Boutique');
 const User = require('../models/User');
+const StockMovement = require('../models/StockMovement');
 const { ApiError, asyncHandler } = require('../middlewares/errorHandler');
 const { sendLowStockAlertEmail } = require('../services/emailService');
 
@@ -56,8 +57,22 @@ exports.createOrder = asyncHandler(async (req, res, next) => {
     }
 
     // Reserve stock (deduct from available)
+    const previousStock = product.stock;
     product.stock -= item.quantity;
     await product.save();
+
+    // Record stock movement
+    await StockMovement.create({
+      productId: product._id,
+      boutiqueId: product.boutiqueId,
+      type: 'out',
+      quantity: -item.quantity,
+      previousStock,
+      newStock: product.stock,
+      reason: 'Vente - Commande client',
+      reference: `order-${Date.now()}`,
+      userId: req.user._id
+    });
 
     // Check low stock alert
     if (product.stock <= product.lowStockThreshold) {
@@ -117,8 +132,8 @@ exports.createOrder = asyncHandler(async (req, res, next) => {
     paymentStatus: 'pending'
   });
 
-  // Clear cart after successful order creation
-  await cart.clearCart();
+  // NOTE: Cart is NOT cleared here - it will be cleared after successful payment
+  // This allows users to return to their cart if payment fails or is cancelled
 
   // Populate order for response
   await order.populate([
@@ -245,9 +260,24 @@ exports.cancelOrder = asyncHandler(async (req, res, next) => {
 
   // Restore stock
   for (const item of order.items) {
-    await Product.findByIdAndUpdate(item.productId, {
-      $inc: { stock: item.quantity }
-    });
+    const product = await Product.findById(item.productId);
+    if (product) {
+      const previousStock = product.stock;
+      product.stock += item.quantity;
+      await product.save();
+
+      await StockMovement.create({
+        productId: product._id,
+        boutiqueId: item.boutiqueId,
+        type: 'in',
+        quantity: item.quantity,
+        previousStock,
+        newStock: product.stock,
+        reason: `Annulation commande - ${order.orderReference}`,
+        reference: order.orderReference,
+        userId: req.user._id
+      });
+    }
   }
 
   order.status = 'cancelled';
@@ -459,9 +489,24 @@ exports.updateOrderStatus = asyncHandler(async (req, res, next) => {
   // Handle cancellation - restore stock
   if (status === 'cancelled' && order.status !== 'cancelled') {
     for (const item of order.items) {
-      await Product.findByIdAndUpdate(item.productId, {
-        $inc: { stock: item.quantity }
-      });
+      const product = await Product.findById(item.productId);
+      if (product) {
+        const previousStock = product.stock;
+        product.stock += item.quantity;
+        await product.save();
+
+        await StockMovement.create({
+          productId: product._id,
+          boutiqueId: item.boutiqueId,
+          type: 'in',
+          quantity: item.quantity,
+          previousStock,
+          newStock: product.stock,
+          reason: `Annulation commande (admin) - ${order.orderReference}`,
+          reference: order.orderReference,
+          userId: req.user._id
+        });
+      }
     }
   }
 

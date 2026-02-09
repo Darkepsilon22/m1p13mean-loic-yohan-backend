@@ -171,7 +171,7 @@ const orderSchema = new mongoose.Schema({
   // Order expiration (for unpaid orders)
   expiresAt: {
     type: Date,
-    default: () => new Date(Date.now() + 15 * 60 * 1000) // 15 minutes
+    default: () => new Date(Date.now() + 2 * 60 * 1000) // 2 minutes (TEST MODE - change to 15 in production)
   }
 }, {
   timestamps: true
@@ -308,21 +308,42 @@ orderSchema.statics.getByBoutique = async function(boutiqueId, filters = {}) {
 orderSchema.statics.expirePendingOrders = async function() {
   const expiredOrders = await this.find({
     status: 'pending',
-    paymentStatus: 'pending',
+    paymentStatus: { $in: ['pending', 'processing'] },
     expiresAt: { $lt: new Date() }
   });
 
+  const Product = mongoose.model('Product');
+  const StockMovement = mongoose.model('StockMovement');
+
   for (const order of expiredOrders) {
     order.status = 'cancelled';
-    order.adminNotes = (order.adminNotes || '') + ' [Auto-cancelled: payment timeout]';
+    order.cancelledAt = new Date();
+    order.adminNotes = (order.adminNotes || '') + ` [Auto-annulé: délai de paiement expiré]`;
     await order.save();
 
-    // Restore stock for each item
-    const Product = mongoose.model('Product');
+    // Restore stock for each item and record stock movement
     for (const item of order.items) {
-      await Product.findByIdAndUpdate(item.productId, {
-        $inc: { stock: item.quantity }
-      });
+      const product = await Product.findById(item.productId);
+      if (product) {
+        const previousStock = product.stock;
+        product.stock += item.quantity;
+        await product.save();
+
+        // Create stock movement record
+        await StockMovement.create({
+          productId: product._id,
+          boutiqueId: item.boutiqueId,
+          type: 'in',
+          quantity: item.quantity,
+          previousStock,
+          newStock: product.stock,
+          reason: `Expiration commande - ${order.orderReference} (délai de paiement dépassé)`,
+          reference: order.orderReference,
+          userId: order.userId
+        });
+
+        console.log(`🔄 Stock restored for "${product.name}": ${previousStock} → ${product.stock} (order expired: ${order.orderReference})`);
+      }
     }
   }
 
