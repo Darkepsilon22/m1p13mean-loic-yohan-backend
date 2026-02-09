@@ -18,7 +18,7 @@ const TYPE_LABELS = {
  * @param {string|null} category - Optional categoryInternal filter
  * @returns {Promise<Array>} Movements with populated productId
  */
-async function getMovementsForExport(boutiqueId, dateDebut, dateFin, productIds, category) {
+async function getMovementsForExport(boutiqueId, dateDebut, dateFin, productIds, category, type) {
   const query = { boutiqueId };
 
   query.createdAt = {};
@@ -31,6 +31,11 @@ async function getMovementsForExport(boutiqueId, dateDebut, dateFin, productIds,
 
   if (productIds && productIds.length > 0) {
     query.productId = { $in: productIds };
+  }
+
+  // Filter by movement type (in, out, adjustment, initial)
+  if (type && type.trim()) {
+    query.type = type.trim();
   }
 
   let movements = await StockMovement.find(query)
