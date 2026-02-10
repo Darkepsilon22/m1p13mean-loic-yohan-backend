@@ -31,6 +31,20 @@ router.post('/', verifyToken, isAcheteur, createOrder, orderController.createOrd
 router.get('/my-orders', verifyToken, isAcheteur, listOrders, orderController.getMyOrders);
 
 /**
+ * @route   GET /api/orders/my-orders/export/pdf
+ * @desc    Export user's orders as PDF
+ * @access  Private (acheteur)
+ */
+router.get('/my-orders/export/pdf', verifyToken, isAcheteur, orderController.exportMyOrdersPDF);
+
+/**
+ * @route   GET /api/orders/my-orders/export/excel
+ * @desc    Export user's orders as Excel
+ * @access  Private (acheteur)
+ */
+router.get('/my-orders/export/excel', verifyToken, isAcheteur, orderController.exportMyOrdersExcel);
+
+/**
  * @route   GET /api/orders/reference/:reference
  * @desc    Get order by reference
  * @access  Private (acheteur - own orders only)

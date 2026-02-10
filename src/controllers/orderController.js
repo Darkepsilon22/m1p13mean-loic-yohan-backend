@@ -7,6 +7,7 @@ const User = require('../models/User');
 const StockMovement = require('../models/StockMovement');
 const { ApiError, asyncHandler } = require('../middlewares/errorHandler');
 const { sendLowStockAlertEmail } = require('../services/emailService');
+const { generateOrdersPDF, generateOrdersExcel } = require('../services/orderExportService');
 
 /**
  * @desc    Create order from cart
@@ -184,6 +185,44 @@ exports.getMyOrders = asyncHandler(async (req, res) => {
       }
     }
   });
+});
+
+/**
+ * @desc    Export user's orders as PDF
+ * @route   GET /api/orders/my-orders/export/pdf
+ * @access  Private (acheteur)
+ */
+exports.exportMyOrdersPDF = asyncHandler(async (req, res) => {
+  const orders = await Order.find({ userId: req.user._id })
+    .populate('items.boutiqueId', 'name')
+    .sort('-createdAt')
+    .lean();
+
+  const customerName = `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim();
+  const buffer = await generateOrdersPDF(orders, customerName);
+
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename=historique-achats-${Date.now()}.pdf`);
+  res.send(buffer);
+});
+
+/**
+ * @desc    Export user's orders as Excel
+ * @route   GET /api/orders/my-orders/export/excel
+ * @access  Private (acheteur)
+ */
+exports.exportMyOrdersExcel = asyncHandler(async (req, res) => {
+  const orders = await Order.find({ userId: req.user._id })
+    .populate('items.boutiqueId', 'name')
+    .sort('-createdAt')
+    .lean();
+
+  const customerName = `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim();
+  const buffer = await generateOrdersExcel(orders, customerName);
+
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename=historique-achats-${Date.now()}.xlsx`);
+  res.send(buffer);
 });
 
 /**
