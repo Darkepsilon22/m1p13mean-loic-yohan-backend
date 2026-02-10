@@ -124,7 +124,7 @@ cartSchema.methods.updateItemQuantity = async function(productId, quantity) {
   );
 
   if (!item) {
-    throw new Error('Item not found in cart');
+    throw new Error('Article introuvable dans le panier');
   }
 
   if (quantity <= 0) {
@@ -163,7 +163,7 @@ cartSchema.methods.validateStock = async function() {
       errors.push({
         productId: item.productId,
         productName: item.productName,
-        error: 'Product no longer exists'
+        error: 'Le produit n\'existe plus'
       });
       continue;
     }
@@ -172,7 +172,7 @@ cartSchema.methods.validateStock = async function() {
       errors.push({
         productId: item.productId,
         productName: item.productName,
-        error: 'Product is no longer available'
+        error: 'Le produit n\'est plus disponible'
       });
       continue;
     }
@@ -181,7 +181,7 @@ cartSchema.methods.validateStock = async function() {
       errors.push({
         productId: item.productId,
         productName: item.productName,
-        error: `Insufficient stock. Available: ${product.stock}, Requested: ${item.quantity}`,
+        error: `Stock insuffisant. Disponible : ${product.stock}, Demandé : ${item.quantity}`,
         availableStock: product.stock
       });
     }
