@@ -921,3 +921,111 @@ exports.getBoutiqueDashboard = asyncHandler(async (req, res) => {
     }
   });
 });
+
+/**
+ * @desc    Get boutique product sales trends over time (monthly, per product)
+ * @route   GET /api/stats/boutique/products-trends
+ * @access  Private (boutique)
+ */
+exports.getBoutiqueProductsTrends = asyncHandler(async (req, res) => {
+  const boutiqueId = req.user.boutiqueId;
+  const { months = 12, type = 'top' } = req.query;
+
+  const startDate = new Date();
+  startDate.setMonth(startDate.getMonth() - parseInt(months));
+
+  
+  const sortOrder = type === 'low' ? 1 : -1;
+  const topProducts = await Order.aggregate([
+    {
+      $match: {
+        'items.boutiqueId': new mongoose.Types.ObjectId(boutiqueId),
+        paymentStatus: 'success',
+        createdAt: { $gte: startDate }
+      }
+    },
+    { $unwind: '$items' },
+    { $match: { 'items.boutiqueId': new mongoose.Types.ObjectId(boutiqueId) } },
+    {
+      $group: {
+        _id: '$items.productId',
+        productName: { $first: '$items.productName' },
+        totalQuantity: { $sum: '$items.quantity' }
+      }
+    },
+    { $sort: { totalQuantity: sortOrder } },
+    { $limit: 5 }
+  ]);
+
+  if (topProducts.length === 0) {
+    return res.status(200).json({
+      success: true,
+      data: { months: [], products: [] }
+    });
+  }
+
+  const productIds = topProducts.map(p => p._id);
+
+  const monthlySales = await Order.aggregate([
+    {
+      $match: {
+        'items.boutiqueId': new mongoose.Types.ObjectId(boutiqueId),
+        paymentStatus: 'success',
+        createdAt: { $gte: startDate }
+      }
+    },
+    { $unwind: '$items' },
+    {
+      $match: {
+        'items.boutiqueId': new mongoose.Types.ObjectId(boutiqueId),
+        'items.productId': { $in: productIds }
+      }
+    },
+    {
+      $group: {
+        _id: {
+          productId: '$items.productId',
+          productName: '$items.productName',
+          year: { $year: '$createdAt' },
+          month: { $month: '$createdAt' }
+        },
+        quantity: { $sum: '$items.quantity' }
+      }
+    },
+    { $sort: { '_id.year': 1, '_id.month': 1 } }
+  ]);
+
+  const monthLabels = [];
+  const d = new Date(startDate);
+  d.setDate(1);
+  const now = new Date();
+  const monthNames = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'];
+  while (d <= now) {
+    monthLabels.push({
+      label: monthNames[d.getMonth()] + ' ' + d.getFullYear(),
+      year: d.getFullYear(),
+      month: d.getMonth() + 1
+    });
+    d.setMonth(d.getMonth() + 1);
+  }
+
+  const productsData = topProducts.map(p => {
+    const data = monthLabels.map(m => {
+      const found = monthlySales.find(
+        s => s._id.productId?.toString() === p._id?.toString()
+          && s._id.year === m.year
+          && s._id.month === m.month
+      );
+      return found ? found.quantity : 0;
+    });
+    return { productName: p.productName, data };
+  });
+
+  res.status(200).json({
+    success: true,
+    data: {
+      months: monthLabels.map(m => m.label),
+      products: productsData
+    }
+  });
+});
