@@ -6,6 +6,11 @@ const reviewSchema = new mongoose.Schema({
     ref: 'Boutique',
     required: [true, 'Boutique is required']
   },
+  productId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Product',
+    default: null
+  },
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
@@ -52,10 +57,28 @@ const reviewSchema = new mongoose.Schema({
   timestamps: true
 });
 
-reviewSchema.index({ boutiqueId: 1, userId: 1 }, { unique: true });
+reviewSchema.index({ boutiqueId: 1, productId: 1, userId: 1 }, { unique: true });
+reviewSchema.index({ boutiqueId: 1, productId: 1 });
 reviewSchema.index({ boutiqueId: 1 });
 reviewSchema.index({ status: 1 });
 reviewSchema.index({ rating: -1 });
 reviewSchema.index({ createdAt: -1 });
 
-module.exports = mongoose.model('Review', reviewSchema);
+const Review = mongoose.model('Review', reviewSchema);
+
+// Migration: supprimer l'ancien index unique {boutiqueId, userId} s'il existe
+Review.collection.dropIndex('boutiqueId_1_userId_1').catch(() => {
+  // L'index n'existe plus, c'est OK
+});
+
+// Migration: ajouter productId: null aux anciens avis qui n'ont pas ce champ
+Review.updateMany(
+  { productId: { $exists: false } },
+  { $set: { productId: null } }
+).then(result => {
+  if (result.modifiedCount > 0) {
+    console.log(`[Review migration] ${result.modifiedCount} ancien(s) avis mis à jour avec productId: null`);
+  }
+}).catch(() => {});
+
+module.exports = Review;
