@@ -91,20 +91,21 @@ cartSchema.virtual('itemsByBoutique').get(function() {
 });
 
 // Method to add item to cart
-cartSchema.methods.addItem = async function(product, quantity = 1) {
+cartSchema.methods.addItem = async function(product, quantity = 1, effectivePrice = null) {
+  const price = effectivePrice != null ? effectivePrice : product.price;
   const existingItem = this.items.find(
     item => item.productId.toString() === product._id.toString()
   );
 
   if (existingItem) {
     existingItem.quantity += quantity;
-    existingItem.unitPrice = product.price; // Update price
+    existingItem.unitPrice = price; // Update price (avec promo si applicable)
   } else {
     this.items.push({
       productId: product._id,
       boutiqueId: product.boutiqueId,
       quantity,
-      unitPrice: product.price,
+      unitPrice: price,
       productName: product.name,
       productImage: product.mainPhoto || (product.photos && product.photos[0])
     });
@@ -123,7 +124,7 @@ cartSchema.methods.updateItemQuantity = async function(productId, quantity) {
   );
 
   if (!item) {
-    throw new Error('Item not found in cart');
+    throw new Error('Article introuvable dans le panier');
   }
 
   if (quantity <= 0) {
@@ -151,7 +152,9 @@ cartSchema.methods.clearCart = async function() {
 // Method to check stock availability for all items
 cartSchema.methods.validateStock = async function() {
   const Product = mongoose.model('Product');
+  const Promotion = mongoose.model('Promotion');
   const errors = [];
+  let priceUpdated = false;
 
   for (const item of this.items) {
     const product = await Product.findById(item.productId);
@@ -160,7 +163,7 @@ cartSchema.methods.validateStock = async function() {
       errors.push({
         productId: item.productId,
         productName: item.productName,
-        error: 'Product no longer exists'
+        error: 'Le produit n\'existe plus'
       });
       continue;
     }
@@ -169,7 +172,7 @@ cartSchema.methods.validateStock = async function() {
       errors.push({
         productId: item.productId,
         productName: item.productName,
-        error: 'Product is no longer available'
+        error: 'Le produit n\'est plus disponible'
       });
       continue;
     }
@@ -178,19 +181,36 @@ cartSchema.methods.validateStock = async function() {
       errors.push({
         productId: item.productId,
         productName: item.productName,
-        error: `Insufficient stock. Available: ${product.stock}, Requested: ${item.quantity}`,
+        error: `Stock insuffisant. Disponible : ${product.stock}, Demandé : ${item.quantity}`,
         availableStock: product.stock
       });
     }
 
-    // Update price if changed
-    if (product.price !== item.unitPrice) {
-      item.unitPrice = product.price;
+    // Calculer le prix effectif (avec promo si applicable)
+    let effectivePrice = product.price;
+    const now = new Date();
+    const promo = await Promotion.findOne({
+      products: product._id,
+      status: 'active',
+      startDate: { $lte: now },
+      endDate: { $gt: now }
+    });
+    if (promo) {
+      if (promo.type === 'percentage' && promo.value != null) {
+        effectivePrice = Math.round(product.price * (1 - promo.value / 100));
+      } else if (promo.type === 'fixed' && promo.value != null) {
+        effectivePrice = Math.max(0, Math.round(product.price - promo.value));
+      }
+    }
+
+    if (item.unitPrice !== effectivePrice) {
+      item.unitPrice = effectivePrice;
+      priceUpdated = true;
     }
   }
 
-  if (errors.length > 0) {
-    await this.save(); // Save price updates
+  if (errors.length > 0 || priceUpdated) {
+    await this.save();
   }
 
   return {
