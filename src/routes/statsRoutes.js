@@ -70,4 +70,12 @@ router.get('/boutique/trends', verifyToken, isBoutique, statsController.getBouti
  */
 router.get('/boutique/margins', verifyToken, isBoutique, statsController.getBoutiqueMargins);
 
+/**
+ * @route   GET /api/stats/boutique/products-trends
+ * @desc    Get product sales trends over time (monthly per product)
+ * @access  Private (boutique)
+ * @query   months (default: 12), type (top|low)
+ */
+router.get('/boutique/products-trends', verifyToken, isBoutique, statsController.getBoutiqueProductsTrends);
+
 module.exports = router;
