@@ -800,6 +800,307 @@ const sendLowStockAlertEmail = async (email, firstName, alertData) => {
   });
 };
 
+// ==================== CONTRACT & INVOICE EMAILS ====================
+
+/**
+ * 1. Email: Reservation approved
+ */
+const sendReservationApprovedEmail = async (email, firstName, data) => {
+  const { boutiqueLocation, surface, price } = data;
+  const locationStr = boutiqueLocation
+    ? `Etage ${boutiqueLocation.floor || '-'}, Zone ${boutiqueLocation.zone || '-'}, N° ${boutiqueLocation.number || '-'}`
+    : 'Non specifie';
+
+  const html = `
+    <!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>${emailStyles}</style></head>
+    <body><div class="container"><div class="card">
+      <div class="header"><h1>Smar'ket</h1><p>Demande d'emplacement approuvee</p></div>
+      <div class="content">
+        <h2>Bonjour ${firstName},</h2>
+        <div class="success-box"><strong>Bonne nouvelle !</strong> Votre demande d'emplacement a ete approuvee par l'administration.</div>
+        <h3 style="font-size:14px;margin:20px 0 10px;">Details de l'emplacement</h3>
+        <ul class="list">
+          <li><strong>Localisation :</strong> ${locationStr}</li>
+          <li><strong>Surface :</strong> ${surface ? surface + ' m²' : '-'}</li>
+          <li><strong>Loyer mensuel :</strong> ${formatMGA(price || 0)}</li>
+        </ul>
+        <div class="info-box"><strong>Prochaine etape :</strong> Un contrat va etre genere par l'administration. Vous recevrez un email des qu'il sera disponible pour signature.</div>
+        <center><a href="${process.env.FRONTEND_URL}/emplacement/my-reservation" class="button">Voir ma reservation</a></center>
+      </div>
+      <div class="footer"><p>${new Date().getFullYear()} Smar'ket. Tous droits reserves.</p></div>
+    </div></div></body></html>`;
+
+  await sendEmail({ to: email, subject: "Votre demande d'emplacement a ete approuvee - Smar'ket", html });
+};
+
+/**
+ * 2. Email: Contract created
+ */
+const sendContractCreatedEmail = async (email, firstName, data) => {
+  const { reference, monthlyRent, deposit, startDate, endDate, boutiqueLocation } = data;
+  const locationStr = boutiqueLocation
+    ? `Etage ${boutiqueLocation.floor || '-'}, Zone ${boutiqueLocation.zone || '-'}, N° ${boutiqueLocation.number || '-'}`
+    : '';
+
+  const html = `
+    <!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>${emailStyles}</style></head>
+    <body><div class="container"><div class="card">
+      <div class="header"><h1>Smar'ket</h1><p>Votre contrat est disponible</p></div>
+      <div class="content">
+        <h2>Bonjour ${firstName},</h2>
+        <p>Un contrat a ete genere pour votre emplacement. Voici le resume :</p>
+        <ul class="list">
+          <li><strong>Reference :</strong> ${reference}</li>
+          ${locationStr ? `<li><strong>Emplacement :</strong> ${locationStr}</li>` : ''}
+          <li><strong>Loyer mensuel :</strong> ${formatMGA(monthlyRent)}</li>
+          <li><strong>Caution :</strong> ${formatMGA(deposit)}</li>
+          <li><strong>Periode :</strong> ${new Date(startDate).toLocaleDateString('fr-FR')} au ${new Date(endDate).toLocaleDateString('fr-FR')}</li>
+        </ul>
+        <div class="info-box"><strong>Prochaine etape :</strong> L'administration va vous envoyer le contrat pour signature. Vous serez notifie par email.</div>
+        <center><a href="${process.env.FRONTEND_URL}/emplacement/my-contract" class="button">Voir mon contrat</a></center>
+      </div>
+      <div class="footer"><p>${new Date().getFullYear()} Smar'ket. Tous droits reserves.</p></div>
+    </div></div></body></html>`;
+
+  await sendEmail({ to: email, subject: `Contrat ${reference} disponible - Smar'ket`, html });
+};
+
+/**
+ * 3. Email: Contract signed - payment required (7-day deadline)
+ */
+const sendContractSignedEmail = async (email, firstName, data) => {
+  const { reference, deposit, monthlyRent, deadline } = data;
+  const deadlineStr = new Date(deadline).toLocaleDateString('fr-FR');
+
+  const html = `
+    <!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>${emailStyles}</style></head>
+    <body><div class="container"><div class="card">
+      <div class="header"><h1>Smar'ket</h1><p>Contrat signe - paiement requis</p></div>
+      <div class="content">
+        <h2>Bonjour ${firstName},</h2>
+        <div class="success-box"><strong>Contrat signe avec succes !</strong> Votre contrat ${reference} a ete signe.</div>
+        <p>Pour activer votre contrat, vous devez effectuer les paiements suivants :</p>
+        <ul class="list">
+          <li><strong>Caution (depot de garantie) :</strong> ${formatMGA(deposit)}</li>
+          <li><strong>Premier loyer :</strong> ${formatMGA(monthlyRent)}</li>
+          <li><strong>Total a payer :</strong> ${formatMGA(deposit + monthlyRent)}</li>
+        </ul>
+        <div class="warning-box"><strong>Date limite : ${deadlineStr}</strong><br>Vous disposez de 7 jours pour effectuer la totalite des paiements. Passe ce delai, le contrat sera automatiquement resilie.</div>
+        <center><a href="${process.env.FRONTEND_URL}/emplacement/my-invoices" class="button">Payer maintenant</a></center>
+      </div>
+      <div class="footer"><p>${new Date().getFullYear()} Smar'ket. Tous droits reserves.</p></div>
+    </div></div></body></html>`;
+
+  await sendEmail({ to: email, subject: `Contrat signe - paiement requis sous 7 jours - Smar'ket`, html });
+};
+
+/**
+ * 4. Email: Partial payment received
+ */
+const sendDepositPartialEmail = async (email, firstName, data) => {
+  const { reference, amountPaid, amountTotal, remaining, deadline } = data;
+  const deadlineStr = new Date(deadline).toLocaleDateString('fr-FR');
+
+  const html = `
+    <!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>${emailStyles}</style></head>
+    <body><div class="container"><div class="card">
+      <div class="header"><h1>Smar'ket</h1><p>Paiement partiel recu</p></div>
+      <div class="content">
+        <h2>Bonjour ${firstName},</h2>
+        <div class="info-box"><strong>Paiement enregistre</strong> pour le contrat ${reference}.</div>
+        <ul class="list">
+          <li><strong>Montant paye :</strong> ${formatMGA(amountPaid)}</li>
+          <li><strong>Montant total :</strong> ${formatMGA(amountTotal)}</li>
+          <li><strong>Reste a payer :</strong> ${formatMGA(remaining)}</li>
+        </ul>
+        <div class="warning-box"><strong>Date limite : ${deadlineStr}</strong><br>Veuillez completer le paiement avant cette date pour eviter la resiliation automatique du contrat.</div>
+        <center><a href="${process.env.FRONTEND_URL}/emplacement/my-invoices" class="button">Completer le paiement</a></center>
+      </div>
+      <div class="footer"><p>${new Date().getFullYear()} Smar'ket. Tous droits reserves.</p></div>
+    </div></div></body></html>`;
+
+  await sendEmail({ to: email, subject: `Paiement partiel recu - ${reference} - Smar'ket`, html });
+};
+
+/**
+ * 5. Email: Contract activated (both deposit + rent paid)
+ */
+const sendContractActivatedEmail = async (email, firstName, data) => {
+  const { reference, startDate, boutiqueLocation, monthlyRent } = data;
+  const locationStr = boutiqueLocation
+    ? `Etage ${boutiqueLocation.floor || '-'}, Zone ${boutiqueLocation.zone || '-'}, N° ${boutiqueLocation.number || '-'}`
+    : '';
+
+  const html = `
+    <!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>${emailStyles}</style></head>
+    <body><div class="container"><div class="card">
+      <div class="header"><h1>Smar'ket</h1><p>Contrat active</p></div>
+      <div class="content">
+        <h2>Bonjour ${firstName},</h2>
+        <div class="success-box"><strong>Felicitations !</strong> Votre contrat ${reference} est maintenant actif.</div>
+        <ul class="list">
+          ${locationStr ? `<li><strong>Emplacement :</strong> ${locationStr}</li>` : ''}
+          <li><strong>Date d'entree :</strong> ${new Date(startDate).toLocaleDateString('fr-FR')}</li>
+          <li><strong>Loyer mensuel :</strong> ${formatMGA(monthlyRent)}</li>
+        </ul>
+        <div class="info-box"><strong>Informations importantes :</strong><br>- Votre loyer est du chaque mois.<br>- Vous recevrez un rappel 5 jours avant chaque echeance.<br>- En cas de retard, des penalites de 5% seront appliquees.</div>
+        <center><a href="${process.env.FRONTEND_URL}/emplacement/my-contract" class="button">Voir mon contrat</a></center>
+      </div>
+      <div class="footer"><p>${new Date().getFullYear()} Smar'ket. Tous droits reserves.</p></div>
+    </div></div></body></html>`;
+
+  await sendEmail({ to: email, subject: `Contrat ${reference} active - Smar'ket`, html });
+};
+
+/**
+ * 6. Email: Rent reminder (5 days before due)
+ */
+const sendRentReminderEmail = async (email, firstName, data) => {
+  const { reference, amountDue, dueDate, period } = data;
+
+  const html = `
+    <!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>${emailStyles}</style></head>
+    <body><div class="container"><div class="card">
+      <div class="header"><h1>Smar'ket</h1><p>Rappel - Loyer du mois a venir</p></div>
+      <div class="content">
+        <h2>Bonjour ${firstName},</h2>
+        <p>Ceci est un rappel concernant votre loyer a venir.</p>
+        <ul class="list">
+          <li><strong>Facture :</strong> ${reference}</li>
+          <li><strong>Montant :</strong> ${formatMGA(amountDue)}</li>
+          <li><strong>Periode :</strong> ${period}</li>
+          <li><strong>Date d'echeance :</strong> ${new Date(dueDate).toLocaleDateString('fr-FR')}</li>
+        </ul>
+        <div class="info-box">Pensez a effectuer votre paiement avant la date d'echeance pour eviter les penalites de retard.</div>
+        <center><a href="${process.env.FRONTEND_URL}/emplacement/my-invoices" class="button">Payer maintenant</a></center>
+      </div>
+      <div class="footer"><p>${new Date().getFullYear()} Smar'ket. Tous droits reserves.</p></div>
+    </div></div></body></html>`;
+
+  await sendEmail({ to: email, subject: `Rappel - Loyer du mois a venir - Smar'ket`, html });
+};
+
+/**
+ * 7. Email: Rent late - Day 1
+ */
+const sendRentLateDay1Email = async (email, firstName, data) => {
+  const { reference, amountDue, dueDate } = data;
+
+  const html = `
+    <!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>${emailStyles}</style></head>
+    <body><div class="container"><div class="card">
+      <div class="header"><h1>Smar'ket</h1><p>Paiement en retard</p></div>
+      <div class="content">
+        <h2>Bonjour ${firstName},</h2>
+        <div class="warning-box"><strong>Votre paiement est en retard.</strong><br>La facture ${reference} d'un montant de ${formatMGA(amountDue)} etait due le ${new Date(dueDate).toLocaleDateString('fr-FR')}.</div>
+        <p>Veuillez effectuer votre paiement dans les plus brefs delais pour eviter l'application de penalites.</p>
+        <div class="info-box"><strong>Rappel :</strong> Des penalites de 5% seront appliquees apres 7 jours de retard.</div>
+        <center><a href="${process.env.FRONTEND_URL}/emplacement/my-invoices" class="button">Payer maintenant</a></center>
+      </div>
+      <div class="footer"><p>${new Date().getFullYear()} Smar'ket. Tous droits reserves.</p></div>
+    </div></div></body></html>`;
+
+  await sendEmail({ to: email, subject: `Paiement en retard - ${reference} - Smar'ket`, html });
+};
+
+/**
+ * 8. Email: Rent late - Day 7 (penalty applied)
+ */
+const sendRentLateDay7Email = async (email, firstName, data) => {
+  const { reference, amountDue, lateFees, totalDue } = data;
+
+  const html = `
+    <!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>${emailStyles}</style></head>
+    <body><div class="container"><div class="card">
+      <div class="header"><h1>Smar'ket</h1><p>Penalite appliquee</p></div>
+      <div class="content">
+        <h2>Bonjour ${firstName},</h2>
+        <div class="warning-box"><strong>Une penalite de retard a ete appliquee</strong> sur votre facture ${reference}.</div>
+        <ul class="list">
+          <li><strong>Montant initial :</strong> ${formatMGA(amountDue)}</li>
+          <li><strong>Penalite (5%) :</strong> ${formatMGA(lateFees)}</li>
+          <li><strong>Total a payer :</strong> ${formatMGA(totalDue)}</li>
+        </ul>
+        <div class="info-box"><strong>Attention :</strong> Si le paiement n'est pas effectue sous 30 jours, votre contrat risque d'etre resilie.</div>
+        <center><a href="${process.env.FRONTEND_URL}/emplacement/my-invoices" class="button">Payer maintenant</a></center>
+      </div>
+      <div class="footer"><p>${new Date().getFullYear()} Smar'ket. Tous droits reserves.</p></div>
+    </div></div></body></html>`;
+
+  await sendEmail({ to: email, subject: `Penalite appliquee - ${reference} - Smar'ket`, html });
+};
+
+/**
+ * 9. Email: Rent late - Day 30 (termination risk)
+ */
+const sendRentLateDay30Email = async (email, firstName, data) => {
+  const { reference, totalDue } = data;
+
+  const html = `
+    <!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>${emailStyles}</style></head>
+    <body><div class="container"><div class="card">
+      <div class="header"><h1>Smar'ket</h1><p>Risque de resiliation</p></div>
+      <div class="content">
+        <h2>Bonjour ${firstName},</h2>
+        <div class="warning-box"><strong>ATTENTION : Risque de resiliation de votre contrat.</strong><br>Votre facture ${reference} est en retard de 30 jours. Le montant total du est de ${formatMGA(totalDue)}.</div>
+        <p>Si le paiement n'est pas effectue rapidement, votre contrat sera automatiquement resilie et votre emplacement sera libere.</p>
+        <center><a href="${process.env.FRONTEND_URL}/emplacement/my-invoices" class="button">Payer immediatement</a></center>
+      </div>
+      <div class="footer"><p>${new Date().getFullYear()} Smar'ket. Tous droits reserves.</p></div>
+    </div></div></body></html>`;
+
+  await sendEmail({ to: email, subject: `URGENT - Risque de resiliation - ${reference} - Smar'ket`, html });
+};
+
+/**
+ * 10. Email: Contract expiring (30 days before end)
+ */
+const sendContractExpiringEmail = async (email, firstName, data) => {
+  const { reference, endDate, boutiqueLocation } = data;
+  const locationStr = boutiqueLocation
+    ? `Etage ${boutiqueLocation.floor || '-'}, Zone ${boutiqueLocation.zone || '-'}, N° ${boutiqueLocation.number || '-'}`
+    : '';
+
+  const html = `
+    <!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>${emailStyles}</style></head>
+    <body><div class="container"><div class="card">
+      <div class="header"><h1>Smar'ket</h1><p>Contrat arrive a expiration</p></div>
+      <div class="content">
+        <h2>Bonjour ${firstName},</h2>
+        <div class="info-box"><strong>Votre contrat ${reference} arrive a expiration</strong> le ${new Date(endDate).toLocaleDateString('fr-FR')}.</div>
+        ${locationStr ? `<p><strong>Emplacement :</strong> ${locationStr}</p>` : ''}
+        <p>Si vous souhaitez renouveler votre contrat, veuillez contacter l'administration avant la date d'expiration.</p>
+        <center><a href="${process.env.FRONTEND_URL}/emplacement/my-contract" class="button">Voir mon contrat</a></center>
+      </div>
+      <div class="footer"><p>${new Date().getFullYear()} Smar'ket. Tous droits reserves.</p></div>
+    </div></div></body></html>`;
+
+  await sendEmail({ to: email, subject: `Votre contrat arrive a expiration - Smar'ket`, html });
+};
+
+/**
+ * 11. Email: Contract terminated
+ */
+const sendContractTerminatedEmail = async (email, firstName, data) => {
+  const { reference, terminationReason, terminatedAt } = data;
+
+  const html = `
+    <!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>${emailStyles}</style></head>
+    <body><div class="container"><div class="card">
+      <div class="header"><h1>Smar'ket</h1><p>Contrat resilie</p></div>
+      <div class="content">
+        <h2>Bonjour ${firstName},</h2>
+        <div class="warning-box"><strong>Votre contrat ${reference} a ete resilie</strong> le ${new Date(terminatedAt).toLocaleDateString('fr-FR')}.</div>
+        ${terminationReason ? `<p><strong>Raison :</strong> ${terminationReason}</p>` : ''}
+        <p>Votre emplacement a ete libere. Si vous pensez qu'il s'agit d'une erreur, veuillez contacter l'administration.</p>
+        <center><a href="${process.env.FRONTEND_URL}/emplacement/my-contract" class="button">Voir les details</a></center>
+      </div>
+      <div class="footer"><p>${new Date().getFullYear()} Smar'ket. Tous droits reserves.</p></div>
+    </div></div></body></html>`;
+
+  await sendEmail({ to: email, subject: `Contrat ${reference} resilie - Smar'ket`, html });
+};
+
 module.exports = {
   sendEmail,
   sendVerificationEmail,
@@ -810,5 +1111,16 @@ module.exports = {
   sendApprovalEmail,
   sendRejectionEmail,
   sendPendingApprovalEmail,
-  sendLowStockAlertEmail
+  sendLowStockAlertEmail,
+  sendReservationApprovedEmail,
+  sendContractCreatedEmail,
+  sendContractSignedEmail,
+  sendDepositPartialEmail,
+  sendContractActivatedEmail,
+  sendRentReminderEmail,
+  sendRentLateDay1Email,
+  sendRentLateDay7Email,
+  sendRentLateDay30Email,
+  sendContractExpiringEmail,
+  sendContractTerminatedEmail
 };
