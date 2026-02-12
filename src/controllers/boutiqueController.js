@@ -139,14 +139,19 @@ exports.create = asyncHandler(async (req, res, next) => {
   if (body.openingHours == null) body.openingHours = defaultOpeningHours();
   else body.openingHours = normalizeOpeningHours(body.openingHours);
 
-  const userId = req.body.userId || req.user._id;
-  if (req.user.role !== 'admin' && userId.toString() !== req.user._id.toString()) {
+  const isAdminEmplacement = req.user.role === 'admin' && body.zoneId && body.mapShape;
+  const userId = isAdminEmplacement && body.userId == null
+    ? null
+    : (req.body.userId || req.user._id);
+  if (req.user.role !== 'admin' && userId && userId.toString() !== req.user._id.toString()) {
     return next(new ApiError(403, 'You can only create a boutique for your own account'));
   }
 
-  const existingBoutique = await Boutique.findOne({ userId });
-  if (existingBoutique) {
-    return next(new ApiError(400, 'This user already has a boutique'));
+  if (!isAdminEmplacement) {
+    const existingBoutique = await Boutique.findOne({ userId });
+    if (existingBoutique) {
+      return next(new ApiError(400, 'This user already has a boutique'));
+    }
   }
 
   const categoryExists = await Category.findById(body.categoryId);
@@ -154,9 +159,11 @@ exports.create = asyncHandler(async (req, res, next) => {
     return next(new ApiError(400, 'Invalid categoryId'));
   }
 
-  const userExists = await User.findById(userId);
-  if (!userExists) {
-    return next(new ApiError(400, 'Invalid userId'));
+  if (userId) {
+    const userExists = await User.findById(userId);
+    if (!userExists) {
+      return next(new ApiError(400, 'Invalid userId'));
+    }
   }
 
   if (body.zoneId && body.mapShape) {
