@@ -2,6 +2,7 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const Order = require('../models/Order');
 const Payment = require('../models/Payment');
 const { ApiError, asyncHandler } = require('../middlewares/errorHandler');
+const { getBrandingSettings } = require('../services/stripeBrandingService');
 
 /**
  * @desc    Get Stripe publishable key
@@ -83,12 +84,13 @@ exports.createCheckoutSession = asyncHandler(async (req, res, next) => {
 
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:4200';
 
-  // Create Stripe Checkout Session
+  // Create Stripe Checkout Session with branding
   const session = await stripe.checkout.sessions.create({
     payment_method_types: ['card'],
     mode: 'payment',
     line_items: lineItems,
     customer_email: order.customerEmail,
+    branding_settings: getBrandingSettings(),
     metadata: {
       orderId: order._id.toString(),
       orderReference: order.orderReference,
