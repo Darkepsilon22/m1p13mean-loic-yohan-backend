@@ -21,6 +21,13 @@ const PAYMENT_LABELS = {
 };
 
 /**
+ * Format amount like invoice emails: "15 000 Ar"
+ */
+const formatMGA = (amount) => {
+  return Math.round(amount).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' Ar';
+};
+
+/**
  * Generate PDF buffer for order history
  */
 function generateOrdersPDF(orders, customerName, statusLabel) {
@@ -81,7 +88,7 @@ function generateOrdersPDF(orders, customerName, statusLabel) {
         doc.text(STATUS_LABELS[o.status] || o.status, x, y, { width: colWidths[2] }); x += colWidths[2];
         doc.text(PAYMENT_LABELS[o.paymentStatus] || o.paymentStatus, x, y, { width: colWidths[3] }); x += colWidths[3];
         doc.text(`${itemCount} article(s)`, x, y, { width: colWidths[4] }); x += colWidths[4];
-        doc.text(`${(o.totalAmount || 0).toLocaleString('fr-FR')} MGA`, x, y, { width: colWidths[5] }); x += colWidths[5];
+        doc.text(formatMGA(o.totalAmount || 0), x, y, { width: colWidths[5] }); x += colWidths[5];
         doc.text(o.paymentMethod || '—', x, y, { width: colWidths[6] });
         y += rowHeight;
 
@@ -90,7 +97,7 @@ function generateOrdersPDF(orders, customerName, statusLabel) {
           doc.font('Helvetica').fontSize(6).fillColor('#666666');
           for (const item of o.items) {
             if (y > 750) { doc.addPage(); y = 40; }
-            doc.text(`   → ${item.productName || 'Produit'} x${item.quantity} — ${(item.unitPrice || 0).toLocaleString('fr-FR')} MGA/u`, margin + 10, y, { width: pageWidth - 10 });
+            doc.text(`   → ${item.productName || 'Produit'} x${item.quantity} — ${formatMGA(item.unitPrice || 0)}/u`, margin + 10, y, { width: pageWidth - 10 });
             y += 12;
           }
           doc.fillColor('#000000').fontSize(7);
@@ -104,7 +111,7 @@ function generateOrdersPDF(orders, customerName, statusLabel) {
       doc.moveTo(margin, y).lineTo(margin + pageWidth, y).stroke();
       y += 8;
       const totalAmount = orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
-      doc.font('Helvetica-Bold').fontSize(10).text(`Total général : ${totalAmount.toLocaleString('fr-FR')} MGA`, margin, y);
+      doc.font('Helvetica-Bold').fontSize(10).text(`Total général : ${formatMGA(totalAmount)}`, margin, y);
 
       doc.end();
     } catch (err) {
@@ -144,7 +151,7 @@ async function generateOrdersExcel(orders, customerName, statusLabel) {
   ];
 
   const headerRow = sheet.getRow(4);
-  headerRow.values = ['Référence', 'Date', 'Statut', 'Paiement', 'Articles', 'Total (MGA)', 'Méthode'];
+  headerRow.values = ['Référence', 'Date', 'Statut', 'Paiement', 'Articles', 'Total (Ar)', 'Méthode'];
   headerRow.font = { bold: true };
   headerRow.eachCell(cell => {
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4472C4' } };
@@ -162,7 +169,7 @@ async function generateOrdersExcel(orders, customerName, statusLabel) {
       STATUS_LABELS[o.status] || o.status,
       PAYMENT_LABELS[o.paymentStatus] || o.paymentStatus,
       itemsStr,
-      o.totalAmount || 0,
+      formatMGA(o.totalAmount || 0),
       o.paymentMethod || '—'
     ];
     rowNum++;
@@ -172,9 +179,8 @@ async function generateOrdersExcel(orders, customerName, statusLabel) {
   const totalRow = sheet.getRow(rowNum + 1);
   totalRow.getCell(5).value = 'Total général :';
   totalRow.getCell(5).font = { bold: true };
-  totalRow.getCell(6).value = orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+  totalRow.getCell(6).value = formatMGA(orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0));
   totalRow.getCell(6).font = { bold: true };
-  totalRow.getCell(6).numFmt = '#,##0';
 
   const buffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(buffer);
