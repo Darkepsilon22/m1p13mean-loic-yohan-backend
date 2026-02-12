@@ -23,7 +23,7 @@ const PAYMENT_LABELS = {
 /**
  * Generate PDF buffer for order history
  */
-function generateOrdersPDF(orders, customerName) {
+function generateOrdersPDF(orders, customerName, statusLabel) {
   return new Promise((resolve, reject) => {
     try {
       const doc = new PDFDocument({ margin: 40, size: 'A4', bufferPages: true });
@@ -36,7 +36,8 @@ function generateOrdersPDF(orders, customerName) {
       const pageWidth = doc.page.width - margin * 2;
 
       // Header
-      doc.fontSize(16).font('Helvetica-Bold').text('Historique des achats', margin, 40);
+      const title = statusLabel ? `Historique des achats — ${statusLabel}` : 'Historique des achats';
+      doc.fontSize(16).font('Helvetica-Bold').text(title, margin, 40);
       if (customerName) doc.fontSize(10).font('Helvetica').text(`Client : ${customerName}`, margin, 62);
       doc.fontSize(9).text(`Généré le : ${new Date().toLocaleString('fr-FR')}`, margin, 74);
       doc.fontSize(9).text(`Total : ${orders.length} commande(s)`, margin, 86);
@@ -115,14 +116,17 @@ function generateOrdersPDF(orders, customerName) {
 /**
  * Generate Excel buffer for order history
  */
-async function generateOrdersExcel(orders, customerName) {
+async function generateOrdersExcel(orders, customerName, statusLabel) {
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'Smar\'ket';
   const sheet = workbook.addWorksheet('Historique achats');
 
   // Summary row
   sheet.mergeCells('A1:G1');
-  sheet.getCell('A1').value = `Historique des achats — ${customerName || 'Client'}`;
+  const excelTitle = statusLabel
+    ? `Historique des achats — ${statusLabel} — ${customerName || 'Client'}`
+    : `Historique des achats — ${customerName || 'Client'}`;
+  sheet.getCell('A1').value = excelTitle;
   sheet.getCell('A1').font = { bold: true, size: 14 };
   sheet.mergeCells('A2:G2');
   sheet.getCell('A2').value = `Généré le ${new Date().toLocaleString('fr-FR')} — ${orders.length} commande(s)`;
@@ -178,5 +182,6 @@ async function generateOrdersExcel(orders, customerName) {
 
 module.exports = {
   generateOrdersPDF,
-  generateOrdersExcel
+  generateOrdersExcel,
+  STATUS_LABELS
 };
