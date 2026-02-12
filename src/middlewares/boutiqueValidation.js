@@ -110,6 +110,14 @@ const createBoutique = [
   body('location.mapCoordinates.x').optional().isNumeric().toFloat(),
   body('location.mapCoordinates.y').optional().isNumeric().toFloat(),
 
+  body('zoneId').optional().isMongoId().withMessage('zoneId must be a valid ObjectId'),
+  body('floorId').optional().isMongoId().withMessage('floorId must be a valid ObjectId'),
+  body('mapShape').optional().isObject().withMessage('mapShape must be an object'),
+  body('mapShape.x').optional().isNumeric().toFloat(),
+  body('mapShape.y').optional().isNumeric().toFloat(),
+  body('mapShape.width').optional().isFloat({ min: 0 }).toFloat(),
+  body('mapShape.height').optional().isFloat({ min: 0 }).toFloat(),
+
   body('openingHours')
     .optional()
     .isArray()
@@ -168,6 +176,14 @@ const updateBoutique = [
   body('location.number').optional().trim(),
   body('location.mapCoordinates.x').optional().isNumeric().toFloat(),
   body('location.mapCoordinates.y').optional().isNumeric().toFloat(),
+
+  body('zoneId').optional().isMongoId().withMessage('zoneId must be a valid ObjectId'),
+  body('floorId').optional().isMongoId().withMessage('floorId must be a valid ObjectId'),
+  body('mapShape').optional().isObject().withMessage('mapShape must be an object'),
+  body('mapShape.x').optional().isNumeric().toFloat(),
+  body('mapShape.y').optional().isNumeric().toFloat(),
+  body('mapShape.width').optional().isFloat({ min: 0 }).toFloat(),
+  body('mapShape.height').optional().isFloat({ min: 0 }).toFloat(),
 
   body('openingHours').optional().isArray(),
   body('rejectionReason').optional().trim(),

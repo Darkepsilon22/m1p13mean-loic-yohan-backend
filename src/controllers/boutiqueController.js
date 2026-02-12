@@ -1,6 +1,7 @@
 const Boutique = require('../models/Boutique');
 const Category = require('../models/Category');
 const User = require('../models/User');
+const Zone = require('../models/Zone');
 const ReservationBoutique = require('../models/ReservationBoutique');
 const BoutiqueReservationService = require('../services/boutiqueReservationService');
 const { ApiError, asyncHandler } = require('../middlewares/errorHandler');
@@ -32,6 +33,34 @@ const normalizeOpeningHours = (hours) => {
  */
 const canEditBoutique = (boutique, userId, userRole) => {
   return userRole === 'admin' || (boutique.userId && boutique.userId.toString() === userId.toString());
+};
+
+/**
+ * Validate zone constraints when zoneId and mapShape are set:
+ * - mapShape must be inside zone bounds
+ * - sum of surfaces in zone must not exceed zone.surfaceTotal
+ * @param {Object} options - { zoneId, floorId, mapShape, surface, excludeBoutiqueId }
+ * @throws {ApiError} if invalid
+ */
+const validateBoutiqueZoneConstraints = async (options) => {
+  const { zoneId, floorId, mapShape, surface, excludeBoutiqueId } = options;
+  if (!zoneId || !mapShape || mapShape.x == null || mapShape.y == null || mapShape.width == null || mapShape.height == null) {
+    return;
+  }
+  const zone = await Zone.findById(zoneId);
+  if (!zone) throw new ApiError(404, 'Zone not found');
+  const { x, y, width, height } = mapShape;
+  if (x < zone.x || y < zone.y || x + width > zone.x + zone.width || y + height > zone.y + zone.height) {
+    throw new ApiError(400, 'Boutique mapShape must be entirely inside the zone bounds');
+  }
+  const surfaceNum = surface != null ? Number(surface) : 0;
+  const query = { zoneId };
+  if (excludeBoutiqueId) query._id = { $ne: excludeBoutiqueId };
+  const existingSum = await Boutique.aggregate([{ $match: query }, { $group: { _id: null, total: { $sum: { $ifNull: ['$surface', 0] } } } }]);
+  const totalSurface = (existingSum[0]?.total || 0) + surfaceNum;
+  if (totalSurface > zone.surfaceTotal) {
+    throw new ApiError(400, `Total surface in zone would exceed zone capacity (${zone.surfaceTotal} m²). Available: ${zone.surfaceTotal - (existingSum[0]?.total || 0)} m².`);
+  }
 };
 
 /**
@@ -130,6 +159,19 @@ exports.create = asyncHandler(async (req, res, next) => {
     return next(new ApiError(400, 'Invalid userId'));
   }
 
+  if (body.zoneId && body.mapShape) {
+    await validateBoutiqueZoneConstraints({
+      zoneId: body.zoneId,
+      floorId: body.floorId,
+      mapShape: body.mapShape,
+      surface: body.surface
+    });
+    if (!body.floorId) {
+      const zone = await Zone.findById(body.zoneId).select('floorId').lean();
+      if (zone) body.floorId = zone.floorId;
+    }
+  }
+
   body.userId = userId;
   const boutique = await Boutique.create(body);
 
@@ -168,6 +210,19 @@ exports.update = asyncHandler(async (req, res, next) => {
   if (body.categoryId) {
     const categoryExists = await Category.findById(body.categoryId);
     if (!categoryExists) return next(new ApiError(400, 'Invalid categoryId'));
+  }
+
+  const zoneId = body.zoneId !== undefined ? body.zoneId : boutique.zoneId;
+  const mapShape = body.mapShape !== undefined ? body.mapShape : boutique.mapShape;
+  const surface = body.surface !== undefined ? body.surface : boutique.surface;
+  if (zoneId && mapShape && mapShape.x != null && mapShape.y != null && mapShape.width != null && mapShape.height != null) {
+    await validateBoutiqueZoneConstraints({
+      zoneId,
+      floorId: body.floorId !== undefined ? body.floorId : boutique.floorId,
+      mapShape,
+      surface,
+      excludeBoutiqueId: req.params.id
+    });
   }
 
   boutique = await Boutique.findByIdAndUpdate(

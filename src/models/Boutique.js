@@ -158,6 +158,23 @@ const boutiqueSchema = new mongoose.Schema({
   reservationExpires: {
     type: Date,
     default: null
+  },
+  // Modélisation 2D du centre commercial (étages / zones)
+  zoneId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Zone',
+    default: null
+  },
+  floorId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Floor',
+    default: null
+  },
+  mapShape: {
+    x: { type: Number },
+    y: { type: Number },
+    width: { type: Number },
+    height: { type: Number }
   }
 }, {
   timestamps: true
@@ -173,6 +190,8 @@ boutiqueSchema.index({ emplacementStatus: 1 });
 boutiqueSchema.index({ assignee: 1 });
 boutiqueSchema.index({ reservationExpires: 1 });
 boutiqueSchema.index({ price: 1 });
+boutiqueSchema.index({ zoneId: 1 });
+boutiqueSchema.index({ floorId: 1 });
 
 // Méthode pour vérifier si la réservation a expiré
 boutiqueSchema.methods.isReservationExpired = function() {
