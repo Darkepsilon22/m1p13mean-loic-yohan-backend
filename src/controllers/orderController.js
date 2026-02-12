@@ -7,7 +7,7 @@ const User = require('../models/User');
 const StockMovement = require('../models/StockMovement');
 const { ApiError, asyncHandler } = require('../middlewares/errorHandler');
 const { sendLowStockAlertEmail } = require('../services/emailService');
-const { generateOrdersPDF, generateOrdersExcel } = require('../services/orderExportService');
+const { generateOrdersPDF, generateOrdersExcel, STATUS_LABELS } = require('../services/orderExportService');
 
 /**
  * @desc    Create order from cart
@@ -193,13 +193,17 @@ exports.getMyOrders = asyncHandler(async (req, res) => {
  * @access  Private (acheteur)
  */
 exports.exportMyOrdersPDF = asyncHandler(async (req, res) => {
-  const orders = await Order.find({ userId: req.user._id })
+  const filter = { userId: req.user._id };
+  if (req.query.status) filter.status = req.query.status;
+
+  const orders = await Order.find(filter)
     .populate('items.boutiqueId', 'name')
     .sort('-createdAt')
     .lean();
 
   const customerName = `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim();
-  const buffer = await generateOrdersPDF(orders, customerName);
+  const statusLabel = req.query.status ? (STATUS_LABELS[req.query.status] || req.query.status) : null;
+  const buffer = await generateOrdersPDF(orders, customerName, statusLabel);
 
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename=historique-achats-${Date.now()}.pdf`);
@@ -212,13 +216,17 @@ exports.exportMyOrdersPDF = asyncHandler(async (req, res) => {
  * @access  Private (acheteur)
  */
 exports.exportMyOrdersExcel = asyncHandler(async (req, res) => {
-  const orders = await Order.find({ userId: req.user._id })
+  const filter = { userId: req.user._id };
+  if (req.query.status) filter.status = req.query.status;
+
+  const orders = await Order.find(filter)
     .populate('items.boutiqueId', 'name')
     .sort('-createdAt')
     .lean();
 
   const customerName = `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim();
-  const buffer = await generateOrdersExcel(orders, customerName);
+  const statusLabel = req.query.status ? (STATUS_LABELS[req.query.status] || req.query.status) : null;
+  const buffer = await generateOrdersExcel(orders, customerName, statusLabel);
 
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.setHeader('Content-Disposition', `attachment; filename=historique-achats-${Date.now()}.xlsx`);
