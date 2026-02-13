@@ -69,7 +69,7 @@ const validateBoutiqueZoneConstraints = async (options) => {
  * @access  Public
  */
 exports.getAll = asyncHandler(async (req, res, next) => {
-  const { category, status, floor, zone, search, page = 1, limit = 20, sort = '-createdAt' } = req.query;
+  const { category, status, floor, zone, floorId, search, page = 1, limit = 20, sort = '-createdAt' } = req.query;
 
   const filter = {};
 
@@ -78,7 +78,8 @@ exports.getAll = asyncHandler(async (req, res, next) => {
   }
   if (category) filter.categoryId = category;
   if (status) filter.status = status;
-  if (floor !== undefined && floor !== '') filter['location.floor'] = Number(floor);
+  if (floorId) filter.floorId = floorId;
+  else if (floor !== undefined && floor !== '') filter['location.floor'] = Number(floor);
   if (zone) filter['location.zone'] = new RegExp(zone, 'i');
 
   const skip = (Math.max(1, parseInt(page, 10)) - 1) * Math.min(100, Math.max(1, parseInt(limit, 10)));
@@ -292,7 +293,8 @@ exports.patchStatus = asyncHandler(async (req, res, next) => {
 });
 
 /**
- * @desc    Update boutique location only
+ * @desc    Update boutique location only (champs legacy: location.floor, zone, number, mapCoordinates).
+ *          Ne met pas à jour zoneId, floorId, mapShape (modélisation) — utiliser PUT /api/boutiques/:id pour cela.
  * @route   PATCH /api/boutiques/:id/location
  * @access  Private (admin or owner)
  */
@@ -362,11 +364,12 @@ exports.delete = asyncHandler(async (req, res, next) => {
  * @access  Public
  */
 exports.getAvailableBoutiques = asyncHandler(async (req, res, next) => {
-  const { floor, zone, minPrice, maxPrice, minSurface } = req.query;
+  const { floor, zone, floorId, minPrice, maxPrice, minSurface } = req.query;
 
   const result = await BoutiqueReservationService.getAvailableBoutiques({
     floor: floor !== undefined ? parseInt(floor) : undefined,
     zone,
+    floorId: floorId || undefined,
     minPrice: minPrice !== undefined ? parseFloat(minPrice) : undefined,
     maxPrice: maxPrice !== undefined ? parseFloat(maxPrice) : undefined,
     minSurface: minSurface !== undefined ? parseFloat(minSurface) : undefined
@@ -422,17 +425,18 @@ exports.getEmplacementStats = asyncHandler(async (req, res, next) => {
  * @access  Admin
  */
 exports.getAllEmplacementsAdmin = asyncHandler(async (req, res, next) => {
-  const { emplacementStatus, floor, zone } = req.query;
+  const { emplacementStatus, floor, zone, floorId } = req.query;
   const query = {};
 
   if (emplacementStatus) query.emplacementStatus = emplacementStatus;
-  if (floor !== undefined) query['location.floor'] = parseInt(floor);
-  if (zone) query['location.zone'] = zone;
+  if (floorId) query.floorId = floorId;
+  else if (floor !== undefined) query['location.floor'] = parseInt(floor);
+  if (zone) query['location.zone'] = new RegExp(zone, 'i');
 
   const boutiques = await Boutique.find(query)
     .populate('assignee', 'firstName lastName email')
     .populate('userId', 'firstName lastName email')
-    .sort({ 'location.floor': 1, 'location.zone': 1, 'location.number': 1 });
+    .sort({ floorId: 1, 'location.floor': 1, 'location.zone': 1, 'location.number': 1 });
 
   res.json({
     success: true,
@@ -453,20 +457,22 @@ exports.releaseBoutique = asyncHandler(async (req, res, next) => {
     return next(new ApiError(404, 'Boutique non trouvée'));
   }
 
-  const previousAssignee = boutique.assignee;
+  // Locataire actuel : modélisation utilise userId (assignee conservé pour compatibilité)
+  const previousUserId = boutique.userId || boutique.assignee;
 
   boutique.emplacementStatus = 'libre';
+  boutique.userId = null;
   boutique.assignee = null;
   boutique.reservationExpires = null;
   await boutique.save();
 
-  // Mettre à jour l'historique si nécessaire
-  if (previousAssignee) {
+  // Mettre à jour la réservation confirmée en annulée
+  if (previousUserId) {
     await ReservationBoutique.findOneAndUpdate(
       {
         boutique: req.params.id,
-        user: previousAssignee,
-        status: { $in: ['temporaire', 'confirmee'] }
+        user: previousUserId,
+        status: 'confirmee'
       },
       {
         status: 'annulee',

@@ -281,7 +281,7 @@ class BoutiqueReservationService {
     const reservations = await ReservationBoutique.find({
       status: 'en_attente_validation'
     })
-      .populate('boutique', 'name location surface price')
+      .populate('boutique') // full doc for floorId/mapShape (plan link)
       .populate('user', 'firstName lastName email')
       .sort({ requestedAt: 1 }); // Les plus anciennes d'abord
 
@@ -461,7 +461,9 @@ class BoutiqueReservationService {
 
     const query = { emplacementStatus: 'libre' };
 
-    if (filters.floor !== undefined) {
+    if (filters.floorId) {
+      query.floorId = filters.floorId;
+    } else if (filters.floor !== undefined) {
       query['location.floor'] = filters.floor;
     }
     if (filters.zone) {
