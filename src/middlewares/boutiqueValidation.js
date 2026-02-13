@@ -98,14 +98,12 @@ const createBoutique = [
     .toInt(),
 
   body('location.zone')
-    .trim()
-    .notEmpty()
-    .withMessage('Location zone is required'),
+    .optional()
+    .trim(),
 
   body('location.number')
-    .trim()
-    .notEmpty()
-    .withMessage('Location number is required'),
+    .optional()
+    .trim(),
 
   body('location.mapCoordinates.x').optional().isNumeric().toFloat(),
   body('location.mapCoordinates.y').optional().isNumeric().toFloat(),
@@ -249,6 +247,7 @@ const listBoutiques = [
   query('category').optional().isMongoId().withMessage('category must be a valid ObjectId'),
   query('status').optional().isIn(['pending', 'active', 'inactive', 'rejected']).withMessage('Invalid status'),
   query('floor').optional().isInt({ min: 0 }).toInt(),
+  query('floorId').optional().isMongoId().withMessage('floorId must be a valid ObjectId'),
   query('zone').optional().trim(),
   query('page').optional().isInt({ min: 1 }).toInt(),
   query('limit').optional().isInt({ min: 1, max: 100 }).toInt(),
