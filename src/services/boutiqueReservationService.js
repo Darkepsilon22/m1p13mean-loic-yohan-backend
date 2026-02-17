@@ -481,6 +481,8 @@ class BoutiqueReservationService {
 
     const boutiques = await Boutique.find(query)
       .populate('categoryId', 'name slug')
+      .populate('zoneId', 'name')
+      .populate('floorId', 'name order')
       .sort({ price: 1 });
 
     return {
