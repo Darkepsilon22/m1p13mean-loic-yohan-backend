@@ -32,7 +32,7 @@ exports.getByFloor = asyncHandler(async (req, res, next) => {
  */
 exports.getById = asyncHandler(async (req, res, next) => {
   const zone = await Zone.findById(req.params.id).populate('floorId', 'name width height order').lean();
-  if (!zone) return next(new ApiError(404, 'Zone not found'));
+  if (!zone) return next(new ApiError(404, 'Zone non trouvée'));
   if (req.query.includeBoutiques === 'true') {
     const boutiques = await Boutique.find({ zoneId: zone._id })
       .populate('categoryId', 'name')
@@ -50,9 +50,9 @@ exports.getById = asyncHandler(async (req, res, next) => {
  */
 exports.create = asyncHandler(async (req, res, next) => {
   const floor = await Floor.findById(req.body.floorId);
-  if (!floor) return next(new ApiError(404, 'Floor not found'));
+  if (!floor) return next(new ApiError(404, 'Étage non trouvé'));
   const zone = await Zone.create(req.body);
-  res.status(201).json({ success: true, message: 'Zone created successfully', data: zone });
+  res.status(201).json({ success: true, message: 'Zone créée avec succès', data: zone });
 });
 
 /**
@@ -62,8 +62,8 @@ exports.create = asyncHandler(async (req, res, next) => {
  */
 exports.update = asyncHandler(async (req, res, next) => {
   const zone = await Zone.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
-  if (!zone) return next(new ApiError(404, 'Zone not found'));
-  res.status(200).json({ success: true, message: 'Zone updated successfully', data: zone });
+  if (!zone) return next(new ApiError(404, 'Zone non trouvée'));
+  res.status(200).json({ success: true, message: 'Zone mise à jour avec succès', data: zone });
 });
 
 /**
@@ -73,11 +73,11 @@ exports.update = asyncHandler(async (req, res, next) => {
  */
 exports.delete = asyncHandler(async (req, res, next) => {
   const zone = await Zone.findById(req.params.id);
-  if (!zone) return next(new ApiError(404, 'Zone not found'));
+  if (!zone) return next(new ApiError(404, 'Zone non trouvée'));
   const boutiquesCount = await Boutique.countDocuments({ zoneId: zone._id });
   if (boutiquesCount > 0) {
-    return next(new ApiError(400, `Cannot delete zone: ${boutiquesCount} boutique(s) exist. Remove them first.`));
+    return next(new ApiError(400, `Impossible de supprimer la zone : ${boutiquesCount} boutique(s) présente(s). Retirez-les d'abord.`));
   }
   await Zone.findByIdAndDelete(req.params.id);
-  res.status(200).json({ success: true, message: 'Zone deleted successfully' });
+  res.status(200).json({ success: true, message: 'Zone supprimée avec succès' });
 });

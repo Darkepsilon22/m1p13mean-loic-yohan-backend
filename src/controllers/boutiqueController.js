@@ -48,10 +48,10 @@ const validateBoutiqueZoneConstraints = async (options) => {
     return;
   }
   const zone = await Zone.findById(zoneId);
-  if (!zone) throw new ApiError(404, 'Zone not found');
+  if (!zone) throw new ApiError(404, 'Zone non trouvée');
   const { x, y, width, height } = mapShape;
   if (x < zone.x || y < zone.y || x + width > zone.x + zone.width || y + height > zone.y + zone.height) {
-    throw new ApiError(400, 'Boutique mapShape must be entirely inside the zone bounds');
+    throw new ApiError(400, 'Le rectangle de la boutique doit être entièrement à l\'intérieur de la zone.');
   }
   const surfaceNum = surface != null ? Number(surface) : 0;
   const query = { zoneId };
@@ -59,7 +59,7 @@ const validateBoutiqueZoneConstraints = async (options) => {
   const existingSum = await Boutique.aggregate([{ $match: query }, { $group: { _id: null, total: { $sum: { $ifNull: ['$surface', 0] } } } }]);
   const totalSurface = (existingSum[0]?.total || 0) + surfaceNum;
   if (totalSurface > zone.surfaceTotal) {
-    throw new ApiError(400, `Total surface in zone would exceed zone capacity (${zone.surfaceTotal} m²). Available: ${zone.surfaceTotal - (existingSum[0]?.total || 0)} m².`);
+    throw new ApiError(400, `La surface totale dans la zone dépasserait la capacité (${zone.surfaceTotal} m²). Disponible : ${zone.surfaceTotal - (existingSum[0]?.total || 0)} m².`);
   }
 };
 
@@ -118,10 +118,12 @@ exports.getAll = asyncHandler(async (req, res, next) => {
 exports.getById = asyncHandler(async (req, res, next) => {
   const boutique = await Boutique.findById(req.params.id)
     .populate('categoryId', 'name slug')
-    .populate('userId', 'firstName lastName email');
+    .populate('userId', 'firstName lastName email')
+    .populate('zoneId', 'name')
+    .populate('floorId', 'name order');
 
   if (!boutique) {
-    return next(new ApiError(404, 'Boutique not found'));
+    return next(new ApiError(404, 'Boutique non trouvée'));
   }
 
   res.status(200).json({
@@ -145,25 +147,25 @@ exports.create = asyncHandler(async (req, res, next) => {
     ? null
     : (req.body.userId || req.user._id);
   if (req.user.role !== 'admin' && userId && userId.toString() !== req.user._id.toString()) {
-    return next(new ApiError(403, 'You can only create a boutique for your own account'));
+    return next(new ApiError(403, 'Vous ne pouvez créer une boutique que pour votre propre compte.'));
   }
 
   if (!isAdminEmplacement) {
     const existingBoutique = await Boutique.findOne({ userId });
     if (existingBoutique) {
-      return next(new ApiError(400, 'This user already has a boutique'));
+      return next(new ApiError(400, 'Cet utilisateur possède déjà une boutique.'));
     }
   }
 
   const categoryExists = await Category.findById(body.categoryId);
   if (!categoryExists) {
-    return next(new ApiError(400, 'Invalid categoryId'));
+    return next(new ApiError(400, 'Catégorie invalide.'));
   }
 
   if (userId) {
     const userExists = await User.findById(userId);
     if (!userExists) {
-      return next(new ApiError(400, 'Invalid userId'));
+      return next(new ApiError(400, 'Utilisateur invalide.'));
     }
   }
 
@@ -189,7 +191,7 @@ exports.create = asyncHandler(async (req, res, next) => {
 
   res.status(201).json({
     success: true,
-    message: 'Boutique created successfully',
+    message: 'Boutique créée avec succès',
     data: { boutique: populated }
   });
 });
@@ -203,11 +205,11 @@ exports.update = asyncHandler(async (req, res, next) => {
   let boutique = await Boutique.findById(req.params.id);
 
   if (!boutique) {
-    return next(new ApiError(404, 'Boutique not found'));
+    return next(new ApiError(404, 'Boutique non trouvée'));
   }
 
   if (!canEditBoutique(boutique, req.user._id, req.user.role)) {
-    return next(new ApiError(403, 'You can only update your own boutique'));
+    return next(new ApiError(403, 'Vous ne pouvez modifier que votre propre boutique.'));
   }
 
   const body = { ...req.body };
@@ -217,7 +219,7 @@ exports.update = asyncHandler(async (req, res, next) => {
 
   if (body.categoryId) {
     const categoryExists = await Category.findById(body.categoryId);
-    if (!categoryExists) return next(new ApiError(400, 'Invalid categoryId'));
+    if (!categoryExists) return next(new ApiError(400, 'Catégorie invalide.'));
   }
 
   const zoneId = body.zoneId !== undefined ? body.zoneId : boutique.zoneId;
@@ -243,7 +245,7 @@ exports.update = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    message: 'Boutique updated successfully',
+    message: 'Boutique mise à jour avec succès',
     data: { boutique }
   });
 });
@@ -259,7 +261,7 @@ exports.patchStatus = asyncHandler(async (req, res, next) => {
   const boutique = await Boutique.findById(req.params.id);
 
   if (!boutique) {
-    return next(new ApiError(404, 'Boutique not found'));
+    return next(new ApiError(404, 'Boutique non trouvée'));
   }
 
   const isAdmin = req.user.role === 'admin';
@@ -267,13 +269,13 @@ exports.patchStatus = asyncHandler(async (req, res, next) => {
 
   if (status === 'active' || status === 'rejected' || status === 'inactive') {
     if (!isAdmin) {
-      if (status === 'rejected') return next(new ApiError(403, 'Only admin can reject a boutique'));
-      if (status === 'inactive' && !isOwner && !isAdmin) return next(new ApiError(403, 'Only admin or owner can set inactive'));
+      if (status === 'rejected') return next(new ApiError(403, 'Seul l\'administrateur peut refuser une boutique.'));
+      if (status === 'inactive' && !isOwner && !isAdmin) return next(new ApiError(403, 'Seul l\'administrateur ou le propriétaire peut désactiver.'));
     }
   }
 
   if (!['pending', 'active', 'inactive', 'rejected'].includes(status)) {
-    return next(new ApiError(400, 'Invalid status. Use: pending, active, inactive, rejected'));
+    return next(new ApiError(400, 'Statut invalide. Utiliser : pending, active, inactive, rejected.'));
   }
 
   boutique.status = status;
@@ -287,7 +289,7 @@ exports.patchStatus = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    message: 'Boutique status updated successfully',
+    message: 'Statut de la boutique mis à jour avec succès',
     data: { boutique: populated }
   });
 });
@@ -302,11 +304,11 @@ exports.updateLocation = asyncHandler(async (req, res, next) => {
   const boutique = await Boutique.findById(req.params.id);
 
   if (!boutique) {
-    return next(new ApiError(404, 'Boutique not found'));
+    return next(new ApiError(404, 'Boutique non trouvée'));
   }
 
   if (!canEditBoutique(boutique, req.user._id, req.user.role)) {
-    return next(new ApiError(403, 'You can only update your own boutique location'));
+    return next(new ApiError(403, 'Vous ne pouvez modifier que l\'emplacement de votre propre boutique.'));
   }
 
   const { floor, zone, number, mapCoordinates } = req.body;
@@ -326,7 +328,7 @@ exports.updateLocation = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    message: 'Boutique location updated successfully',
+    message: 'Emplacement de la boutique mis à jour avec succès',
     data: { boutique: populated }
   });
 });
@@ -340,18 +342,18 @@ exports.delete = asyncHandler(async (req, res, next) => {
   const boutique = await Boutique.findById(req.params.id);
 
   if (!boutique) {
-    return next(new ApiError(404, 'Boutique not found'));
+    return next(new ApiError(404, 'Boutique non trouvée'));
   }
 
   if (!canEditBoutique(boutique, req.user._id, req.user.role)) {
-    return next(new ApiError(403, 'You can only delete your own boutique'));
+    return next(new ApiError(403, 'Vous ne pouvez supprimer que votre propre boutique.'));
   }
 
   await Boutique.findByIdAndDelete(req.params.id);
 
   res.status(200).json({
     success: true,
-    message: 'Boutique deleted successfully'
+    message: 'Boutique supprimée avec succès'
   });
 });
 
@@ -436,6 +438,8 @@ exports.getAllEmplacementsAdmin = asyncHandler(async (req, res, next) => {
   const boutiques = await Boutique.find(query)
     .populate('assignee', 'firstName lastName email')
     .populate('userId', 'firstName lastName email')
+    .populate('zoneId', 'name')
+    .populate('floorId', 'name order')
     .sort({ floorId: 1, 'location.floor': 1, 'location.zone': 1, 'location.number': 1 });
 
   res.json({

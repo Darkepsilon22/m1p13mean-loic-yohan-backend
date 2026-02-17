@@ -5,7 +5,7 @@ const handleValidationErrors = (req, res, next) => {
   if (!errors.isEmpty()) {
     return res.status(400).json({
       success: false,
-      message: 'Validation failed',
+      message: 'Erreur de validation',
       errors: errors.array().map(err => ({ field: err.path, message: err.msg }))
     });
   }
@@ -13,23 +13,23 @@ const handleValidationErrors = (req, res, next) => {
 };
 
 const validateFloorId = (paramName = 'id') => [
-  param(paramName).isMongoId().withMessage(`Invalid ${paramName} format`),
+  param(paramName).isMongoId().withMessage(`Format ${paramName} invalide`),
   handleValidationErrors
 ];
 
 const createFloor = [
-  body('name').trim().notEmpty().withMessage('Floor name is required').isLength({ max: 100 }).withMessage('Floor name cannot exceed 100 characters'),
-  body('width').isFloat({ min: 1 }).withMessage('Width must be a positive number').toFloat(),
-  body('height').isFloat({ min: 1 }).withMessage('Height must be a positive number').toFloat(),
-  body('order').optional().isInt({ min: 0 }).withMessage('Order must be a non-negative integer').toInt(),
+  body('name').trim().notEmpty().withMessage('Le nom de l\'étage est requis').isLength({ max: 100 }).withMessage('Le nom ne peut pas dépasser 100 caractères'),
+  body('width').isFloat({ min: 1 }).withMessage('La largeur doit être un nombre positif').toFloat(),
+  body('height').isFloat({ min: 1 }).withMessage('La hauteur doit être un nombre positif').toFloat(),
+  body('order').optional().isInt({ min: 0 }).withMessage('L\'ordre doit être un entier positif ou nul').toInt(),
   handleValidationErrors
 ];
 
 const updateFloor = [
-  body('name').optional().trim().notEmpty().withMessage('Floor name cannot be empty').isLength({ max: 100 }).withMessage('Floor name cannot exceed 100 characters'),
-  body('width').optional().isFloat({ min: 1 }).withMessage('Width must be a positive number').toFloat(),
-  body('height').optional().isFloat({ min: 1 }).withMessage('Height must be a positive number').toFloat(),
-  body('order').optional().isInt({ min: 0 }).withMessage('Order must be a non-negative integer').toInt(),
+  body('name').optional().trim().notEmpty().withMessage('Le nom de l\'étage ne peut pas être vide').isLength({ max: 100 }).withMessage('Le nom ne peut pas dépasser 100 caractères'),
+  body('width').optional().isFloat({ min: 1 }).withMessage('La largeur doit être un nombre positif').toFloat(),
+  body('height').optional().isFloat({ min: 1 }).withMessage('La hauteur doit être un nombre positif').toFloat(),
+  body('order').optional().isInt({ min: 0 }).withMessage('L\'ordre doit être un entier positif ou nul').toInt(),
   handleValidationErrors
 ];
 

@@ -34,7 +34,7 @@ exports.getByFloor = asyncHandler(async (req, res) => {
  */
 exports.getById = asyncHandler(async (req, res, next) => {
   const space = await SpecialSpace.findById(req.params.id).populate('floorId', 'name width height order').lean();
-  if (!space) return next(new ApiError(404, 'Special space not found'));
+  if (!space) return next(new ApiError(404, 'Espace spécial non trouvé'));
   res.status(200).json({ success: true, data: space });
 });
 
@@ -45,9 +45,9 @@ exports.getById = asyncHandler(async (req, res, next) => {
  */
 exports.create = asyncHandler(async (req, res, next) => {
   const floor = await Floor.findById(req.body.floorId);
-  if (!floor) return next(new ApiError(404, 'Floor not found'));
+  if (!floor) return next(new ApiError(404, 'Étage non trouvé'));
   const space = await SpecialSpace.create(req.body);
-  res.status(201).json({ success: true, message: 'Special space created successfully', data: space });
+  res.status(201).json({ success: true, message: 'Espace spécial créé avec succès', data: space });
 });
 
 /**
@@ -57,8 +57,8 @@ exports.create = asyncHandler(async (req, res, next) => {
  */
 exports.update = asyncHandler(async (req, res, next) => {
   const space = await SpecialSpace.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
-  if (!space) return next(new ApiError(404, 'Special space not found'));
-  res.status(200).json({ success: true, message: 'Special space updated successfully', data: space });
+  if (!space) return next(new ApiError(404, 'Espace spécial non trouvé'));
+  res.status(200).json({ success: true, message: 'Espace spécial mis à jour avec succès', data: space });
 });
 
 /**
@@ -68,6 +68,6 @@ exports.update = asyncHandler(async (req, res, next) => {
  */
 exports.delete = asyncHandler(async (req, res, next) => {
   const space = await SpecialSpace.findByIdAndDelete(req.params.id);
-  if (!space) return next(new ApiError(404, 'Special space not found'));
-  res.status(200).json({ success: true, message: 'Special space deleted successfully' });
+  if (!space) return next(new ApiError(404, 'Espace spécial non trouvé'));
+  res.status(200).json({ success: true, message: 'Espace spécial supprimé avec succès' });
 });

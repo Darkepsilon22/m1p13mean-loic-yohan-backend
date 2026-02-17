@@ -19,7 +19,7 @@ exports.getAll = asyncHandler(async (req, res) => {
  */
 exports.getById = asyncHandler(async (req, res, next) => {
   const floor = await Floor.findById(req.params.id).lean();
-  if (!floor) return next(new ApiError(404, 'Floor not found'));
+  if (!floor) return next(new ApiError(404, 'Étage non trouvé'));
   res.status(200).json({ success: true, data: floor });
 });
 
@@ -30,7 +30,7 @@ exports.getById = asyncHandler(async (req, res, next) => {
  */
 exports.create = asyncHandler(async (req, res) => {
   const floor = await Floor.create(req.body);
-  res.status(201).json({ success: true, message: 'Floor created successfully', data: floor });
+  res.status(201).json({ success: true, message: 'Étage créé avec succès', data: floor });
 });
 
 /**
@@ -40,8 +40,8 @@ exports.create = asyncHandler(async (req, res) => {
  */
 exports.update = asyncHandler(async (req, res, next) => {
   const floor = await Floor.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
-  if (!floor) return next(new ApiError(404, 'Floor not found'));
-  res.status(200).json({ success: true, message: 'Floor updated successfully', data: floor });
+  if (!floor) return next(new ApiError(404, 'Étage non trouvé'));
+  res.status(200).json({ success: true, message: 'Étage mis à jour avec succès', data: floor });
 });
 
 /**
@@ -51,11 +51,11 @@ exports.update = asyncHandler(async (req, res, next) => {
  */
 exports.delete = asyncHandler(async (req, res, next) => {
   const floor = await Floor.findById(req.params.id);
-  if (!floor) return next(new ApiError(404, 'Floor not found'));
+  if (!floor) return next(new ApiError(404, 'Étage non trouvé'));
   const zonesCount = await Zone.countDocuments({ floorId: floor._id });
   if (zonesCount > 0) {
-    return next(new ApiError(400, `Cannot delete floor: ${zonesCount} zone(s) exist. Delete them first.`));
+    return next(new ApiError(400, `Impossible de supprimer l'étage : ${zonesCount} zone(s) existante(s). Supprimez-les d'abord.`));
   }
   await Floor.findByIdAndDelete(req.params.id);
-  res.status(200).json({ success: true, message: 'Floor deleted successfully' });
+  res.status(200).json({ success: true, message: 'Étage supprimé avec succès' });
 });

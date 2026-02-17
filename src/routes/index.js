@@ -10,6 +10,7 @@ router.use('/floors', require('./floorRoutes'));
 router.use('/zones', require('./zoneRoutes'));
 router.use('/special-spaces', require('./specialSpaceRoutes'));
 router.use('/map', require('./mapRoutes'));
+router.use('/navigation', require('./navigationRoutes'));
 router.use('/products', require('./productRoutes'));
 router.use('/promotions', require('./promotionRoutes'));
 router.use('/stock', require('./stockRoutes'));

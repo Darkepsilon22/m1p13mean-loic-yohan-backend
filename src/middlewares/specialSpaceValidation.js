@@ -6,7 +6,7 @@ const handleValidationErrors = (req, res, next) => {
   if (!errors.isEmpty()) {
     return res.status(400).json({
       success: false,
-      message: 'Validation failed',
+      message: 'Erreur de validation',
       errors: errors.array().map(err => ({ field: err.path, message: err.msg }))
     });
   }
@@ -14,34 +14,34 @@ const handleValidationErrors = (req, res, next) => {
 };
 
 const validateSpecialSpaceId = (paramName = 'id') => [
-  param(paramName).isMongoId().withMessage(`Invalid ${paramName} format`),
+  param(paramName).isMongoId().withMessage(`Format ${paramName} invalide`),
   handleValidationErrors
 ];
 
 const createSpecialSpace = [
-  body('floorId').isMongoId().withMessage('floorId must be a valid ObjectId'),
-  body('type').isIn(SPECIAL_SPACE_TYPES).withMessage(`Type must be one of: ${SPECIAL_SPACE_TYPES.join(', ')}`),
-  body('name').optional().trim().isLength({ max: 100 }).withMessage('Name cannot exceed 100 characters'),
-  body('x').isFloat({ min: 0 }).withMessage('X must be non-negative').toFloat(),
-  body('y').isFloat({ min: 0 }).withMessage('Y must be non-negative').toFloat(),
-  body('width').isFloat({ min: 1 }).withMessage('Width must be positive').toFloat(),
-  body('height').isFloat({ min: 1 }).withMessage('Height must be positive').toFloat(),
+  body('floorId').isMongoId().withMessage('floorId doit être un ObjectId valide'),
+  body('type').isIn(SPECIAL_SPACE_TYPES).withMessage(`Le type doit être parmi : ${SPECIAL_SPACE_TYPES.join(', ')}`),
+  body('name').optional().trim().isLength({ max: 100 }).withMessage('Le nom ne peut pas dépasser 100 caractères'),
+  body('x').isFloat({ min: 0 }).withMessage('X doit être positif ou nul').toFloat(),
+  body('y').isFloat({ min: 0 }).withMessage('Y doit être positif ou nul').toFloat(),
+  body('width').isFloat({ min: 1 }).withMessage('La largeur doit être positive').toFloat(),
+  body('height').isFloat({ min: 1 }).withMessage('La hauteur doit être positive').toFloat(),
   handleValidationErrors
 ];
 
 const updateSpecialSpace = [
-  body('floorId').optional().isMongoId().withMessage('floorId must be a valid ObjectId'),
-  body('type').optional().isIn(SPECIAL_SPACE_TYPES).withMessage(`Type must be one of: ${SPECIAL_SPACE_TYPES.join(', ')}`),
-  body('name').optional().trim().isLength({ max: 100 }).withMessage('Name cannot exceed 100 characters'),
-  body('x').optional().isFloat({ min: 0 }).withMessage('X must be non-negative').toFloat(),
-  body('y').optional().isFloat({ min: 0 }).withMessage('Y must be non-negative').toFloat(),
-  body('width').optional().isFloat({ min: 1 }).withMessage('Width must be positive').toFloat(),
-  body('height').optional().isFloat({ min: 1 }).withMessage('Height must be positive').toFloat(),
+  body('floorId').optional().isMongoId().withMessage('floorId doit être un ObjectId valide'),
+  body('type').optional().isIn(SPECIAL_SPACE_TYPES).withMessage(`Le type doit être parmi : ${SPECIAL_SPACE_TYPES.join(', ')}`),
+  body('name').optional().trim().isLength({ max: 100 }).withMessage('Le nom ne peut pas dépasser 100 caractères'),
+  body('x').optional().isFloat({ min: 0 }).withMessage('X doit être positif ou nul').toFloat(),
+  body('y').optional().isFloat({ min: 0 }).withMessage('Y doit être positif ou nul').toFloat(),
+  body('width').optional().isFloat({ min: 1 }).withMessage('La largeur doit être positive').toFloat(),
+  body('height').optional().isFloat({ min: 1 }).withMessage('La hauteur doit être positive').toFloat(),
   handleValidationErrors
 ];
 
 const listSpecialSpaces = [
-  query('floorId').optional().isMongoId().withMessage('floorId must be a valid ObjectId'),
+  query('floorId').optional().isMongoId().withMessage('floorId doit être un ObjectId valide'),
   handleValidationErrors
 ];
 
