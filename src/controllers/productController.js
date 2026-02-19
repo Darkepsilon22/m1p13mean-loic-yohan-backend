@@ -1,6 +1,7 @@
 const Product = require('../models/Product');
 const Boutique = require('../models/Boutique');
 const { asyncHandler, ApiError } = require('../middlewares/errorHandler');
+const { emitToAdmin, emitToPublic, emitToBoutique } = require('../socket');
 
 /**
  * @desc    Get all products (with filters)
@@ -233,6 +234,9 @@ exports.create = asyncHandler(async (req, res, next) => {
     lowStockThreshold
   });
 
+  emitToAdmin('product:created', { productId: product._id, name: product.name, boutiqueId });
+  emitToPublic('product:created', { productId: product._id, name: product.name, boutiqueId });
+
   res.status(201).json({
     success: true,
     message: 'Product created successfully',
@@ -280,6 +284,9 @@ exports.update = asyncHandler(async (req, res, next) => {
     { new: true, runValidators: true }
   );
 
+  emitToAdmin('product:updated', { productId: product._id, name: product.name });
+  emitToBoutique(product.boutiqueId.toString(), 'product:updated', { productId: product._id, name: product.name });
+
   res.status(200).json({
     success: true,
     message: 'Product updated successfully',
@@ -312,6 +319,8 @@ exports.patchAvailability = asyncHandler(async (req, res, next) => {
     { new: true, runValidators: true }
   );
 
+  emitToPublic('product:availabilityChanged', { productId: product._id, name: product.name, availability });
+
   res.status(200).json({
     success: true,
     message: 'Product availability updated',
@@ -342,6 +351,8 @@ exports.toggleFeatured = asyncHandler(async (req, res, next) => {
     { new: true }
   );
 
+  emitToPublic('product:featuredToggled', { productId: product._id, name: product.name, isFeatured: product.isFeatured });
+
   res.status(200).json({
     success: true,
     message: `Product ${product.isFeatured ? 'marked as featured' : 'removed from featured'}`,
@@ -367,8 +378,10 @@ exports.delete = asyncHandler(async (req, res, next) => {
     return next(new ApiError(403, 'You are not authorized to delete this product'));
   }
 
-  // Archive instead of delete (RG23)
   await Product.findByIdAndUpdate(req.params.id, { isArchived: true });
+
+  emitToAdmin('product:archived', { productId: req.params.id, name: product.name });
+  emitToBoutique(product.boutiqueId.toString(), 'product:archived', { productId: req.params.id, name: product.name });
 
   res.status(200).json({
     success: true,
@@ -399,6 +412,9 @@ exports.restore = asyncHandler(async (req, res, next) => {
     { isArchived: false },
     { new: true }
   );
+
+  emitToAdmin('product:restored', { productId: product._id, name: product.name });
+  emitToBoutique(product.boutiqueId.toString(), 'product:restored', { productId: product._id, name: product.name });
 
   res.status(200).json({
     success: true,
@@ -619,6 +635,9 @@ exports.archive = asyncHandler(async (req, res, next) => {
     { isArchived: true },
     { new: true }
   );
+
+  emitToAdmin('product:archived', { productId: product._id, name: product.name });
+  emitToBoutique(product.boutiqueId.toString(), 'product:archived', { productId: product._id, name: product.name });
 
   res.status(200).json({
     success: true,

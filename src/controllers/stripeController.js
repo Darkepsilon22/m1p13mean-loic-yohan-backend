@@ -2,6 +2,7 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const Order = require('../models/Order');
 const Payment = require('../models/Payment');
 const { ApiError, asyncHandler } = require('../middlewares/errorHandler');
+const { emitToAdmin, emitToUser } = require('../socket');
 const { getBrandingSettings } = require('../services/stripeBrandingService');
 
 /**
@@ -123,6 +124,8 @@ exports.createCheckoutSession = asyncHandler(async (req, res, next) => {
   order.paymentUrl = session.url;
   await order.save();
 
+  emitToAdmin('stripe:sessionCreated', { orderId: order._id, sessionId: session.id });
+
   res.status(200).json({
     success: true,
     data: {
@@ -181,6 +184,7 @@ exports.verifyPayment = asyncHandler(async (req, res, next) => {
         currency: session.currency
       }
     });
+    emitToUser(payment.userId.toString(), 'stripe:paymentVerified', { paymentRef: payment.reference, orderId: payment.orderId });
   }
 
   const order = await Order.findById(payment.orderId);
@@ -249,6 +253,8 @@ exports.stripeWebhook = asyncHandler(async (req, res, next) => {
             }
           });
           console.log(`✅ Payment confirmed via webhook: ${payment.reference}`);
+          emitToAdmin('stripe:webhookProcessed', { type: event.type });
+          if (payment && payment.userId) emitToUser(payment.userId.toString(), 'stripe:webhookProcessed', { type: event.type, reference: payment.reference });
         } else {
           // Async payment - mark as processing, wait for async_payment_succeeded
           console.log(`⏳ Payment pending async confirmation: ${payment.reference}`);

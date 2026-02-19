@@ -2,6 +2,7 @@ const Review = require('../models/Review');
 const Boutique = require('../models/Boutique');
 const { ApiError, asyncHandler } = require('../middlewares/errorHandler');
 const { recalculateBoutiqueRating } = require('../services/reviewService');
+const { emitToAdmin, emitToUser, emitToBoutique } = require('../socket');
 
 /**
  * @desc    List reviews (by boutique, with filters)
@@ -123,6 +124,8 @@ exports.create = asyncHandler(async (req, res, next) => {
     .populate('userId', 'firstName lastName email')
     .populate('boutiqueId', 'name slug');
 
+  emitToBoutique(review.boutiqueId.toString(), 'review:created', { reviewId: review._id, boutiqueId: review.boutiqueId, rating: review.rating });
+
   res.status(201).json({
     success: true,
     message: 'Review created successfully',
@@ -160,6 +163,8 @@ exports.update = asyncHandler(async (req, res, next) => {
   const populated = await Review.findById(review._id)
     .populate('userId', 'firstName lastName email')
     .populate('boutiqueId', 'name slug');
+
+  emitToBoutique(review.boutiqueId.toString(), 'review:updated', { reviewId: review._id, boutiqueId: review.boutiqueId });
 
   res.status(200).json({
     success: true,
@@ -202,6 +207,8 @@ exports.patchResponse = asyncHandler(async (req, res, next) => {
   const populated = await Review.findById(review._id)
     .populate('userId', 'firstName lastName email')
     .populate('boutiqueId', 'name slug');
+
+  emitToUser(review.userId.toString(), 'review:responseAdded', { reviewId: review._id, boutiqueId: review.boutiqueId });
 
   res.status(200).json({
     success: true,
@@ -254,6 +261,8 @@ exports.patchStatus = asyncHandler(async (req, res, next) => {
     .populate('userId', 'firstName lastName email')
     .populate('boutiqueId', 'name slug');
 
+  emitToUser(review.userId.toString(), 'review:statusChanged', { reviewId: review._id, status: review.status });
+
   res.status(200).json({
     success: true,
     message: 'Review status updated successfully',
@@ -297,6 +306,8 @@ exports.report = asyncHandler(async (req, res, next) => {
   if (review.status === 'reported') {
     await recalculateBoutiqueRating(review.boutiqueId);
   }
+
+  emitToAdmin('review:reported', { reviewId: review._id, boutiqueId: review.boutiqueId, reportCount: review.reportCount });
 
   res.status(200).json({
     success: true,
@@ -384,6 +395,8 @@ exports.delete = asyncHandler(async (req, res, next) => {
   await Review.findByIdAndDelete(req.params.id);
 
   await recalculateBoutiqueRating(boutiqueId);
+
+  emitToAdmin('review:deleted', { reviewId: req.params.id });
 
   res.status(200).json({
     success: true,

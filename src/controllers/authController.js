@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { ApiError, asyncHandler } = require('../middlewares/errorHandler');
 const { sendVerificationEmail, sendPasswordResetEmail, sendOTPEmail, sendWelcomeEmail, sendApprovalEmail, sendRejectionEmail, sendPendingApprovalEmail } = require('../services/emailService');
+const { emitToAdmin, emitToUser } = require('../socket');
 
 /**
  * Generate JWT Token
@@ -72,6 +73,8 @@ exports.register = asyncHandler(async (req, res, next) => {
   try {
     await sendVerificationEmail(user.email, user.firstName, verificationToken);
 
+    emitToAdmin('user:registered', { userId: user._id, email: user.email, firstName: user.firstName, lastName: user.lastName, role: user.role });
+
     res.status(201).json({
       success: true,
       message: 'Registration successful. Please check your email to verify your account.',
@@ -86,8 +89,9 @@ exports.register = asyncHandler(async (req, res, next) => {
       }
     });
   } catch (emailError) {
-    // If email fails, still return success but notify user
     console.error('Email sending failed:', emailError);
+
+    emitToAdmin('user:registered', { userId: user._id, email: user.email, firstName: user.firstName, lastName: user.lastName, role: user.role });
 
     res.status(201).json({
       success: true,
@@ -513,6 +517,8 @@ exports.updateProfile = asyncHandler(async (req, res, next) => {
     }
   );
 
+  emitToAdmin('user:profileUpdated', { userId: user._id, firstName: user.firstName, lastName: user.lastName });
+
   res.status(200).json({
     success: true,
     message: 'Profile updated successfully',
@@ -748,6 +754,8 @@ exports.updateUserStatus = asyncHandler(async (req, res, next) => {
 
   await user.save({ validateBeforeSave: false });
 
+  emitToUser(userId, 'user:statusChanged', { userId, status, previousStatus });
+
   res.status(200).json({
     success: true,
     message: `User status updated from '${previousStatus}' to '${status}'`,
@@ -798,6 +806,8 @@ exports.approveUser = asyncHandler(async (req, res, next) => {
     // Don't fail the request if email fails
   }
 
+  emitToUser(userId, 'user:approved', { userId, firstName: user.firstName, role: user.role });
+
   res.status(200).json({
     success: true,
     message: 'User approved successfully',
@@ -831,6 +841,8 @@ exports.rejectUser = asyncHandler(async (req, res, next) => {
     console.error('Failed to send rejection email:', emailError);
     // Don't fail the request if email fails
   }
+
+  emitToUser(userId, 'user:rejected', { userId, reason: user.statusReason });
 
   res.status(200).json({
     success: true,
@@ -868,6 +880,8 @@ exports.blockUser = asyncHandler(async (req, res, next) => {
   user.statusReason = reason || 'Account blocked by administrator';
   await user.save({ validateBeforeSave: false });
 
+  emitToUser(userId, 'user:blocked', { userId, reason: user.statusReason });
+
   res.status(200).json({
     success: true,
     message: 'User blocked successfully',
@@ -896,6 +910,8 @@ exports.unblockUser = asyncHandler(async (req, res, next) => {
   user.status = 'active';
   user.statusReason = undefined;
   await user.save({ validateBeforeSave: false });
+
+  emitToUser(userId, 'user:unblocked', { userId });
 
   res.status(200).json({
     success: true,

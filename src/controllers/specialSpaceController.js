@@ -1,6 +1,7 @@
 const SpecialSpace = require('../models/SpecialSpace');
 const Floor = require('../models/Floor');
 const { ApiError, asyncHandler } = require('../middlewares/errorHandler');
+const { emitToAdmin } = require('../socket');
 
 /**
  * @desc    Get all special spaces (optional filter by floorId)
@@ -47,6 +48,7 @@ exports.create = asyncHandler(async (req, res, next) => {
   const floor = await Floor.findById(req.body.floorId);
   if (!floor) return next(new ApiError(404, 'Étage non trouvé'));
   const space = await SpecialSpace.create(req.body);
+  emitToAdmin('specialSpace:created', { spaceId: space._id, name: space.name, type: space.type });
   res.status(201).json({ success: true, message: 'Espace spécial créé avec succès', data: space });
 });
 
@@ -58,6 +60,7 @@ exports.create = asyncHandler(async (req, res, next) => {
 exports.update = asyncHandler(async (req, res, next) => {
   const space = await SpecialSpace.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
   if (!space) return next(new ApiError(404, 'Espace spécial non trouvé'));
+  emitToAdmin('specialSpace:updated', { spaceId: space._id, name: space.name });
   res.status(200).json({ success: true, message: 'Espace spécial mis à jour avec succès', data: space });
 });
 
@@ -69,5 +72,6 @@ exports.update = asyncHandler(async (req, res, next) => {
 exports.delete = asyncHandler(async (req, res, next) => {
   const space = await SpecialSpace.findByIdAndDelete(req.params.id);
   if (!space) return next(new ApiError(404, 'Espace spécial non trouvé'));
+  emitToAdmin('specialSpace:deleted', { spaceId: req.params.id });
   res.status(200).json({ success: true, message: 'Espace spécial supprimé avec succès' });
 });

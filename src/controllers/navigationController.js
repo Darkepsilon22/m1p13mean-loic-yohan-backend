@@ -3,6 +3,7 @@ const NavigationEdge = require('../models/NavigationEdge');
 const Floor = require('../models/Floor');
 const SpecialSpace = require('../models/SpecialSpace');
 const { ApiError, asyncHandler } = require('../middlewares/errorHandler');
+const { emitToAdmin } = require('../socket');
 
 /**
  * @desc    Get all navigation nodes (optional filter by floorId, type)
@@ -71,6 +72,7 @@ exports.createNode = asyncHandler(async (req, res, next) => {
     .populate('floorId', 'name order')
     .populate('specialSpaceId', 'type name x y width height')
     .lean();
+  emitToAdmin('navigation:nodeCreated', { nodeId: populated._id, label: populated.label });
   res.status(201).json({ success: true, message: 'Noeud créé avec succès', data: populated });
 });
 
@@ -115,6 +117,7 @@ exports.updateNode = asyncHandler(async (req, res, next) => {
     .populate('floorId', 'name order')
     .populate('specialSpaceId', 'type name x y width height')
     .lean();
+  emitToAdmin('navigation:nodeUpdated', { nodeId: populated._id, label: populated.label });
   res.status(200).json({ success: true, message: 'Noeud mis à jour avec succès', data: populated });
 });
 
@@ -129,6 +132,7 @@ exports.deleteNode = asyncHandler(async (req, res, next) => {
   // Supprimer toutes les arêtes liées
   await NavigationEdge.deleteMany({ $or: [{ fromNode: node._id }, { toNode: node._id }] });
   await NavigationNode.findByIdAndDelete(req.params.id);
+  emitToAdmin('navigation:nodeDeleted', { nodeId: req.params.id });
   res.status(200).json({ success: true, message: 'Noeud supprimé avec succès' });
 });
 
@@ -196,6 +200,7 @@ exports.createEdge = asyncHandler(async (req, res, next) => {
     .populate('fromNode', 'floorId type x y label')
     .populate('toNode', 'floorId type x y label')
     .lean();
+  emitToAdmin('navigation:edgeCreated', { edgeId: populated._id });
   res.status(201).json({ success: true, message: 'Arête créée avec succès', data: populated });
 });
 
@@ -217,6 +222,7 @@ exports.updateEdge = asyncHandler(async (req, res, next) => {
     .populate('fromNode', 'floorId type x y label')
     .populate('toNode', 'floorId type x y label')
     .lean();
+  emitToAdmin('navigation:edgeUpdated', { edgeId: populated._id });
   res.status(200).json({ success: true, message: 'Arête mise à jour avec succès', data: populated });
 });
 
@@ -228,5 +234,6 @@ exports.updateEdge = asyncHandler(async (req, res, next) => {
 exports.deleteEdge = asyncHandler(async (req, res, next) => {
   const edge = await NavigationEdge.findByIdAndDelete(req.params.id);
   if (!edge) return next(new ApiError(404, 'Arête non trouvée'));
+  emitToAdmin('navigation:edgeDeleted', { edgeId: req.params.id });
   res.status(200).json({ success: true, message: 'Arête supprimée avec succès' });
 });

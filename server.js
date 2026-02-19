@@ -1,7 +1,9 @@
 require('dotenv').config();
+const http = require('http');
 const app = require('./src/app');
 const { connectDB } = require('./src/config');
 const { startBoutiqueReservationCronJob } = require('./src/jobs/boutiqueReservationCron');
+const { initSocket } = require('./src/socket');
 const { startOrderExpirationJob } = require('./src/jobs/orderExpiration');
 const { startInvoiceGenerationJob } = require('./src/jobs/invoiceGenerationCron');
 const { startLatePaymentJob } = require('./src/jobs/latePaymentCron');
@@ -12,7 +14,10 @@ const { initBranding } = require('./src/services/stripeBrandingService');
 
 const PORT = process.env.PORT || 5000;
 
-// Connect to database and start server
+const server = http.createServer(app);
+
+initSocket(server);
+
 const startServer = async () => {
   try {
     await connectDB();
@@ -28,6 +33,7 @@ const startServer = async () => {
     // Upload logo & icône sur Stripe (cache en mémoire)
     await initBranding();
 
+    server.listen(PORT, () => {
     app.listen(PORT, () => {
       console.log(`Server running on http://localhost:${PORT}`);
       console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);

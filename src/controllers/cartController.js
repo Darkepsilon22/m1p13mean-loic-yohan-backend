@@ -2,6 +2,7 @@ const Cart = require('../models/Cart');
 const Product = require('../models/Product');
 const Promotion = require('../models/Promotion');
 const { ApiError, asyncHandler } = require('../middlewares/errorHandler');
+const { emitToUser } = require('../socket');
 
 /**
  * Calcule le prix effectif d'un produit en tenant compte des promotions actives
@@ -117,6 +118,8 @@ exports.addItem = asyncHandler(async (req, res, next) => {
     { path: 'items.boutiqueId', select: 'name logo' }
   ]);
 
+  emitToUser(req.user._id.toString(), 'cart:itemAdded', { productId, quantity });
+
   res.status(200).json({
     success: true,
     message: 'Article ajouté au panier',
@@ -173,6 +176,8 @@ exports.updateItemQuantity = asyncHandler(async (req, res, next) => {
     { path: 'items.boutiqueId', select: 'name logo' }
   ]);
 
+  emitToUser(req.user._id.toString(), 'cart:itemUpdated', { productId: req.params.productId });
+
   res.status(200).json({
     success: true,
     message: 'Panier mis à jour',
@@ -208,6 +213,8 @@ exports.removeItem = asyncHandler(async (req, res, next) => {
     { path: 'items.boutiqueId', select: 'name logo' }
   ]);
 
+  emitToUser(req.user._id.toString(), 'cart:itemRemoved', { productId: req.params.productId });
+
   res.status(200).json({
     success: true,
     message: 'Article supprimé du panier',
@@ -235,6 +242,8 @@ exports.clearCart = asyncHandler(async (req, res, next) => {
   }
 
   await cart.clearCart();
+
+  emitToUser(req.user._id.toString(), 'cart:cleared', {});
 
   res.status(200).json({
     success: true,

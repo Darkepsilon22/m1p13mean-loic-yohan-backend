@@ -1,6 +1,7 @@
 const Category = require('../models/Category');
 const Boutique = require('../models/Boutique');
 const { ApiError, asyncHandler } = require('../middlewares/errorHandler');
+const { emitToAdmin, emitToPublic } = require('../socket');
 
 /**
  * @desc    Get all categories (flat list)
@@ -239,6 +240,8 @@ exports.create = asyncHandler(async (req, res, next) => {
   const populated = await Category.findById(category._id)
     .populate('parentId', 'name slug');
 
+  emitToPublic('category:created', { categoryId: populated._id, name: populated.name });
+
   res.status(201).json({
     success: true,
     message: 'Category created successfully',
@@ -316,6 +319,8 @@ exports.update = asyncHandler(async (req, res, next) => {
       options: { sort: { order: 1 } }
     });
 
+  emitToPublic('category:updated', { categoryId: populated._id, name: populated.name });
+
   res.status(200).json({
     success: true,
     message: 'Category updated successfully',
@@ -351,6 +356,8 @@ exports.patchStatus = asyncHandler(async (req, res, next) => {
 
   category.isActive = isActive;
   await category.save();
+
+  emitToPublic('category:statusChanged', { categoryId: category._id, name: category.name, isActive });
 
   res.status(200).json({
     success: true,
@@ -440,6 +447,8 @@ exports.delete = asyncHandler(async (req, res, next) => {
   }
 
   await category.deleteOne();
+
+  emitToAdmin('category:deleted', { categoryId: req.params.id, name: category.name });
 
   res.status(200).json({
     success: true,

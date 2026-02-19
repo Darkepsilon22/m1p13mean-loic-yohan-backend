@@ -3,6 +3,7 @@ const StockMovement = require('../models/StockMovement');
 const Boutique = require('../models/Boutique');
 const { asyncHandler, ApiError } = require('../middlewares/errorHandler');
 const stockExportService = require('../services/stockExportService');
+const { emitToAdmin, emitToBoutique } = require('../socket');
 
 /**
  * @desc    Add stock to a product (entrée de stock)
@@ -47,6 +48,9 @@ exports.addStock = asyncHandler(async (req, res, next) => {
     reference,
     userId: req.user._id
   });
+
+  emitToAdmin('stock:added', { productId, boutiqueId: product.boutiqueId, quantity });
+  emitToBoutique(product.boutiqueId.toString(), 'stock:added', { productId, quantity, newStock: product.stock });
 
   res.status(200).json({
     success: true,
@@ -112,6 +116,9 @@ exports.removeStock = asyncHandler(async (req, res, next) => {
     userId: req.user._id
   });
 
+  emitToAdmin('stock:removed', { productId, boutiqueId: product.boutiqueId, quantity });
+  emitToBoutique(product.boutiqueId.toString(), 'stock:removed', { productId, quantity, newStock: product.stock });
+
   res.status(200).json({
     success: true,
     message: 'Stock removed successfully',
@@ -172,6 +179,9 @@ exports.adjustStock = asyncHandler(async (req, res, next) => {
     userId: req.user._id
   });
 
+  emitToAdmin('stock:adjusted', { productId, boutiqueId: product.boutiqueId });
+  emitToBoutique(product.boutiqueId.toString(), 'stock:adjusted', { productId, newStock: product.stock });
+
   res.status(200).json({
     success: true,
     message: 'Stock adjusted successfully',
@@ -224,6 +234,8 @@ exports.setInitialStock = asyncHandler(async (req, res, next) => {
     reason: reason || 'Initial stock setup',
     userId: req.user._id
   });
+
+  emitToAdmin('stock:initialized', { productId, boutiqueId: product.boutiqueId, quantity: stock });
 
   res.status(200).json({
     success: true,

@@ -2,6 +2,7 @@ const Promotion = require('../models/Promotion');
 const Boutique = require('../models/Boutique');
 const Product = require('../models/Product');
 const { asyncHandler, ApiError } = require('../middlewares/errorHandler');
+const { emitToAdmin, emitToPublic } = require('../socket');
 
 /**
  * @desc    Get all promotions (with filters)
@@ -228,6 +229,8 @@ exports.create = asyncHandler(async (req, res, next) => {
     endDate: new Date(endDate)
   });
 
+  emitToPublic('promotion:created', { promotionId: promotion._id, title: promotion.title, boutiqueId: promotion.boutiqueId });
+
   res.status(201).json({
     success: true,
     message: 'Promotion created successfully',
@@ -290,6 +293,8 @@ exports.update = asyncHandler(async (req, res, next) => {
     { new: true, runValidators: true }
   );
 
+  emitToPublic('promotion:updated', { promotionId: promotion._id, title: promotion.title });
+
   res.status(200).json({
     success: true,
     message: 'Promotion updated successfully',
@@ -326,6 +331,8 @@ exports.cancel = asyncHandler(async (req, res, next) => {
     { new: true }
   );
 
+  emitToPublic('promotion:cancelled', { promotionId: promotion._id, title: promotion.title });
+
   res.status(200).json({
     success: true,
     message: 'Promotion cancelled successfully',
@@ -357,6 +364,8 @@ exports.delete = asyncHandler(async (req, res, next) => {
   }
 
   await Promotion.findByIdAndDelete(req.params.id);
+
+  emitToAdmin('promotion:deleted', { promotionId: req.params.id });
 
   res.status(200).json({
     success: true,
