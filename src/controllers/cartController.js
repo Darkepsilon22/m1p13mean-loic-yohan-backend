@@ -1,6 +1,7 @@
 const Cart = require('../models/Cart');
 const Product = require('../models/Product');
 const { ApiError, asyncHandler } = require('../middlewares/errorHandler');
+const { emitToUser } = require('../socket');
 
 /**
  * @desc    Get user's cart
@@ -76,6 +77,8 @@ exports.addItem = asyncHandler(async (req, res, next) => {
     { path: 'items.boutiqueId', select: 'name logo' }
   ]);
 
+  emitToUser(req.user._id.toString(), 'cart:itemAdded', { productId, quantity });
+
   res.status(200).json({
     success: true,
     message: 'Item added to cart',
@@ -132,6 +135,8 @@ exports.updateItemQuantity = asyncHandler(async (req, res, next) => {
     { path: 'items.boutiqueId', select: 'name logo' }
   ]);
 
+  emitToUser(req.user._id.toString(), 'cart:itemUpdated', { productId: req.params.productId });
+
   res.status(200).json({
     success: true,
     message: 'Cart updated',
@@ -167,6 +172,8 @@ exports.removeItem = asyncHandler(async (req, res, next) => {
     { path: 'items.boutiqueId', select: 'name logo' }
   ]);
 
+  emitToUser(req.user._id.toString(), 'cart:itemRemoved', { productId: req.params.productId });
+
   res.status(200).json({
     success: true,
     message: 'Item removed from cart',
@@ -194,6 +201,8 @@ exports.clearCart = asyncHandler(async (req, res, next) => {
   }
 
   await cart.clearCart();
+
+  emitToUser(req.user._id.toString(), 'cart:cleared', {});
 
   res.status(200).json({
     success: true,

@@ -2,6 +2,7 @@ const Payment = require('../models/Payment');
 const Order = require('../models/Order');
 const Product = require('../models/Product');
 const { ApiError, asyncHandler } = require('../middlewares/errorHandler');
+const { emitToAdmin, emitToUser } = require('../socket');
 
 /**
  * @desc    Initialize payment for an order
@@ -77,6 +78,8 @@ exports.initializePayment = asyncHandler(async (req, res, next) => {
   payment.paymentUrl = paymentUrl;
   await payment.save();
 
+  emitToAdmin('payment:initialized', { paymentRef: payment.reference, orderId: order._id, amount: payment.amount });
+
   res.status(201).json({
     success: true,
     message: 'Payment initialized',
@@ -140,6 +143,8 @@ exports.confirmPayment = asyncHandler(async (req, res, next) => {
     response: { manual: true, confirmedBy: req.user._id, notes }
   });
 
+  emitToUser(payment.userId.toString(), 'payment:confirmed', { paymentRef: payment.reference, amount: payment.amount });
+
   res.status(200).json({
     success: true,
     message: 'Payment confirmed successfully',
@@ -166,6 +171,8 @@ exports.failPayment = asyncHandler(async (req, res, next) => {
   }
 
   await payment.markAsFailed(reason);
+
+  emitToUser(payment.userId.toString(), 'payment:failed', { paymentRef: payment.reference, reason });
 
   res.status(200).json({
     success: true,
@@ -195,6 +202,8 @@ exports.refundPayment = asyncHandler(async (req, res, next) => {
   }
 
   await payment.processRefund(refundAmount, reason);
+
+  emitToUser(payment.userId.toString(), 'payment:refunded', { paymentRef: payment.reference, amount: refundAmount });
 
   res.status(200).json({
     success: true,

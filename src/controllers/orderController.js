@@ -6,6 +6,7 @@ const Boutique = require('../models/Boutique');
 const User = require('../models/User');
 const { ApiError, asyncHandler } = require('../middlewares/errorHandler');
 const { sendLowStockAlertEmail } = require('../services/emailService');
+const { emitToAdmin, emitToUser, emitToBoutique } = require('../socket');
 
 /**
  * @desc    Create order from cart
@@ -125,6 +126,10 @@ exports.createOrder = asyncHandler(async (req, res, next) => {
     { path: 'items.boutiqueId', select: 'name logo' },
     { path: 'userId', select: 'firstName lastName email' }
   ]);
+
+  const boutiqueIds = [...new Set(orderItems.map(item => item.boutiqueId.toString()))];
+  emitToAdmin('order:created', { orderId: order._id, reference: order.orderReference, totalAmount: order.totalAmount });
+  boutiqueIds.forEach(bid => emitToBoutique(bid, 'order:created', { orderId: order._id, reference: order.orderReference, totalAmount: order.totalAmount }));
 
   res.status(201).json({
     success: true,
@@ -253,6 +258,10 @@ exports.cancelOrder = asyncHandler(async (req, res, next) => {
   order.status = 'cancelled';
   order.cancelledAt = new Date();
   await order.save();
+
+  const cancelBoutiqueIds = [...new Set(order.items.map(item => item.boutiqueId.toString()))];
+  emitToAdmin('order:cancelled', { orderId: order._id, reference: order.orderReference });
+  cancelBoutiqueIds.forEach(bid => emitToBoutique(bid, 'order:cancelled', { orderId: order._id, reference: order.orderReference }));
 
   res.status(200).json({
     success: true,
@@ -471,6 +480,10 @@ exports.updateOrderStatus = asyncHandler(async (req, res, next) => {
   if (adminNotes) order.adminNotes = adminNotes;
 
   await order.save();
+
+  emitToUser(order.userId.toString(), 'order:statusUpdated', { orderId: order._id, reference: order.orderReference, status });
+  const statusBoutiqueIds = [...new Set(order.items.map(item => item.boutiqueId.toString()))];
+  statusBoutiqueIds.forEach(bid => emitToBoutique(bid, 'order:statusUpdated', { orderId: order._id, reference: order.orderReference, status }));
 
   res.status(200).json({
     success: true,

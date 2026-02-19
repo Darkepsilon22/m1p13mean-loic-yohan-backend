@@ -5,6 +5,7 @@ const Zone = require('../models/Zone');
 const ReservationBoutique = require('../models/ReservationBoutique');
 const BoutiqueReservationService = require('../services/boutiqueReservationService');
 const { ApiError, asyncHandler } = require('../middlewares/errorHandler');
+const { emitToAdmin, emitToUser, emitToBoutique } = require('../socket');
 
 const DAYS = [0, 1, 2, 3, 4, 5, 6];
 
@@ -189,6 +190,8 @@ exports.create = asyncHandler(async (req, res, next) => {
     .populate('categoryId', 'name slug')
     .populate('userId', 'firstName lastName email');
 
+  emitToAdmin('boutique:created', { boutiqueId: populated._id, name: populated.name });
+
   res.status(201).json({
     success: true,
     message: 'Boutique créée avec succès',
@@ -243,6 +246,9 @@ exports.update = asyncHandler(async (req, res, next) => {
     .populate('categoryId', 'name slug')
     .populate('userId', 'firstName lastName email');
 
+  emitToAdmin('boutique:updated', { boutiqueId: boutique._id, name: boutique.name });
+  if (boutique._id) emitToBoutique(boutique._id.toString(), 'boutique:updated', { boutiqueId: boutique._id, name: boutique.name });
+
   res.status(200).json({
     success: true,
     message: 'Boutique mise à jour avec succès',
@@ -286,6 +292,8 @@ exports.patchStatus = asyncHandler(async (req, res, next) => {
   const populated = await Boutique.findById(boutique._id)
     .populate('categoryId', 'name slug')
     .populate('userId', 'firstName lastName email');
+
+  if (populated.userId) emitToBoutique(populated._id.toString(), 'boutique:statusChanged', { boutiqueId: populated._id, name: populated.name, status });
 
   res.status(200).json({
     success: true,
@@ -350,6 +358,8 @@ exports.delete = asyncHandler(async (req, res, next) => {
   }
 
   await Boutique.findByIdAndDelete(req.params.id);
+
+  emitToAdmin('boutique:deleted', { boutiqueId: req.params.id, name: boutique.name });
 
   res.status(200).json({
     success: true,
@@ -486,6 +496,8 @@ exports.releaseBoutique = asyncHandler(async (req, res, next) => {
     );
   }
 
+  if (previousUserId) emitToBoutique(req.params.id, 'boutique:released', { boutiqueId: req.params.id });
+
   res.json({
     success: true,
     message: 'Boutique libérée avec succès',
@@ -505,6 +517,8 @@ exports.reserveBoutique = asyncHandler(async (req, res, next) => {
       req.user._id
     );
 
+    emitToAdmin('reservation:created', { boutiqueId: req.params.id, userId: req.user._id });
+
     res.json(result);
   } catch (error) {
     return next(new ApiError(400, error.message));
@@ -522,6 +536,8 @@ exports.confirmReservation = asyncHandler(async (req, res, next) => {
       req.params.id,
       req.user._id
     );
+
+    emitToAdmin('reservation:confirmed', { boutiqueId: req.params.id, userId: req.user._id });
 
     res.json(result);
   } catch (error) {
@@ -541,6 +557,8 @@ exports.cancelReservation = asyncHandler(async (req, res, next) => {
       req.user._id,
       req.body.reason
     );
+
+    emitToAdmin('reservation:cancelled', { boutiqueId: req.params.id, userId: req.user._id });
 
     res.json(result);
   } catch (error) {
@@ -595,6 +613,9 @@ exports.validateReservation = asyncHandler(async (req, res, next) => {
       req.user._id
     );
 
+    const reservation = await ReservationBoutique.findOne({ boutique: req.params.id, status: 'confirmee' });
+    if (reservation) emitToUser(reservation.user.toString(), 'reservation:validated', { boutiqueId: req.params.id });
+
     res.json(result);
   } catch (error) {
     return next(new ApiError(400, error.message));
@@ -608,11 +629,15 @@ exports.validateReservation = asyncHandler(async (req, res, next) => {
  */
 exports.rejectReservation = asyncHandler(async (req, res, next) => {
   try {
+    const reservation = await ReservationBoutique.findOne({ boutique: req.params.id, status: { $in: ['en_attente', 'confirmee'] } });
+
     const result = await BoutiqueReservationService.rejectReservation(
       req.params.id,
       req.user._id,
       req.body.reason
     );
+
+    if (reservation) emitToUser(reservation.user.toString(), 'reservation:rejected', { boutiqueId: req.params.id, reason: req.body.reason });
 
     res.json(result);
   } catch (error) {

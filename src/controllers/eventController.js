@@ -1,5 +1,6 @@
 const Event = require('../models/Event');
 const { ApiError, asyncHandler } = require('../middlewares/errorHandler');
+const { emitToAdmin, emitToPublic } = require('../socket');
 
 /**
  * @desc    List events (with filters)
@@ -75,6 +76,8 @@ exports.create = asyncHandler(async (req, res, next) => {
   const populated = await Event.findById(event._id)
     .populate('createdBy', 'firstName lastName email');
 
+  emitToAdmin('event:created', { eventId: populated._id, title: populated.title });
+
   res.status(201).json({
     success: true,
     message: 'Event created successfully',
@@ -102,6 +105,8 @@ exports.update = asyncHandler(async (req, res, next) => {
   if (!event) {
     return next(new ApiError(404, 'Event not found'));
   }
+
+  emitToAdmin('event:updated', { eventId: event._id, title: event.title });
 
   res.status(200).json({
     success: true,
@@ -147,6 +152,8 @@ exports.delete = asyncHandler(async (req, res, next) => {
   if (!event) {
     return next(new ApiError(404, 'Event not found'));
   }
+
+  emitToAdmin('event:deleted', { eventId: req.params.id, title: event.title });
 
   res.status(200).json({
     success: true,
@@ -246,6 +253,8 @@ exports.publish = asyncHandler(async (req, res, next) => {
 
   await event.populate('createdBy', 'firstName lastName email');
 
+  emitToPublic('event:published', { eventId: event._id, title: event.title });
+
   res.status(200).json({
     success: true,
     message: 'Event published successfully',
@@ -277,6 +286,8 @@ exports.cancel = asyncHandler(async (req, res, next) => {
   await event.save();
 
   await event.populate('createdBy', 'firstName lastName email');
+
+  emitToPublic('event:cancelled', { eventId: event._id, title: event.title });
 
   res.status(200).json({
     success: true,

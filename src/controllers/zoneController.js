@@ -2,6 +2,7 @@ const Zone = require('../models/Zone');
 const Floor = require('../models/Floor');
 const Boutique = require('../models/Boutique');
 const { ApiError, asyncHandler } = require('../middlewares/errorHandler');
+const { emitToAdmin } = require('../socket');
 
 /**
  * @desc    Get all zones (optional filter by floorId)
@@ -52,6 +53,7 @@ exports.create = asyncHandler(async (req, res, next) => {
   const floor = await Floor.findById(req.body.floorId);
   if (!floor) return next(new ApiError(404, 'Étage non trouvé'));
   const zone = await Zone.create(req.body);
+  emitToAdmin('zone:created', { zoneId: zone._id, name: zone.name });
   res.status(201).json({ success: true, message: 'Zone créée avec succès', data: zone });
 });
 
@@ -63,6 +65,7 @@ exports.create = asyncHandler(async (req, res, next) => {
 exports.update = asyncHandler(async (req, res, next) => {
   const zone = await Zone.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
   if (!zone) return next(new ApiError(404, 'Zone non trouvée'));
+  emitToAdmin('zone:updated', { zoneId: zone._id, name: zone.name });
   res.status(200).json({ success: true, message: 'Zone mise à jour avec succès', data: zone });
 });
 
@@ -79,5 +82,6 @@ exports.delete = asyncHandler(async (req, res, next) => {
     return next(new ApiError(400, `Impossible de supprimer la zone : ${boutiquesCount} boutique(s) présente(s). Retirez-les d'abord.`));
   }
   await Zone.findByIdAndDelete(req.params.id);
+  emitToAdmin('zone:deleted', { zoneId: req.params.id, name: zone.name });
   res.status(200).json({ success: true, message: 'Zone supprimée avec succès' });
 });

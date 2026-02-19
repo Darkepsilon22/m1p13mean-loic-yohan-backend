@@ -1,6 +1,7 @@
 const Floor = require('../models/Floor');
 const Zone = require('../models/Zone');
 const { ApiError, asyncHandler } = require('../middlewares/errorHandler');
+const { emitToAdmin } = require('../socket');
 
 /**
  * @desc    Get all floors
@@ -30,6 +31,7 @@ exports.getById = asyncHandler(async (req, res, next) => {
  */
 exports.create = asyncHandler(async (req, res) => {
   const floor = await Floor.create(req.body);
+  emitToAdmin('floor:created', { floorId: floor._id, name: floor.name });
   res.status(201).json({ success: true, message: 'Étage créé avec succès', data: floor });
 });
 
@@ -41,6 +43,7 @@ exports.create = asyncHandler(async (req, res) => {
 exports.update = asyncHandler(async (req, res, next) => {
   const floor = await Floor.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
   if (!floor) return next(new ApiError(404, 'Étage non trouvé'));
+  emitToAdmin('floor:updated', { floorId: floor._id, name: floor.name });
   res.status(200).json({ success: true, message: 'Étage mis à jour avec succès', data: floor });
 });
 
@@ -57,5 +60,6 @@ exports.delete = asyncHandler(async (req, res, next) => {
     return next(new ApiError(400, `Impossible de supprimer l'étage : ${zonesCount} zone(s) existante(s). Supprimez-les d'abord.`));
   }
   await Floor.findByIdAndDelete(req.params.id);
+  emitToAdmin('floor:deleted', { floorId: req.params.id, name: floor.name });
   res.status(200).json({ success: true, message: 'Étage supprimé avec succès' });
 });
