@@ -82,6 +82,20 @@ router.get('/boutique', verifyToken, isBoutique, listOrders, orderController.get
 router.get('/boutique/stats', verifyToken, isBoutique, orderController.getBoutiqueOrderStats);
 
 /**
+ * @route   GET /api/orders/boutique/report/pdf
+ * @desc    Export boutique monthly report as PDF
+ * @access  Private (boutique)
+ */
+router.get('/boutique/report/pdf', verifyToken, isBoutique, orderController.exportBoutiqueMonthlyReportPDF);
+
+/**
+ * @route   GET /api/orders/boutique/report/excel
+ * @desc    Export boutique monthly report as Excel
+ * @access  Private (boutique)
+ */
+router.get('/boutique/report/excel', verifyToken, isBoutique, orderController.exportBoutiqueMonthlyReportExcel);
+
+/**
  * @route   PATCH /api/orders/boutique/:id/status
  * @desc    Boutique updates order status
  * @access  Private (boutique)
