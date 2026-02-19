@@ -74,8 +74,8 @@ router.delete('/:id', validateBoutiqueId('id'), isAdmin, boutiqueController.dele
 
 // ==================== BOUTIQUE OWNER ROUTES (modification de SA boutique) ====================
 
-// Modifier sa boutique - Propriétaire SEULEMENT (admin ne peut pas)
-router.put('/:id', validateBoutiqueId('id'), isBoutique, updateBoutique, boutiqueController.update);
+// Modifier une boutique - Admin ou propriétaire (admin pour placement carte, propriétaire pour ses infos)
+router.put('/:id', validateBoutiqueId('id'), isAdminOrBoutique, updateBoutique, boutiqueController.update);
 
 // Modifier le statut (admin pour validation/rejet boutique, propriétaire pour activer/désactiver)
 router.patch('/:id/status', validateBoutiqueId('id'), isAdminOrBoutique, patchBoutiqueStatus, boutiqueController.patchStatus);

@@ -13,7 +13,6 @@ const navigationEdgeSchema = new mongoose.Schema({
   },
   cost: {
     type: Number,
-    required: [true, 'Coût requis'],
     min: [0.1, 'Le coût doit être positif']
   },
   isBidirectional: {
@@ -37,29 +36,28 @@ navigationEdgeSchema.index({ fromNode: 1 });
 navigationEdgeSchema.index({ toNode: 1 });
 navigationEdgeSchema.index({ fromNode: 1, toNode: 1 }, { unique: true });
 
-// Validation : empêcher les arêtes trop longues (distance maximale 200 unités par défaut)
-navigationEdgeSchema.pre('save', async function(next) {
+// Calcul automatique du coût et validation de distance
+navigationEdgeSchema.pre('validate', async function() {
   if (this.isNew || this.isModified('fromNode') || this.isModified('toNode')) {
     const MAX_DISTANCE = 200;
     const fromNode = await mongoose.model('NavigationNode').findById(this.fromNode);
     const toNode = await mongoose.model('NavigationNode').findById(this.toNode);
     if (!fromNode || !toNode) {
-      return next(new Error('Noeuds invalides'));
+      throw new Error('Noeuds invalides');
     }
     if (fromNode.floorId.toString() !== toNode.floorId.toString()) {
       // Arête inter-étages : pas de limite de distance
-      return next();
+      return;
     }
     const dist = Math.sqrt(Math.pow(toNode.x - fromNode.x, 2) + Math.pow(toNode.y - fromNode.y, 2));
     if (dist > MAX_DISTANCE) {
-      return next(new Error(`Arête trop longue (${dist.toFixed(2)} unités, max: ${MAX_DISTANCE}). Vérifiez qu'il n'y a pas de raccourci à travers un mur.`));
+      throw new Error(`Arête trop longue (${dist.toFixed(2)} unités, max: ${MAX_DISTANCE}). Vérifiez qu'il n'y a pas de raccourci à travers un mur.`);
     }
     // Si cost n'est pas défini, utiliser la distance euclidienne
     if (!this.cost || this.cost === 0) {
       this.cost = dist;
     }
   }
-  next();
 });
 
 module.exports = mongoose.model('NavigationEdge', navigationEdgeSchema);

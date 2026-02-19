@@ -45,7 +45,7 @@ navigationNodeSchema.index({ floorId: 1, type: 1 });
 navigationNodeSchema.index({ floorId: 1, x: 1, y: 1 });
 
 // Validation : empêcher deux noeuds trop proches (distance minimale 5 unités)
-navigationNodeSchema.pre('save', async function(next) {
+navigationNodeSchema.pre('save', async function() {
   if (this.isNew || this.isModified('x') || this.isModified('y') || this.isModified('floorId')) {
     const MIN_DISTANCE = 5;
     const existing = await mongoose.model('NavigationNode').find({
@@ -55,11 +55,10 @@ navigationNodeSchema.pre('save', async function(next) {
     for (const node of existing) {
       const dist = Math.sqrt(Math.pow(this.x - node.x, 2) + Math.pow(this.y - node.y, 2));
       if (dist < MIN_DISTANCE) {
-        return next(new Error(`Un noeud existe déjà à moins de ${MIN_DISTANCE} unités (distance: ${dist.toFixed(2)})`));
+        throw new Error(`Un noeud existe déjà à moins de ${MIN_DISTANCE} unités (distance: ${dist.toFixed(2)})`);
       }
     }
   }
-  next();
 });
 
 module.exports = mongoose.model('NavigationNode', navigationNodeSchema);
