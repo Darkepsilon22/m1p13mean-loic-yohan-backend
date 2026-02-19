@@ -6,7 +6,7 @@ const Boutique = require('../models/Boutique');
 const User = require('../models/User');
 const StockMovement = require('../models/StockMovement');
 const { ApiError, asyncHandler } = require('../middlewares/errorHandler');
-const { sendLowStockAlertEmail } = require('../services/emailService');
+const { sendLowStockAlertEmail, sendOrderStatusEmail } = require('../services/emailService');
 const { generateOrdersPDF, generateOrdersExcel, STATUS_LABELS } = require('../services/orderExportService');
 
 /**
@@ -155,10 +155,19 @@ exports.createOrder = asyncHandler(async (req, res, next) => {
  * @access  Private (acheteur)
  */
 exports.getMyOrders = asyncHandler(async (req, res) => {
-  const { status, page = 1, limit = 10, sort = '-createdAt' } = req.query;
+  const { status, page = 1, limit = 10, sort = '-createdAt', startDate, endDate } = req.query;
 
   const filter = { userId: req.user._id };
   if (status) filter.status = status;
+  if (startDate || endDate) {
+    filter.createdAt = {};
+    if (startDate) filter.createdAt.$gte = new Date(startDate);
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      filter.createdAt.$lte = end;
+    }
+  }
 
   const skip = (Math.max(1, parseInt(page)) - 1) * Math.min(100, Math.max(1, parseInt(limit)));
   const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
@@ -195,6 +204,15 @@ exports.getMyOrders = asyncHandler(async (req, res) => {
 exports.exportMyOrdersPDF = asyncHandler(async (req, res) => {
   const filter = { userId: req.user._id };
   if (req.query.status) filter.status = req.query.status;
+  if (req.query.startDate || req.query.endDate) {
+    filter.createdAt = {};
+    if (req.query.startDate) filter.createdAt.$gte = new Date(req.query.startDate);
+    if (req.query.endDate) {
+      const end = new Date(req.query.endDate);
+      end.setHours(23, 59, 59, 999);
+      filter.createdAt.$lte = end;
+    }
+  }
 
   const orders = await Order.find(filter)
     .populate('items.boutiqueId', 'name')
@@ -218,6 +236,15 @@ exports.exportMyOrdersPDF = asyncHandler(async (req, res) => {
 exports.exportMyOrdersExcel = asyncHandler(async (req, res) => {
   const filter = { userId: req.user._id };
   if (req.query.status) filter.status = req.query.status;
+  if (req.query.startDate || req.query.endDate) {
+    filter.createdAt = {};
+    if (req.query.startDate) filter.createdAt.$gte = new Date(req.query.startDate);
+    if (req.query.endDate) {
+      const end = new Date(req.query.endDate);
+      end.setHours(23, 59, 59, 999);
+      filter.createdAt.$lte = end;
+    }
+  }
 
   const orders = await Order.find(filter)
     .populate('items.boutiqueId', 'name')
@@ -397,6 +424,124 @@ exports.getBoutiqueOrderById = asyncHandler(async (req, res, next) => {
         boutiqueSubtotal
       }
     }
+  });
+});
+
+/**
+ * @desc    Boutique updates order status (confirm, processing, shipped, delivered, completed)
+ * @route   PATCH /api/orders/boutique/:id/status
+ * @access  Private (boutique)
+ */
+exports.boutiqueUpdateOrderStatus = asyncHandler(async (req, res, next) => {
+  const { status, trackingNumber, carrier } = req.body;
+
+  const order = await Order.findOne({
+    _id: req.params.id,
+    'items.boutiqueId': req.user.boutiqueId
+  });
+
+  if (!order) {
+    return next(new ApiError(404, 'Commande non trouvée'));
+  }
+
+  // Validate allowed transitions for boutique
+  const allowedTransitions = {
+    pending: ['confirmed'],
+    confirmed: ['processing'],
+    processing: ['shipped'],
+    shipped: ['delivered'],
+    delivered: ['completed']
+  };
+
+  const allowed = allowedTransitions[order.status] || [];
+  if (!allowed.includes(status)) {
+    return next(new ApiError(400, `Impossible de passer de "${order.status}" à "${status}".`));
+  }
+
+  // Check payment for statuses that require it
+  if (order.requiresPaymentForStatus(status) && order.paymentStatus !== 'success') {
+    return next(new ApiError(400, `Impossible : paiement non confirmé (statut: ${order.paymentStatus}).`));
+  }
+
+  order.status = status;
+
+  // Auto-generate tracking number if shipping and none provided
+  if (status === 'shipped') {
+    order.trackingNumber = trackingNumber || ('SM-' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substring(2, 6).toUpperCase());
+    if (carrier) order.carrier = carrier;
+  } else {
+    if (trackingNumber) order.trackingNumber = trackingNumber;
+    if (carrier) order.carrier = carrier;
+  }
+
+  await order.save();
+
+  // Send email notification to customer
+  try {
+    const boutique = await Boutique.findById(req.user.boutiqueId).select('name').lean();
+    const boutiqueName = boutique?.name || 'la boutique';
+    await sendOrderStatusEmail(
+      order.customerEmail,
+      order.customerName,
+      order,
+      status,
+      boutiqueName
+    );
+  } catch (emailErr) {
+    console.error('Email notification failed:', emailErr.message);
+    // Don't fail the request if email fails
+  }
+
+  res.status(200).json({
+    success: true,
+    message: `Statut mis à jour : ${status}`,
+    data: { order }
+  });
+});
+
+/**
+ * @desc    Acheteur confirms order reception
+ * @route   PATCH /api/orders/:id/confirm-reception
+ * @access  Private (acheteur)
+ */
+exports.confirmReception = asyncHandler(async (req, res, next) => {
+  const order = await Order.findOne({
+    _id: req.params.id,
+    userId: req.user._id
+  });
+
+  if (!order) {
+    return next(new ApiError(404, 'Commande non trouvée'));
+  }
+
+  if (order.status !== 'delivered' && order.status !== 'shipped') {
+    return next(new ApiError(400, `Impossible de confirmer la réception : la commande est "${order.status}".`));
+  }
+
+  order.status = 'completed';
+  await order.save();
+
+  // Send completion email to customer
+  try {
+    // Find the boutique from order items
+    const firstBoutiqueId = order.items[0]?.boutiqueId;
+    const boutique = firstBoutiqueId ? await Boutique.findById(firstBoutiqueId).select('name').lean() : null;
+    const boutiqueName = boutique?.name || 'la boutique';
+    await sendOrderStatusEmail(
+      order.customerEmail,
+      order.customerName,
+      order,
+      'completed',
+      boutiqueName
+    );
+  } catch (emailErr) {
+    console.error('Email notification failed:', emailErr.message);
+  }
+
+  res.status(200).json({
+    success: true,
+    message: 'Réception confirmée. Merci pour votre achat !',
+    data: { order }
   });
 });
 

@@ -1101,6 +1101,83 @@ const sendContractTerminatedEmail = async (email, firstName, data) => {
   await sendEmail({ to: email, subject: `Contrat ${reference} resilie - Smar'ket`, html });
 };
 
+/**
+ 
+ * @param {string} email 
+ * @param {string} customerName 
+ * @param {Object} order
+ * @param {string} newStatus
+ * @param {string} boutiqueName 
+ */
+const sendOrderStatusEmail = async (email, customerName, order, newStatus, boutiqueName) => {
+  const statusLabels = {
+    confirmed: 'Confirmee',
+    processing: 'En preparation',
+    shipped: 'Expediee',
+    delivered: 'Livree',
+    completed: 'Terminee',
+    cancelled: 'Annulee'
+  };
+
+  const statusColors = {
+    confirmed: '#17a2b8',
+    processing: '#4680ff',
+    shipped: '#6f42c1',
+    delivered: '#28a745',
+    completed: '#28a745',
+    cancelled: '#dc3545'
+  };
+
+  const statusMessages = {
+    confirmed: `Votre commande a ete confirmee par <strong>${boutiqueName}</strong>. Elle sera bientot preparee.`,
+    processing: `Votre commande est en cours de preparation par <strong>${boutiqueName}</strong>.`,
+    shipped: `Votre commande a ete expediee par <strong>${boutiqueName}</strong>. Vous la recevrez bientot !`,
+    delivered: `Votre commande a ete livree. N'oubliez pas de confirmer la reception dans votre espace client.`,
+    completed: `Votre commande est terminee. Merci pour votre achat chez <strong>${boutiqueName}</strong> !`,
+    cancelled: `Votre commande a ete annulee.`
+  };
+
+  const label = statusLabels[newStatus] || newStatus;
+  const color = statusColors[newStatus] || '#333';
+  const message = statusMessages[newStatus] || `Le statut de votre commande a ete mis a jour : ${label}.`;
+
+  const formatMGA = (amount) => Math.round(amount).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' Ar';
+
+  const trackingSection = order.trackingNumber ? `
+    <div class="info-box" style="margin-top: 20px;">
+      <strong>Informations de livraison</strong><br>
+      ${order.carrier ? `Transporteur : <strong>${order.carrier}</strong><br>` : ''}
+      Numero de suivi : <strong style="font-family: monospace;">${order.trackingNumber}</strong>
+    </div>` : '';
+
+  const confirmButton = newStatus === 'delivered' ? `
+    <center><a href="${process.env.FRONTEND_URL || 'http://localhost:4200'}/my-profile" class="button" style="background: #28a745;">Confirmer la reception</a></center>` : '';
+
+  const html = `<!DOCTYPE html><html><head><style>${emailStyles}</style></head>
+    <body><div class="container"><div class="card">
+      <div class="header" style="background: ${color};">
+        <h1>Commande ${label}</h1>
+        <p>Ref. ${order.orderReference}</p>
+      </div>
+      <div class="content">
+        <p>Bonjour <strong>${customerName}</strong>,</p>
+        <p>${message}</p>
+        <div class="info-box">
+          <strong>Details de la commande</strong><br>
+          Reference : <strong>${order.orderReference}</strong><br>
+          Montant : <strong>${formatMGA(order.totalAmount)}</strong><br>
+          Boutique : <strong>${boutiqueName}</strong>
+        </div>
+        ${trackingSection}
+        ${confirmButton}
+        <center><a href="${process.env.FRONTEND_URL || 'http://localhost:4200'}/my-profile" class="button">Voir mes commandes</a></center>
+      </div>
+      <div class="footer"><p>${new Date().getFullYear()} Smar'ket. Tous droits reserves.</p></div>
+    </div></div></body></html>`;
+
+  await sendEmail({ to: email, subject: `Commande ${order.orderReference} - ${label} - Smar'ket`, html });
+};
+
 module.exports = {
   sendEmail,
   sendVerificationEmail,
@@ -1122,5 +1199,6 @@ module.exports = {
   sendRentLateDay7Email,
   sendRentLateDay30Email,
   sendContractExpiringEmail,
-  sendContractTerminatedEmail
+  sendContractTerminatedEmail,
+  sendOrderStatusEmail
 };

@@ -58,6 +58,13 @@ router.get('/reference/:reference', verifyToken, validateOrderReference, orderCo
  */
 router.patch('/:id/cancel', verifyToken, isAcheteur, validateOrderId(), orderController.cancelOrder);
 
+/**
+ * @route   PATCH /api/orders/:id/confirm-reception
+ * @desc    Buyer confirms order reception
+ * @access  Private (acheteur - own orders only)
+ */
+router.patch('/:id/confirm-reception', verifyToken, isAcheteur, validateOrderId(), orderController.confirmReception);
+
 // ==================== BOUTIQUE ROUTES ====================
 
 /**
@@ -73,6 +80,13 @@ router.get('/boutique', verifyToken, isBoutique, listOrders, orderController.get
  * @access  Private (boutique)
  */
 router.get('/boutique/stats', verifyToken, isBoutique, orderController.getBoutiqueOrderStats);
+
+/**
+ * @route   PATCH /api/orders/boutique/:id/status
+ * @desc    Boutique updates order status
+ * @access  Private (boutique)
+ */
+router.patch('/boutique/:id/status', verifyToken, isBoutique, validateOrderId(), orderController.boutiqueUpdateOrderStatus);
 
 /**
  * @route   GET /api/orders/boutique/:id

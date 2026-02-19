@@ -32,36 +32,36 @@ const createNode = [
   body('type').isIn(['intersection', 'corridor', 'stairs', 'elevator', 'entrance', 'parking', 'info', 'poi']).withMessage('Type invalide'),
   body('x').isFloat().withMessage('X doit être un nombre').toFloat(),
   body('y').isFloat().withMessage('Y doit être un nombre').toFloat(),
-  body('label').optional().isLength({ max: 100 }).withMessage('Label ne peut pas dépasser 100 caractères'),
-  body('specialSpaceId').optional().isMongoId().withMessage('specialSpaceId doit être un ObjectId valide'),
-  body('accessible').optional().isBoolean().withMessage('accessible doit être un booléen'),
+  body('label').optional({ values: 'null' }).isLength({ max: 100 }).withMessage('Label ne peut pas dépasser 100 caractères'),
+  body('specialSpaceId').optional({ values: 'null' }).isMongoId().withMessage('specialSpaceId doit être un ObjectId valide'),
+  body('accessible').optional({ values: 'null' }).isBoolean().withMessage('accessible doit être un booléen'),
   handleValidationErrors
 ];
 
 const updateNode = [
-  body('floorId').optional().isMongoId().withMessage('floorId doit être un ObjectId valide'),
-  body('type').optional().isIn(['intersection', 'corridor', 'stairs', 'elevator', 'entrance', 'parking', 'info', 'poi']).withMessage('Type invalide'),
-  body('x').optional().isFloat().withMessage('X doit être un nombre').toFloat(),
-  body('y').optional().isFloat().withMessage('Y doit être un nombre').toFloat(),
-  body('label').optional().isLength({ max: 100 }).withMessage('Label ne peut pas dépasser 100 caractères'),
-  body('specialSpaceId').optional().isMongoId().withMessage('specialSpaceId doit être un ObjectId valide'),
-  body('accessible').optional().isBoolean().withMessage('accessible doit être un booléen'),
+  body('floorId').optional({ values: 'null' }).isMongoId().withMessage('floorId doit être un ObjectId valide'),
+  body('type').optional({ values: 'null' }).isIn(['intersection', 'corridor', 'stairs', 'elevator', 'entrance', 'parking', 'info', 'poi']).withMessage('Type invalide'),
+  body('x').optional({ values: 'null' }).isFloat().withMessage('X doit être un nombre').toFloat(),
+  body('y').optional({ values: 'null' }).isFloat().withMessage('Y doit être un nombre').toFloat(),
+  body('label').optional({ values: 'null' }).isLength({ max: 100 }).withMessage('Label ne peut pas dépasser 100 caractères'),
+  body('specialSpaceId').optional({ values: 'null' }).isMongoId().withMessage('specialSpaceId doit être un ObjectId valide'),
+  body('accessible').optional({ values: 'null' }).isBoolean().withMessage('accessible doit être un booléen'),
   handleValidationErrors
 ];
 
 const createEdge = [
   body('fromNode').isMongoId().withMessage('fromNode doit être un ObjectId valide'),
   body('toNode').isMongoId().withMessage('toNode doit être un ObjectId valide'),
-  body('cost').optional().isFloat({ min: 0.1 }).withMessage('cost doit être un nombre positif').toFloat(),
-  body('isBidirectional').optional().isBoolean().withMessage('isBidirectional doit être un booléen'),
-  body('accessible').optional().isBoolean().withMessage('accessible doit être un booléen'),
+  body('cost').optional({ values: 'null' }).isFloat({ min: 0.1 }).withMessage('cost doit être un nombre positif').toFloat(),
+  body('isBidirectional').optional({ values: 'null' }).isBoolean().withMessage('isBidirectional doit être un booléen'),
+  body('accessible').optional({ values: 'null' }).isBoolean().withMessage('accessible doit être un booléen'),
   handleValidationErrors
 ];
 
 const updateEdge = [
-  body('cost').optional().isFloat({ min: 0.1 }).withMessage('cost doit être un nombre positif').toFloat(),
-  body('isBidirectional').optional().isBoolean().withMessage('isBidirectional doit être un booléen'),
-  body('accessible').optional().isBoolean().withMessage('accessible doit être un booléen'),
+  body('cost').optional({ values: 'null' }).isFloat({ min: 0.1 }).withMessage('cost doit être un nombre positif').toFloat(),
+  body('isBidirectional').optional({ values: 'null' }).isBoolean().withMessage('isBidirectional doit être un booléen'),
+  body('accessible').optional({ values: 'null' }).isBoolean().withMessage('accessible doit être un booléen'),
   handleValidationErrors
 ];
 
