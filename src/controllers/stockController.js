@@ -595,7 +595,7 @@ exports.exportStockPDF = asyncHandler(async (req, res, next) => {
     return next(new ApiError(404, 'Boutique not found'));
   }
 
-  const { dateDebut, dateFin, productIds: productIdsParam, category } = req.query;
+  const { dateDebut, dateFin, productIds: productIdsParam, category, type } = req.query;
   if (!dateDebut || !dateFin) {
     return next(new ApiError(400, 'dateDebut and dateFin are required (YYYY-MM-DD)'));
   }
@@ -609,7 +609,8 @@ exports.exportStockPDF = asyncHandler(async (req, res, next) => {
     dateDebut,
     dateFin,
     productIds,
-    category || null
+    category || null,
+    type || null
   );
 
   const pdfBuffer = await stockExportService.generateStockPDF(movements, boutique.name);
@@ -632,7 +633,7 @@ exports.exportStockExcel = asyncHandler(async (req, res, next) => {
     return next(new ApiError(404, 'Boutique not found'));
   }
 
-  const { dateDebut, dateFin, productIds: productIdsParam, category } = req.query;
+  const { dateDebut, dateFin, productIds: productIdsParam, category, type } = req.query;
   if (!dateDebut || !dateFin) {
     return next(new ApiError(400, 'dateDebut and dateFin are required (YYYY-MM-DD)'));
   }
@@ -646,7 +647,8 @@ exports.exportStockExcel = asyncHandler(async (req, res, next) => {
     dateDebut,
     dateFin,
     productIds,
-    category || null
+    category || null,
+    type || null
   );
 
   const excelBuffer = await stockExportService.generateStockExcel(movements, boutique.name);

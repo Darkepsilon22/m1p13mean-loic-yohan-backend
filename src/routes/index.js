@@ -18,5 +18,7 @@ router.use('/cart', require('./cartRoutes'));
 router.use('/orders', require('./orderRoutes'));
 router.use('/payments', require('./paymentRoutes'));
 router.use('/stats', require('./statsRoutes'));
+router.use('/contracts', require('./contractRoutes'));
+router.use('/invoices', require('./invoiceRoutes'));
 
 module.exports = router;

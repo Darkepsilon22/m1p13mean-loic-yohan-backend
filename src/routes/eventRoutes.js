@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const eventController = require('../controllers/eventController');
-const { verifyToken } = require('../middlewares/auth');
+const { verifyToken, optionalAuth } = require('../middlewares/auth');
 const { isAdmin } = require('../middlewares/roles');
 const {
   validateEventId,
@@ -16,6 +16,7 @@ router.get('/', listEvents, eventController.getAll);
 router.get('/upcoming', eventController.getUpcoming);
 router.get('/current', eventController.getCurrent);
 router.get('/featured', eventController.getFeatured);
+router.get('/banners', optionalAuth, eventController.getBanners);
 router.get('/:id', validateEventId('id'), eventController.getById);
 
 // Admin routes

@@ -145,8 +145,8 @@ const boutiqueSchema = new mongoose.Schema({
   emplacementStatus: {
     type: String,
     enum: {
-      values: ['libre', 'temporaire', 'occupee'],
-      message: 'Le statut emplacement doit être: libre, temporaire ou occupee'
+      values: ['libre', 'temporaire', 'reservee', 'occupee'],
+      message: 'Le statut emplacement doit être: libre, temporaire, reservee ou occupee'
     },
     default: 'libre'
   },
@@ -215,7 +215,6 @@ boutiqueSchema.pre('validate', function() {
     this.slug = slugify(this.name, { lower: true, strict: true });
   }
 
-  // Validate photos array length
   if (this.photos && this.photos.length > 10) {
     throw new Error('Photos array cannot exceed 10 items');
   }

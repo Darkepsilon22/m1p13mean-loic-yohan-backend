@@ -3,6 +3,8 @@ const { body, param, query, validationResult } = require('express-validator');
 const handleValidationErrors = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
+    console.log('[EventValidation] Errors:', JSON.stringify(errors.array(), null, 2));
+    console.log('[EventValidation] Body:', JSON.stringify(req.body, null, 2));
     return res.status(400).json({
       success: false,
       message: 'Validation failed',
@@ -38,22 +40,26 @@ const createEvent = [
 ];
 
 const updateEventValidation = [
-  body('title').optional().trim().notEmpty().withMessage('Title cannot be empty').isLength({ max: 200 }).withMessage('Title cannot exceed 200 characters'),
-  body('description').optional().trim().notEmpty().withMessage('Description cannot be empty'),
-  body('shortDescription').optional().trim(),
-  body('image').optional().trim().notEmpty().withMessage('Image URL cannot be empty'),
-  body('startDate').optional().isISO8601().withMessage('Start date must be a valid ISO 8601 date').toDate(),
+  body('title').optional().trim().notEmpty().withMessage('Le titre ne peut pas être vide').isLength({ max: 200 }).withMessage('Le titre ne peut pas dépasser 200 caractères'),
+  body('description').optional().trim().notEmpty().withMessage('La description ne peut pas être vide'),
+  body('shortDescription').optional({ nullable: true }).trim(),
+  body('image').optional().trim().notEmpty().withMessage('L\'URL de l\'image ne peut pas être vide'),
+  body('startDate').optional().isISO8601().withMessage('La date de début doit être au format ISO 8601'),
   body('endDate')
     .optional()
-    .isISO8601().withMessage('End date must be a valid ISO 8601 date').toDate()
+    .isISO8601().withMessage('La date de fin doit être au format ISO 8601')
     .custom((value, { req }) => {
       const start = req.body.startDate;
-      if (start && value && new Date(value) <= new Date(start)) {
-        throw new Error('End date must be after start date');
+      if (start && value) {
+        const startMs = new Date(start).getTime();
+        const endMs = new Date(value).getTime();
+        if (endMs <= startMs) {
+          throw new Error('La date de fin doit être après la date de début');
+        }
       }
       return true;
     }),
-  body('visibility').optional().isIn(['public', 'boutiques']).withMessage('Visibility must be public or boutiques'),
+  body('visibility').optional().isIn(['public', 'boutiques']).withMessage('La visibilité doit être public ou boutiques'),
   body('isFeatured').optional().isBoolean().toBoolean(),
   handleValidationErrors
 ];

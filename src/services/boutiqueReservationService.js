@@ -1,13 +1,13 @@
 const Boutique = require('../models/Boutique');
 const ReservationBoutique = require('../models/ReservationBoutique');
+const User = require('../models/User');
 const mongoose = require('mongoose');
+const emailService = require('./emailService');
 
 const RESERVATION_DURATION_MINUTES = 15; // Durée de réservation temporaire
 
 class BoutiqueReservationService {
-  /**
-   * Réserver temporairement une boutique (emplacement)
-   */
+ 
   static async reserveBoutique(boutiqueId, userId) {
     const session = await mongoose.startSession();
     session.startTransaction();
@@ -23,8 +23,8 @@ class BoutiqueReservationService {
         throw new Error('Boutique non trouvée');
       }
 
-      if (boutique.emplacementStatus === 'occupee') {
-        throw new Error('Cette boutique est déjà occupée');
+      if (boutique.emplacementStatus === 'occupee' || boutique.emplacementStatus === 'reservee') {
+        throw new Error('Cette boutique est déjà occupée ou réservée');
       }
 
       if (boutique.emplacementStatus === 'temporaire') {
@@ -194,8 +194,9 @@ class BoutiqueReservationService {
         throw new Error('Aucune réservation en attente de validation pour cette boutique');
       }
 
-      // Confirmer définitivement la boutique
-      boutique.emplacementStatus = 'occupee';
+      // Confirmer la boutique - statut 'reservee' (pas occupee)
+      // La boutique ne passera en 'occupee' que lorsque le contrat sera activé
+      boutique.emplacementStatus = 'reservee';
       boutique.userId = reservation.user;
       boutique.reservationExpires = null;
       await boutique.save({ session });
@@ -207,6 +208,21 @@ class BoutiqueReservationService {
       await reservation.save({ session });
 
       await session.commitTransaction();
+
+      // Envoyer email de réservation approuvée (après commit)
+      try {
+        const tenant = await User.findById(reservation.user);
+        if (tenant) {
+          const boutiqueLocation = `Étage ${boutique.location?.floor || 0}, Zone ${boutique.location?.zone || '?'}, N°${boutique.location?.number || '?'}`;
+          await emailService.sendReservationApprovedEmail(tenant.email, tenant.firstName, {
+            boutiqueLocation,
+            surface: boutique.surface,
+            price: boutique.price
+          });
+        }
+      } catch (emailErr) {
+        console.error('[ReservationService] Erreur envoi email réservation approuvée:', emailErr.message);
+      }
 
       return {
         success: true,

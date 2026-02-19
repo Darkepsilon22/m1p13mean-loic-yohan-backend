@@ -22,9 +22,9 @@ router.use(verifyToken);
 // Admin ne peut PAS voir les stocks et mouvements des boutiques
 router.use(isBoutique);
 
-// Export PDF/Excel (must be before /:productId)
-router.get('/export/pdf', stockController.exportStockPDF);
-router.get('/export/excel', stockController.exportStockExcel);
+// Download PDF/Excel (must be before /:productId)
+router.get('/download/pdf', stockController.exportStockPDF);
+router.get('/download/excel', stockController.exportStockExcel);
 
 // Stock operations with productId in body (alternative routes)
 router.post('/add', stockController.addStock);

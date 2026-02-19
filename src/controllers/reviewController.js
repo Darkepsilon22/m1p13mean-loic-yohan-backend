@@ -10,13 +10,22 @@ const { emitToAdmin, emitToUser, emitToBoutique } = require('../socket');
  * @access  Public
  */
 exports.getAll = asyncHandler(async (req, res, next) => {
-  const { boutiqueId, status, page = 1, limit = 20, sort = '-createdAt' } = req.query;
+  const { boutiqueId, productId, status, page = 1, limit = 20, sort = '-createdAt' } = req.query;
 
   if (!boutiqueId) {
     return next(new ApiError(400, 'boutiqueId query parameter is required'));
   }
 
   const filter = { boutiqueId };
+
+  // productId=null => avis boutique uniquement (champ existe ET vaut null)
+  // productId=<id> => avis produit spécifique
+  if (productId === 'null' || productId === '') {
+    filter.productId = { $exists: true, $eq: null };
+  } else if (productId) {
+    filter.productId = productId;
+  }
+
   if (status) filter.status = status;
 
   const skip = (Math.max(1, parseInt(page, 10)) - 1) * Math.min(100, Math.max(1, parseInt(limit, 10)));
@@ -24,7 +33,7 @@ exports.getAll = asyncHandler(async (req, res, next) => {
 
   const [reviews, total] = await Promise.all([
     Review.find(filter)
-      .populate('userId', 'firstName lastName')
+      .populate('userId', 'firstName lastName email')
       .sort(sort)
       .skip(skip)
       .limit(limitNum)
@@ -53,7 +62,7 @@ exports.getAll = asyncHandler(async (req, res, next) => {
  */
 exports.getById = asyncHandler(async (req, res, next) => {
   const review = await Review.findById(req.params.id)
-    .populate('userId', 'firstName lastName')
+    .populate('userId', 'firstName lastName email')
     .populate('boutiqueId', 'name slug');
 
   if (!review) {
@@ -72,7 +81,7 @@ exports.getById = asyncHandler(async (req, res, next) => {
  * @access  Private (acheteur)
  */
 exports.create = asyncHandler(async (req, res, next) => {
-  const { boutiqueId, rating, comment } = req.body;
+  const { boutiqueId, productId, rating, comment } = req.body;
   const userId = req.user._id;
 
   const boutique = await Boutique.findById(boutiqueId);
@@ -80,23 +89,39 @@ exports.create = asyncHandler(async (req, res, next) => {
     return next(new ApiError(404, 'Boutique not found'));
   }
 
-  const existing = await Review.findOne({ boutiqueId, userId });
+  // Vérifier si productId est fourni et valide
+  if (productId) {
+    const Product = require('../models/Product');
+    const product = await Product.findById(productId);
+    if (!product) {
+      return next(new ApiError(404, 'Product not found'));
+    }
+  }
+
+  // Vérifier si l'utilisateur a déjà un avis (boutique ou produit selon le cas)
+  const existingQuery = { boutiqueId, userId, productId: productId || null };
+  const existing = await Review.findOne(existingQuery);
   if (existing) {
-    return next(new ApiError(400, 'You have already left a review for this boutique. You can update it.'));
+    const target = productId ? 'ce produit' : 'cette boutique';
+    return next(new ApiError(400, `Vous avez déjà laissé un avis pour ${target}. Vous pouvez le modifier.`));
   }
 
   const review = await Review.create({
     boutiqueId,
+    productId: productId || null,
     userId,
     rating: Math.round(Number(rating)),
     comment: comment || undefined,
     status: 'published'
   });
 
-  await recalculateBoutiqueRating(boutiqueId);
+  // Recalculer le rating boutique seulement pour les avis boutique
+  if (!productId) {
+    await recalculateBoutiqueRating(boutiqueId);
+  }
 
   const populated = await Review.findById(review._id)
-    .populate('userId', 'firstName lastName')
+    .populate('userId', 'firstName lastName email')
     .populate('boutiqueId', 'name slug');
 
   emitToBoutique(review.boutiqueId.toString(), 'review:created', { reviewId: review._id, boutiqueId: review.boutiqueId, rating: review.rating });
@@ -136,7 +161,7 @@ exports.update = asyncHandler(async (req, res, next) => {
   await recalculateBoutiqueRating(review.boutiqueId);
 
   const populated = await Review.findById(review._id)
-    .populate('userId', 'firstName lastName')
+    .populate('userId', 'firstName lastName email')
     .populate('boutiqueId', 'name slug');
 
   emitToBoutique(review.boutiqueId.toString(), 'review:updated', { reviewId: review._id, boutiqueId: review.boutiqueId });
@@ -180,7 +205,7 @@ exports.patchResponse = asyncHandler(async (req, res, next) => {
   await review.save();
 
   const populated = await Review.findById(review._id)
-    .populate('userId', 'firstName lastName')
+    .populate('userId', 'firstName lastName email')
     .populate('boutiqueId', 'name slug');
 
   emitToUser(review.userId.toString(), 'review:responseAdded', { reviewId: review._id, boutiqueId: review.boutiqueId });
@@ -233,7 +258,7 @@ exports.patchStatus = asyncHandler(async (req, res, next) => {
   }
 
   const populated = await Review.findById(review._id)
-    .populate('userId', 'firstName lastName')
+    .populate('userId', 'firstName lastName email')
     .populate('boutiqueId', 'name slug');
 
   emitToUser(review.userId.toString(), 'review:statusChanged', { reviewId: review._id, status: review.status });
@@ -290,6 +315,59 @@ exports.report = asyncHandler(async (req, res, next) => {
     data: {
       reportCount: review.reportCount,
       status: review.status
+    }
+  });
+});
+
+/**
+ * @desc    Get all reviews for the authenticated boutique owner's boutique
+ * @route   GET /api/reviews/my-reviews
+ * @access  Private (boutique owner)
+ */
+exports.getMyReviews = asyncHandler(async (req, res, next) => {
+  const boutique = await Boutique.findOne({ userId: req.user._id });
+  if (!boutique) {
+    return next(new ApiError(404, 'Vous n\'avez pas de boutique'));
+  }
+
+  const { type, status, rating, page = 1, limit = 20, sort = '-createdAt' } = req.query;
+
+  const filter = { boutiqueId: boutique._id };
+
+  // Filtre par type : boutique (productId null) ou product (productId existe)
+  if (type === 'boutique') {
+    filter.productId = { $exists: true, $eq: null };
+  } else if (type === 'product') {
+    filter.productId = { $ne: null };
+  }
+
+  if (status) filter.status = status;
+  if (rating) filter.rating = parseInt(rating, 10);
+
+  const skip = (Math.max(1, parseInt(page, 10)) - 1) * Math.min(100, Math.max(1, parseInt(limit, 10)));
+  const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10)));
+
+  const [reviews, total] = await Promise.all([
+    Review.find(filter)
+      .populate('userId', 'firstName lastName email')
+      .populate('productId', 'name')
+      .sort(sort)
+      .skip(skip)
+      .limit(limitNum)
+      .lean(),
+    Review.countDocuments(filter)
+  ]);
+
+  res.status(200).json({
+    success: true,
+    data: {
+      reviews,
+      pagination: {
+        page: Math.floor(skip / limitNum) + 1,
+        limit: limitNum,
+        total,
+        pages: Math.ceil(total / limitNum) || 1
+      }
     }
   });
 });

@@ -31,6 +31,20 @@ router.post('/', verifyToken, isAcheteur, createOrder, orderController.createOrd
 router.get('/my-orders', verifyToken, isAcheteur, listOrders, orderController.getMyOrders);
 
 /**
+ * @route   GET /api/orders/my-orders/export/pdf
+ * @desc    Export user's orders as PDF
+ * @access  Private (acheteur)
+ */
+router.get('/my-orders/export/pdf', verifyToken, isAcheteur, orderController.exportMyOrdersPDF);
+
+/**
+ * @route   GET /api/orders/my-orders/export/excel
+ * @desc    Export user's orders as Excel
+ * @access  Private (acheteur)
+ */
+router.get('/my-orders/export/excel', verifyToken, isAcheteur, orderController.exportMyOrdersExcel);
+
+/**
  * @route   GET /api/orders/reference/:reference
  * @desc    Get order by reference
  * @access  Private (acheteur - own orders only)
@@ -43,6 +57,13 @@ router.get('/reference/:reference', verifyToken, validateOrderReference, orderCo
  * @access  Private (acheteur - own orders only)
  */
 router.patch('/:id/cancel', verifyToken, isAcheteur, validateOrderId(), orderController.cancelOrder);
+
+/**
+ * @route   PATCH /api/orders/:id/confirm-reception
+ * @desc    Buyer confirms order reception
+ * @access  Private (acheteur - own orders only)
+ */
+router.patch('/:id/confirm-reception', verifyToken, isAcheteur, validateOrderId(), orderController.confirmReception);
 
 // ==================== BOUTIQUE ROUTES ====================
 
@@ -59,6 +80,27 @@ router.get('/boutique', verifyToken, isBoutique, listOrders, orderController.get
  * @access  Private (boutique)
  */
 router.get('/boutique/stats', verifyToken, isBoutique, orderController.getBoutiqueOrderStats);
+
+/**
+ * @route   GET /api/orders/boutique/report/pdf
+ * @desc    Export boutique monthly report as PDF
+ * @access  Private (boutique)
+ */
+router.get('/boutique/report/pdf', verifyToken, isBoutique, orderController.exportBoutiqueMonthlyReportPDF);
+
+/**
+ * @route   GET /api/orders/boutique/report/excel
+ * @desc    Export boutique monthly report as Excel
+ * @access  Private (boutique)
+ */
+router.get('/boutique/report/excel', verifyToken, isBoutique, orderController.exportBoutiqueMonthlyReportExcel);
+
+/**
+ * @route   PATCH /api/orders/boutique/:id/status
+ * @desc    Boutique updates order status
+ * @access  Private (boutique)
+ */
+router.patch('/boutique/:id/status', verifyToken, isBoutique, validateOrderId(), orderController.boutiqueUpdateOrderStatus);
 
 /**
  * @route   GET /api/orders/boutique/:id

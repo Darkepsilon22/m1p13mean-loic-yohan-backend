@@ -1,7 +1,31 @@
 const Cart = require('../models/Cart');
 const Product = require('../models/Product');
+const Promotion = require('../models/Promotion');
 const { ApiError, asyncHandler } = require('../middlewares/errorHandler');
 const { emitToUser } = require('../socket');
+
+/**
+ * Calcule le prix effectif d'un produit en tenant compte des promotions actives
+ */
+async function getEffectivePrice(product) {
+  const now = new Date();
+  const promo = await Promotion.findOne({
+    products: product._id,
+    status: 'active',
+    startDate: { $lte: now },
+    endDate: { $gt: now }
+  });
+
+  if (!promo) return product.price;
+
+  if (promo.type === 'percentage' && promo.value != null) {
+    return Math.round(product.price * (1 - promo.value / 100));
+  }
+  if (promo.type === 'fixed' && promo.value != null) {
+    return Math.max(0, Math.round(product.price - promo.value));
+  }
+  return product.price;
+}
 
 /**
  * @desc    Get user's cart
@@ -10,6 +34,22 @@ const { emitToUser } = require('../socket');
  */
 exports.getCart = asyncHandler(async (req, res) => {
   const cart = await Cart.getOrCreateCart(req.user._id);
+
+  // Mettre à jour les prix avec les promotions actives
+  let priceUpdated = false;
+  for (const item of cart.items) {
+    const product = await Product.findById(item.productId);
+    if (product) {
+      const effectivePrice = await getEffectivePrice(product);
+      if (item.unitPrice !== effectivePrice) {
+        item.unitPrice = effectivePrice;
+        priceUpdated = true;
+      }
+    }
+  }
+  if (priceUpdated) {
+    await cart.save();
+  }
 
   await cart.populate([
     { path: 'items.productId', select: 'name price stock mainPhoto availability isArchived' },
@@ -43,19 +83,19 @@ exports.addItem = asyncHandler(async (req, res, next) => {
   const product = await Product.findById(productId).populate('boutiqueId', 'name');
 
   if (!product) {
-    return next(new ApiError(404, 'Product not found'));
+    return next(new ApiError(404, 'Produit introuvable'));
   }
 
   if (product.isArchived) {
-    return next(new ApiError(400, 'Product is no longer available'));
+    return next(new ApiError(400, 'Ce produit n\'est plus disponible'));
   }
 
   if (product.availability === 'outOfStock') {
-    return next(new ApiError(400, 'Product is out of stock'));
+    return next(new ApiError(400, 'Produit en rupture de stock'));
   }
 
   if (product.stock < quantity) {
-    return next(new ApiError(400, `Insufficient stock. Available: ${product.stock}`));
+    return next(new ApiError(400, `Stock insuffisant. Disponible : ${product.stock}`));
   }
 
   const cart = await Cart.getOrCreateCart(req.user._id);
@@ -67,10 +107,11 @@ exports.addItem = asyncHandler(async (req, res, next) => {
   const totalQuantity = (existingItem?.quantity || 0) + quantity;
 
   if (totalQuantity > product.stock) {
-    return next(new ApiError(400, `Cannot add ${quantity} items. Stock available: ${product.stock}, Already in cart: ${existingItem?.quantity || 0}`));
+    return next(new ApiError(400, `Impossible d'ajouter ${quantity} article(s). Stock disponible : ${product.stock}, Déjà dans le panier : ${existingItem?.quantity || 0}`));
   }
 
-  await cart.addItem(product, quantity);
+  const effectivePrice = await getEffectivePrice(product);
+  await cart.addItem(product, quantity, effectivePrice);
 
   await cart.populate([
     { path: 'items.productId', select: 'name price stock mainPhoto availability' },
@@ -81,7 +122,7 @@ exports.addItem = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    message: 'Item added to cart',
+    message: 'Article ajouté au panier',
     data: {
       cart: {
         _id: cart._id,
@@ -103,13 +144,13 @@ exports.updateItemQuantity = asyncHandler(async (req, res, next) => {
   const { quantity } = req.body;
 
   if (quantity < 0) {
-    return next(new ApiError(400, 'Quantity cannot be negative'));
+    return next(new ApiError(400, 'La quantité ne peut pas être négative'));
   }
 
   const cart = await Cart.findOne({ userId: req.user._id });
 
   if (!cart) {
-    return next(new ApiError(404, 'Cart not found'));
+    return next(new ApiError(404, 'Panier introuvable'));
   }
 
   // If quantity is 0, remove the item
@@ -120,11 +161,11 @@ exports.updateItemQuantity = asyncHandler(async (req, res, next) => {
     const product = await Product.findById(productId);
 
     if (!product) {
-      return next(new ApiError(404, 'Product not found'));
+      return next(new ApiError(404, 'Produit introuvable'));
     }
 
     if (quantity > product.stock) {
-      return next(new ApiError(400, `Insufficient stock. Available: ${product.stock}`));
+      return next(new ApiError(400, `Stock insuffisant. Disponible : ${product.stock}`));
     }
 
     await cart.updateItemQuantity(productId, quantity);
@@ -139,7 +180,7 @@ exports.updateItemQuantity = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    message: 'Cart updated',
+    message: 'Panier mis à jour',
     data: {
       cart: {
         _id: cart._id,
@@ -162,7 +203,7 @@ exports.removeItem = asyncHandler(async (req, res, next) => {
   const cart = await Cart.findOne({ userId: req.user._id });
 
   if (!cart) {
-    return next(new ApiError(404, 'Cart not found'));
+    return next(new ApiError(404, 'Panier introuvable'));
   }
 
   await cart.removeItem(productId);
@@ -176,7 +217,7 @@ exports.removeItem = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    message: 'Item removed from cart',
+    message: 'Article supprimé du panier',
     data: {
       cart: {
         _id: cart._id,
@@ -197,7 +238,7 @@ exports.clearCart = asyncHandler(async (req, res, next) => {
   const cart = await Cart.findOne({ userId: req.user._id });
 
   if (!cart) {
-    return next(new ApiError(404, 'Cart not found'));
+    return next(new ApiError(404, 'Panier introuvable'));
   }
 
   await cart.clearCart();
@@ -206,7 +247,7 @@ exports.clearCart = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    message: 'Cart cleared',
+    message: 'Panier vidé',
     data: {
       cart: {
         _id: cart._id,
@@ -227,11 +268,11 @@ exports.validateCart = asyncHandler(async (req, res, next) => {
   const cart = await Cart.findOne({ userId: req.user._id });
 
   if (!cart) {
-    return next(new ApiError(404, 'Cart not found'));
+    return next(new ApiError(404, 'Panier introuvable'));
   }
 
   if (cart.items.length === 0) {
-    return next(new ApiError(400, 'Cart is empty'));
+    return next(new ApiError(400, 'Le panier est vide'));
   }
 
   const validation = await cart.validateStock();
@@ -265,7 +306,7 @@ exports.getCartSummary = asyncHandler(async (req, res, next) => {
   const cart = await Cart.findOne({ userId: req.user._id });
 
   if (!cart || cart.items.length === 0) {
-    return next(new ApiError(400, 'Cart is empty'));
+    return next(new ApiError(400, 'Le panier est vide'));
   }
 
   // Validate stock first

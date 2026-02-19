@@ -3,10 +3,12 @@ const User = require('../models/User');
 const Boutique = require('../models/Boutique');
 const Product = require('../models/Product');
 const Payment = require('../models/Payment');
+const Contract = require('../models/Contract');
+const Invoice = require('../models/Invoice');
+const ReservationBoutique = require('../models/ReservationBoutique');
 const { asyncHandler } = require('../middlewares/errorHandler');
 const mongoose = require('mongoose');
 
-// ==================== ADMIN - STATISTIQUES GLOBALES DU CENTRE ====================
 
 /**
  * @desc    Get global center revenue statistics (CA total)
@@ -175,7 +177,6 @@ exports.getCustomerMetrics = asyncHandler(async (req, res) => {
   if (startDate) dateFilter.$gte = new Date(startDate);
   if (endDate) dateFilter.$lte = new Date(endDate);
 
-  // Total customers by role
   const customersByRole = await User.aggregate([
     {
       $group: {
@@ -188,7 +189,6 @@ exports.getCustomerMetrics = asyncHandler(async (req, res) => {
     }
   ]);
 
-  // New customers by period
   let dateGrouping;
   switch (period) {
     case 'day':
@@ -230,7 +230,6 @@ exports.getCustomerMetrics = asyncHandler(async (req, res) => {
     { $limit: 24 }
   ]);
 
-  // Customer retention - customers who made multiple orders
   const customerRetention = await Order.aggregate([
     { $match: { paymentStatus: 'success' } },
     {
@@ -254,7 +253,6 @@ exports.getCustomerMetrics = asyncHandler(async (req, res) => {
     }
   ]);
 
-  // Top customers
   const topCustomers = await Order.aggregate([
     { $match: { paymentStatus: 'success' } },
     {
@@ -446,31 +444,21 @@ exports.getAdminDashboard = asyncHandler(async (req, res) => {
       { $match: { paymentStatus: 'success', createdAt: { $gte: startOfMonth } } },
       { $group: { _id: null, total: { $sum: '$totalAmount' } } }
     ]),
-    // Yearly revenue
     Order.aggregate([
       { $match: { paymentStatus: 'success', createdAt: { $gte: startOfYear } } },
       { $group: { _id: null, total: { $sum: '$totalAmount' } } }
     ]),
-    // Total orders
     Order.countDocuments(),
-    // Pending orders
     Order.countDocuments({ status: 'pending' }),
-    // Total customers
     User.countDocuments({ role: 'acheteur' }),
-    // Active customers
     User.countDocuments({ role: 'acheteur', status: 'active' }),
-    // Total boutiques
     Boutique.countDocuments(),
-    // Active boutiques
     Boutique.countDocuments({ status: 'active' }),
-    // Total products
     Product.countDocuments({ isArchived: false }),
-    // Low stock products
     Product.countDocuments({
       isArchived: false,
       $expr: { $and: [{ $gt: ['$stock', 0] }, { $lte: ['$stock', '$lowStockThreshold'] }] }
     }),
-    // Recent orders
     Order.find()
       .populate('userId', 'firstName lastName')
       .sort('-createdAt')
@@ -504,6 +492,309 @@ exports.getAdminDashboard = asyncHandler(async (req, res) => {
         lowStock: lowStockProducts
       },
       recentOrders
+    }
+  });
+});
+
+/**
+ * @desc    Get boutique revenue trends over time (monthly per boutique, top N)
+ * @route   GET /api/stats/admin/boutiques-trends
+ * @access  Private (admin)
+ * @query   months (default: 12)
+ */
+exports.getAdminBoutiquesTrends = asyncHandler(async (req, res) => {
+  const { months = 12 } = req.query;
+
+  const startDate = new Date();
+  startDate.setMonth(startDate.getMonth() - parseInt(months));
+
+  // Find top boutiques by total revenue
+  const topBoutiques = await Order.aggregate([
+    { $match: { paymentStatus: 'success', createdAt: { $gte: startDate } } },
+    { $unwind: '$items' },
+    {
+      $group: {
+        _id: '$items.boutiqueId',
+        totalRevenue: { $sum: '$items.totalPrice' }
+      }
+    },
+    { $sort: { totalRevenue: -1 } },
+    { $limit: 8 },
+    {
+      $lookup: {
+        from: 'boutiques',
+        localField: '_id',
+        foreignField: '_id',
+        as: 'boutique'
+      }
+    },
+    { $unwind: { path: '$boutique', preserveNullAndEmptyArrays: true } },
+    {
+      $project: {
+        boutiqueId: '$_id',
+        boutiqueName: { $ifNull: ['$boutique.name', 'Sans nom'] },
+        totalRevenue: 1
+      }
+    }
+  ]);
+
+  if (topBoutiques.length === 0) {
+    return res.status(200).json({
+      success: true,
+      data: { months: [], boutiques: [] }
+    });
+  }
+
+  const boutiqueIds = topBoutiques.map(b => b.boutiqueId);
+
+  // Get monthly revenue per boutique
+  const monthlySales = await Order.aggregate([
+    { $match: { paymentStatus: 'success', createdAt: { $gte: startDate } } },
+    { $unwind: '$items' },
+    { $match: { 'items.boutiqueId': { $in: boutiqueIds } } },
+    {
+      $group: {
+        _id: {
+          boutiqueId: '$items.boutiqueId',
+          year: { $year: '$createdAt' },
+          month: { $month: '$createdAt' }
+        },
+        revenue: { $sum: '$items.totalPrice' }
+      }
+    },
+    { $sort: { '_id.year': 1, '_id.month': 1 } }
+  ]);
+
+  // Build month labels
+  const monthLabels = [];
+  const d = new Date(startDate);
+  d.setDate(1);
+  const now = new Date();
+  const monthNames = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'];
+  while (d <= now) {
+    monthLabels.push({
+      label: monthNames[d.getMonth()] + ' ' + d.getFullYear(),
+      year: d.getFullYear(),
+      month: d.getMonth() + 1
+    });
+    d.setMonth(d.getMonth() + 1);
+  }
+
+  // Build data per boutique
+  const boutiquesData = topBoutiques.map(b => {
+    const data = monthLabels.map(m => {
+      const found = monthlySales.find(
+        s => s._id.boutiqueId?.toString() === b.boutiqueId?.toString()
+          && s._id.year === m.year
+          && s._id.month === m.month
+      );
+      return found ? found.revenue : 0;
+    });
+    return { boutiqueName: b.boutiqueName, data };
+  });
+
+  res.status(200).json({
+    success: true,
+    data: {
+      months: monthLabels.map(m => m.label),
+      boutiques: boutiquesData
+    }
+  });
+});
+
+/**
+ * @desc    Get rental dashboard statistics (KPIs, charts, tables)
+ * @route   GET /api/stats/admin/rental-dashboard
+ * @access  Private (admin)
+ */
+exports.getAdminRentalDashboard = asyncHandler(async (req, res) => {
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const startOfYear = new Date(now.getFullYear(), 0, 1);
+
+  // ===== KPIs =====
+  const [
+    totalBoutiques,
+    occupiedBoutiques,
+    availableBoutiques,
+    pendingReservationsCount,
+    activeContracts,
+    paidThisMonth,
+    lateInvoicesCount,
+    defaultInvoicesCount
+  ] = await Promise.all([
+    Boutique.countDocuments(),
+    Boutique.countDocuments({ emplacementStatus: 'occupee' }),
+    Boutique.countDocuments({ emplacementStatus: 'libre' }),
+    ReservationBoutique.countDocuments({ status: 'en_attente_validation' }),
+    Contract.countDocuments({ status: 'active' }),
+    Invoice.aggregate([
+      { $match: { status: 'paid', type: 'rent', paidInFullAt: { $gte: startOfMonth } } },
+      { $group: { _id: null, total: { $sum: '$amountPaid' } } }
+    ]),
+    Invoice.countDocuments({ status: 'late' }),
+    Invoice.countDocuments({ status: 'default' })
+  ]);
+
+  const occupancyRate = totalBoutiques > 0
+    ? parseFloat(((occupiedBoutiques / totalBoutiques) * 100).toFixed(1))
+    : 0;
+
+  // ===== Revenus mensuels (loyers) sur 12 mois =====
+  const twelveMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+  const monthlyRentRevenue = await Invoice.aggregate([
+    {
+      $match: {
+        type: 'rent',
+        status: 'paid',
+        paidInFullAt: { $gte: twelveMonthsAgo }
+      }
+    },
+    {
+      $group: {
+        _id: {
+          year: { $year: '$paidInFullAt' },
+          month: { $month: '$paidInFullAt' }
+        },
+        revenue: { $sum: '$amountPaid' },
+        count: { $sum: 1 }
+      }
+    },
+    { $sort: { '_id.year': 1, '_id.month': 1 } }
+  ]);
+
+  // Construire les labels des 12 derniers mois
+  const monthNames = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'];
+  const monthLabels = [];
+  const d = new Date(twelveMonthsAgo);
+  while (d <= now) {
+    monthLabels.push({
+      label: monthNames[d.getMonth()] + ' ' + d.getFullYear(),
+      year: d.getFullYear(),
+      month: d.getMonth() + 1
+    });
+    d.setMonth(d.getMonth() + 1);
+  }
+
+  const monthlyRevenueData = monthLabels.map(m => {
+    const found = monthlyRentRevenue.find(r => r._id.year === m.year && r._id.month === m.month);
+    return found ? found.revenue : 0;
+  });
+
+  // ===== Revenus par zone (étage) =====
+  const revenueByZone = await Invoice.aggregate([
+    { $match: { type: 'rent', status: 'paid' } },
+    {
+      $lookup: {
+        from: 'boutiques',
+        localField: 'boutique',
+        foreignField: '_id',
+        as: 'boutiqueInfo'
+      }
+    },
+    { $unwind: { path: '$boutiqueInfo', preserveNullAndEmptyArrays: true } },
+    {
+      $group: {
+        _id: { $ifNull: ['$boutiqueInfo.location.zone', 'Non défini'] },
+        revenue: { $sum: '$amountPaid' },
+        count: { $sum: 1 }
+      }
+    },
+    { $sort: { revenue: -1 } }
+  ]);
+
+  // Boutiques par étage
+  const boutiquesByFloor = await Boutique.aggregate([
+    {
+      $group: {
+        _id: { $ifNull: ['$location.floor', 0] },
+        total: { $sum: 1 },
+        occupied: { $sum: { $cond: [{ $eq: ['$emplacementStatus', 'occupee'] }, 1, 0] } },
+        available: { $sum: { $cond: [{ $eq: ['$emplacementStatus', 'libre'] }, 1, 0] } }
+      }
+    },
+    { $sort: { _id: 1 } }
+  ]);
+
+  // ===== Tables =====
+  // Réservations en attente
+  const pendingReservations = await ReservationBoutique.find({ status: 'en_attente_validation' })
+    .populate('boutique', 'name location surface price')
+    .populate('user', 'firstName lastName email')
+    .sort({ requestedAt: 1 })
+    .limit(10)
+    .lean();
+
+  // Paiements en retard
+  const latePayments = await Invoice.find({ status: { $in: ['late', 'default'] } })
+    .populate('tenant', 'firstName lastName email')
+    .populate('boutique', 'name location')
+    .populate('contract', 'reference')
+    .sort({ dueDate: 1 })
+    .limit(10)
+    .lean();
+
+  // Alertes
+  const alerts = [];
+
+  // Contrats expirant bientôt (dans 30 jours)
+  const thirtyDaysFromNow = new Date();
+  thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+  const expiringContracts = await Contract.countDocuments({
+    status: 'active',
+    endDate: { $lte: thirtyDaysFromNow, $gte: now }
+  });
+  if (expiringContracts > 0) {
+    alerts.push({ type: 'warning', icon: 'icon-clock', message: `${expiringContracts} contrat(s) expirant bientôt` });
+  }
+
+  // Boutiques inactives
+  const inactiveBoutiques = await Boutique.countDocuments({ status: 'inactive' });
+  if (inactiveBoutiques > 0) {
+    alerts.push({ type: 'info', icon: 'icon-alert-triangle', message: `${inactiveBoutiques} boutique(s) inactive(s)` });
+  }
+
+  // Factures en défaut
+  if (defaultInvoicesCount > 0) {
+    alerts.push({ type: 'danger', icon: 'icon-alert-triangle', message: `${defaultInvoicesCount} facture(s) en défaut` });
+  }
+
+  // Contrats suspendus
+  const suspendedContracts = await Contract.countDocuments({ status: 'suspended' });
+  if (suspendedContracts > 0) {
+    alerts.push({ type: 'warning', icon: 'icon-pause-circle', message: `${suspendedContracts} contrat(s) suspendu(s)` });
+  }
+
+  res.status(200).json({
+    success: true,
+    data: {
+      kpis: {
+        totalBoutiques,
+        occupiedBoutiques,
+        availableBoutiques,
+        occupancyRate,
+        monthlyRentRevenue: paidThisMonth[0]?.total || 0,
+        pendingReservations: pendingReservationsCount,
+        activeContracts,
+        lateInvoices: lateInvoicesCount,
+        defaultInvoices: defaultInvoicesCount
+      },
+      charts: {
+        monthlyRentRevenue: {
+          labels: monthLabels.map(m => m.label),
+          data: monthlyRevenueData
+        },
+        revenueByZone,
+        boutiquesByFloor
+      },
+      tables: {
+        pendingReservations,
+        latePayments: latePayments.map(inv => ({
+          ...inv,
+          daysOverdue: Math.floor((now - new Date(inv.dueDate)) / (1000 * 60 * 60 * 24))
+        })),
+        alerts
+      }
     }
   });
 });
@@ -657,7 +948,6 @@ exports.getBoutiqueSalesTrends = asyncHandler(async (req, res) => {
     { $sort: { '_id.year': 1, '_id.month': 1 } }
   ]);
 
-  // Top selling products
   const topProducts = await Order.aggregate([
     {
       $match: {
@@ -918,6 +1208,114 @@ exports.getBoutiqueDashboard = asyncHandler(async (req, res) => {
         lowStock: lowStockProducts
       },
       recentOrders: filteredRecentOrders
+    }
+  });
+});
+
+/**
+ * @desc    Get boutique product sales trends over time (monthly, per product)
+ * @route   GET /api/stats/boutique/products-trends
+ * @access  Private (boutique)
+ */
+exports.getBoutiqueProductsTrends = asyncHandler(async (req, res) => {
+  const boutiqueId = req.user.boutiqueId;
+  const { months = 12, type = 'top' } = req.query;
+
+  const startDate = new Date();
+  startDate.setMonth(startDate.getMonth() - parseInt(months));
+
+  
+  const sortOrder = type === 'low' ? 1 : -1;
+  const topProducts = await Order.aggregate([
+    {
+      $match: {
+        'items.boutiqueId': new mongoose.Types.ObjectId(boutiqueId),
+        paymentStatus: 'success',
+        createdAt: { $gte: startDate }
+      }
+    },
+    { $unwind: '$items' },
+    { $match: { 'items.boutiqueId': new mongoose.Types.ObjectId(boutiqueId) } },
+    {
+      $group: {
+        _id: '$items.productId',
+        productName: { $first: '$items.productName' },
+        totalQuantity: { $sum: '$items.quantity' }
+      }
+    },
+    { $sort: { totalQuantity: sortOrder } },
+    { $limit: 5 }
+  ]);
+
+  if (topProducts.length === 0) {
+    return res.status(200).json({
+      success: true,
+      data: { months: [], products: [] }
+    });
+  }
+
+  const productIds = topProducts.map(p => p._id);
+
+  const monthlySales = await Order.aggregate([
+    {
+      $match: {
+        'items.boutiqueId': new mongoose.Types.ObjectId(boutiqueId),
+        paymentStatus: 'success',
+        createdAt: { $gte: startDate }
+      }
+    },
+    { $unwind: '$items' },
+    {
+      $match: {
+        'items.boutiqueId': new mongoose.Types.ObjectId(boutiqueId),
+        'items.productId': { $in: productIds }
+      }
+    },
+    {
+      $group: {
+        _id: {
+          productId: '$items.productId',
+          productName: '$items.productName',
+          year: { $year: '$createdAt' },
+          month: { $month: '$createdAt' }
+        },
+        quantity: { $sum: '$items.quantity' }
+      }
+    },
+    { $sort: { '_id.year': 1, '_id.month': 1 } }
+  ]);
+
+  const monthLabels = [];
+  const d = new Date(startDate);
+  d.setDate(1);
+  const now = new Date();
+  const monthNames = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'];
+  while (d <= now) {
+    monthLabels.push({
+      label: monthNames[d.getMonth()] + ' ' + d.getFullYear(),
+      year: d.getFullYear(),
+      month: d.getMonth() + 1
+    });
+    d.setMonth(d.getMonth() + 1);
+  }
+
+  const productsData = topProducts.map(p => {
+    const data = monthLabels.map(m => {
+      const found = monthlySales.find(
+        s => s._id.productId?.toString() === p._id?.toString()
+          && s._id.year === m.year
+          && s._id.month === m.month
+      );
+      return found ? found.quantity : 0;
+    });
+    return { productName: p.productName, data };
+  });
+
+  res.status(200).json({
+    success: true,
+    data: {
+      months: monthLabels.map(m => m.label),
+      products: productsData
     }
   });
 });

@@ -13,7 +13,7 @@ const recalculateBoutiqueRating = async (boutiqueId) => {
     ? new mongoose.Types.ObjectId(boutiqueId)
     : boutiqueId;
   const result = await Review.aggregate([
-    { $match: { boutiqueId: id, status: 'published' } },
+    { $match: { boutiqueId: id, productId: { $exists: true, $eq: null }, status: 'published' } },
     {
       $group: {
         _id: null,

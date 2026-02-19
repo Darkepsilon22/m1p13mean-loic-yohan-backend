@@ -14,6 +14,10 @@ const {
 } = require('../middlewares/reviewValidation');
 
 router.get('/', listReviews, reviewController.getAll);
+
+// my-reviews doit être AVANT /:id pour éviter que Express traite "my-reviews" comme un :id
+router.get('/my-reviews', verifyToken, isAdminOrBoutique, reviewController.getMyReviews);
+
 router.get('/:id', validateReviewId('id'), reviewController.getById);
 
 router.use(verifyToken);

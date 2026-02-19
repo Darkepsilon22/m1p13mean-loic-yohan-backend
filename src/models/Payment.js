@@ -186,6 +186,19 @@ paymentSchema.methods.markAsSuccess = async function(providerData = {}) {
 
   await this.save();
 
+  // Clear the user's cart after successful payment
+  const Cart = mongoose.model('Cart');
+  try {
+    const cart = await Cart.findOne({ userId: order.userId });
+    if (cart) {
+      await cart.clearCart();
+      console.log('🛒 Cart cleared for user after successful payment');
+    }
+  } catch (cartError) {
+    console.error('❌ Failed to clear cart:', cartError.message);
+    // Don't throw - payment is still successful even if cart clearing fails
+  }
+
   // Send invoice email
   if (order && order.customerEmail) {
     try {
@@ -228,11 +241,48 @@ paymentSchema.methods.markAsFailed = async function(reason = '') {
   this.failedAt = new Date();
   if (reason) this.notes = reason;
 
-  // Update the related order
+  // Update the related order - cancel it and restore stock
   const Order = mongoose.model('Order');
-  await Order.findByIdAndUpdate(this.orderId, {
-    paymentStatus: 'failed'
-  });
+  const order = await Order.findById(this.orderId);
+
+  if (order && order.status === 'pending') {
+    order.paymentStatus = 'failed';
+    order.status = 'cancelled';
+    order.cancelledAt = new Date();
+    order.adminNotes = (order.adminNotes || '') + ` [Auto-annulé: paiement échoué - ${reason}]`;
+    await order.save();
+
+    // Restore stock for each item
+    const Product = mongoose.model('Product');
+    const StockMovement = mongoose.model('StockMovement');
+
+    for (const item of order.items) {
+      const product = await Product.findById(item.productId);
+      if (product) {
+        const previousStock = product.stock;
+        product.stock += item.quantity;
+        await product.save();
+
+        await StockMovement.create({
+          productId: product._id,
+          boutiqueId: item.boutiqueId,
+          type: 'in',
+          quantity: item.quantity,
+          previousStock,
+          newStock: product.stock,
+          reason: `Paiement échoué - ${order.orderReference} (${reason})`,
+          reference: order.orderReference,
+          userId: order.userId
+        });
+
+        console.log(`🔄 Stock restored for "${product.name}": ${previousStock} → ${product.stock} (payment failed: ${order.orderReference})`);
+      }
+    }
+  } else if (order) {
+    // Order already processed, just update payment status
+    order.paymentStatus = 'failed';
+    await order.save();
+  }
 
   return this.save();
 };

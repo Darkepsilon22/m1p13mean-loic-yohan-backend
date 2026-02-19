@@ -37,6 +37,21 @@ router.get('/admin/customers', verifyToken, isAdmin, statsController.getCustomer
  */
 router.get('/admin/comparison', verifyToken, isAdmin, statsController.getPeriodComparison);
 
+/**
+ * @route   GET /api/stats/admin/boutiques-trends
+ * @desc    Get boutique revenue trends over time (monthly per boutique)
+ * @access  Private (admin)
+ * @query   months (default: 12)
+ */
+router.get('/admin/boutiques-trends', verifyToken, isAdmin, statsController.getAdminBoutiquesTrends);
+
+/**
+ * @route   GET /api/stats/admin/rental-dashboard
+ * @desc    Get rental dashboard (KPIs, charts, tables for location management)
+ * @access  Private (admin)
+ */
+router.get('/admin/rental-dashboard', verifyToken, isAdmin, statsController.getAdminRentalDashboard);
+
 // ==================== BOUTIQUE ROUTES - Statistiques financières ====================
 
 /**
@@ -69,5 +84,13 @@ router.get('/boutique/trends', verifyToken, isBoutique, statsController.getBouti
  * @query   startDate, endDate
  */
 router.get('/boutique/margins', verifyToken, isBoutique, statsController.getBoutiqueMargins);
+
+/**
+ * @route   GET /api/stats/boutique/products-trends
+ * @desc    Get product sales trends over time (monthly per product)
+ * @access  Private (boutique)
+ * @query   months (default: 12), type (top|low)
+ */
+router.get('/boutique/products-trends', verifyToken, isBoutique, statsController.getBoutiqueProductsTrends);
 
 module.exports = router;

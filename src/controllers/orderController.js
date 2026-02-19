@@ -4,9 +4,12 @@ const Product = require('../models/Product');
 const Payment = require('../models/Payment');
 const Boutique = require('../models/Boutique');
 const User = require('../models/User');
+const StockMovement = require('../models/StockMovement');
 const { ApiError, asyncHandler } = require('../middlewares/errorHandler');
-const { sendLowStockAlertEmail } = require('../services/emailService');
+
 const { emitToAdmin, emitToUser, emitToBoutique } = require('../socket');
+const { sendLowStockAlertEmail, sendOrderStatusEmail } = require('../services/emailService');
+const { generateOrdersPDF, generateOrdersExcel, generateMonthlyReportPDF, generateMonthlyReportExcel, STATUS_LABELS } = require('../services/orderExportService');
 
 /**
  * @desc    Create order from cart
@@ -57,8 +60,22 @@ exports.createOrder = asyncHandler(async (req, res, next) => {
     }
 
     // Reserve stock (deduct from available)
+    const previousStock = product.stock;
     product.stock -= item.quantity;
     await product.save();
+
+    // Record stock movement
+    await StockMovement.create({
+      productId: product._id,
+      boutiqueId: product.boutiqueId,
+      type: 'out',
+      quantity: -item.quantity,
+      previousStock,
+      newStock: product.stock,
+      reason: 'Vente - Commande client',
+      reference: `order-${Date.now()}`,
+      userId: req.user._id
+    });
 
     // Check low stock alert
     if (product.stock <= product.lowStockThreshold) {
@@ -118,8 +135,8 @@ exports.createOrder = asyncHandler(async (req, res, next) => {
     paymentStatus: 'pending'
   });
 
-  // Clear cart after successful order creation
-  await cart.clearCart();
+  // NOTE: Cart is NOT cleared here - it will be cleared after successful payment
+  // This allows users to return to their cart if payment fails or is cancelled
 
   // Populate order for response
   await order.populate([
@@ -144,10 +161,19 @@ exports.createOrder = asyncHandler(async (req, res, next) => {
  * @access  Private (acheteur)
  */
 exports.getMyOrders = asyncHandler(async (req, res) => {
-  const { status, page = 1, limit = 10, sort = '-createdAt' } = req.query;
+  const { status, page = 1, limit = 10, sort = '-createdAt', startDate, endDate } = req.query;
 
   const filter = { userId: req.user._id };
   if (status) filter.status = status;
+  if (startDate || endDate) {
+    filter.createdAt = {};
+    if (startDate) filter.createdAt.$gte = new Date(startDate);
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      filter.createdAt.$lte = end;
+    }
+  }
 
   const skip = (Math.max(1, parseInt(page)) - 1) * Math.min(100, Math.max(1, parseInt(limit)));
   const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
@@ -174,6 +200,70 @@ exports.getMyOrders = asyncHandler(async (req, res) => {
       }
     }
   });
+});
+
+/**
+ * @desc    Export user's orders as PDF
+ * @route   GET /api/orders/my-orders/export/pdf
+ * @access  Private (acheteur)
+ */
+exports.exportMyOrdersPDF = asyncHandler(async (req, res) => {
+  const filter = { userId: req.user._id };
+  if (req.query.status) filter.status = req.query.status;
+  if (req.query.startDate || req.query.endDate) {
+    filter.createdAt = {};
+    if (req.query.startDate) filter.createdAt.$gte = new Date(req.query.startDate);
+    if (req.query.endDate) {
+      const end = new Date(req.query.endDate);
+      end.setHours(23, 59, 59, 999);
+      filter.createdAt.$lte = end;
+    }
+  }
+
+  const orders = await Order.find(filter)
+    .populate('items.boutiqueId', 'name')
+    .sort('-createdAt')
+    .lean();
+
+  const customerName = `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim();
+  const statusLabel = req.query.status ? (STATUS_LABELS[req.query.status] || req.query.status) : null;
+  const buffer = await generateOrdersPDF(orders, customerName, statusLabel);
+
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename=historique-achats-${Date.now()}.pdf`);
+  res.send(buffer);
+});
+
+/**
+ * @desc    Export user's orders as Excel
+ * @route   GET /api/orders/my-orders/export/excel
+ * @access  Private (acheteur)
+ */
+exports.exportMyOrdersExcel = asyncHandler(async (req, res) => {
+  const filter = { userId: req.user._id };
+  if (req.query.status) filter.status = req.query.status;
+  if (req.query.startDate || req.query.endDate) {
+    filter.createdAt = {};
+    if (req.query.startDate) filter.createdAt.$gte = new Date(req.query.startDate);
+    if (req.query.endDate) {
+      const end = new Date(req.query.endDate);
+      end.setHours(23, 59, 59, 999);
+      filter.createdAt.$lte = end;
+    }
+  }
+
+  const orders = await Order.find(filter)
+    .populate('items.boutiqueId', 'name')
+    .sort('-createdAt')
+    .lean();
+
+  const customerName = `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim();
+  const statusLabel = req.query.status ? (STATUS_LABELS[req.query.status] || req.query.status) : null;
+  const buffer = await generateOrdersExcel(orders, customerName, statusLabel);
+
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename=historique-achats-${Date.now()}.xlsx`);
+  res.send(buffer);
 });
 
 /**
@@ -250,9 +340,24 @@ exports.cancelOrder = asyncHandler(async (req, res, next) => {
 
   // Restore stock
   for (const item of order.items) {
-    await Product.findByIdAndUpdate(item.productId, {
-      $inc: { stock: item.quantity }
-    });
+    const product = await Product.findById(item.productId);
+    if (product) {
+      const previousStock = product.stock;
+      product.stock += item.quantity;
+      await product.save();
+
+      await StockMovement.create({
+        productId: product._id,
+        boutiqueId: item.boutiqueId,
+        type: 'in',
+        quantity: item.quantity,
+        previousStock,
+        newStock: product.stock,
+        reason: `Annulation commande - ${order.orderReference}`,
+        reference: order.orderReference,
+        userId: req.user._id
+      });
+    }
   }
 
   order.status = 'cancelled';
@@ -329,6 +434,124 @@ exports.getBoutiqueOrderById = asyncHandler(async (req, res, next) => {
         boutiqueSubtotal
       }
     }
+  });
+});
+
+/**
+ * @desc    Boutique updates order status (confirm, processing, shipped, delivered, completed)
+ * @route   PATCH /api/orders/boutique/:id/status
+ * @access  Private (boutique)
+ */
+exports.boutiqueUpdateOrderStatus = asyncHandler(async (req, res, next) => {
+  const { status, trackingNumber, carrier } = req.body;
+
+  const order = await Order.findOne({
+    _id: req.params.id,
+    'items.boutiqueId': req.user.boutiqueId
+  });
+
+  if (!order) {
+    return next(new ApiError(404, 'Commande non trouvée'));
+  }
+
+  // Validate allowed transitions for boutique
+  const allowedTransitions = {
+    pending: ['confirmed'],
+    confirmed: ['processing'],
+    processing: ['shipped'],
+    shipped: ['delivered'],
+    delivered: ['completed']
+  };
+
+  const allowed = allowedTransitions[order.status] || [];
+  if (!allowed.includes(status)) {
+    return next(new ApiError(400, `Impossible de passer de "${order.status}" à "${status}".`));
+  }
+
+  // Check payment for statuses that require it
+  if (order.requiresPaymentForStatus(status) && order.paymentStatus !== 'success') {
+    return next(new ApiError(400, `Impossible : paiement non confirmé (statut: ${order.paymentStatus}).`));
+  }
+
+  order.status = status;
+
+  // Auto-generate tracking number if shipping and none provided
+  if (status === 'shipped') {
+    order.trackingNumber = trackingNumber || ('SM-' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substring(2, 6).toUpperCase());
+    if (carrier) order.carrier = carrier;
+  } else {
+    if (trackingNumber) order.trackingNumber = trackingNumber;
+    if (carrier) order.carrier = carrier;
+  }
+
+  await order.save();
+
+  // Send email notification to customer
+  try {
+    const boutique = await Boutique.findById(req.user.boutiqueId).select('name').lean();
+    const boutiqueName = boutique?.name || 'la boutique';
+    await sendOrderStatusEmail(
+      order.customerEmail,
+      order.customerName,
+      order,
+      status,
+      boutiqueName
+    );
+  } catch (emailErr) {
+    console.error('Email notification failed:', emailErr.message);
+    // Don't fail the request if email fails
+  }
+
+  res.status(200).json({
+    success: true,
+    message: `Statut mis à jour : ${status}`,
+    data: { order }
+  });
+});
+
+/**
+ * @desc    Acheteur confirms order reception
+ * @route   PATCH /api/orders/:id/confirm-reception
+ * @access  Private (acheteur)
+ */
+exports.confirmReception = asyncHandler(async (req, res, next) => {
+  const order = await Order.findOne({
+    _id: req.params.id,
+    userId: req.user._id
+  });
+
+  if (!order) {
+    return next(new ApiError(404, 'Commande non trouvée'));
+  }
+
+  if (order.status !== 'delivered' && order.status !== 'shipped') {
+    return next(new ApiError(400, `Impossible de confirmer la réception : la commande est "${order.status}".`));
+  }
+
+  order.status = 'completed';
+  await order.save();
+
+  // Send completion email to customer
+  try {
+    // Find the boutique from order items
+    const firstBoutiqueId = order.items[0]?.boutiqueId;
+    const boutique = firstBoutiqueId ? await Boutique.findById(firstBoutiqueId).select('name').lean() : null;
+    const boutiqueName = boutique?.name || 'la boutique';
+    await sendOrderStatusEmail(
+      order.customerEmail,
+      order.customerName,
+      order,
+      'completed',
+      boutiqueName
+    );
+  } catch (emailErr) {
+    console.error('Email notification failed:', emailErr.message);
+  }
+
+  res.status(200).json({
+    success: true,
+    message: 'Réception confirmée. Merci pour votre achat !',
+    data: { order }
   });
 });
 
@@ -468,9 +691,24 @@ exports.updateOrderStatus = asyncHandler(async (req, res, next) => {
   // Handle cancellation - restore stock
   if (status === 'cancelled' && order.status !== 'cancelled') {
     for (const item of order.items) {
-      await Product.findByIdAndUpdate(item.productId, {
-        $inc: { stock: item.quantity }
-      });
+      const product = await Product.findById(item.productId);
+      if (product) {
+        const previousStock = product.stock;
+        product.stock += item.quantity;
+        await product.save();
+
+        await StockMovement.create({
+          productId: product._id,
+          boutiqueId: item.boutiqueId,
+          type: 'in',
+          quantity: item.quantity,
+          previousStock,
+          newStock: product.stock,
+          reason: `Annulation commande (admin) - ${order.orderReference}`,
+          reference: order.orderReference,
+          userId: req.user._id
+        });
+      }
     }
   }
 
@@ -590,3 +828,126 @@ exports.expirePendingOrders = asyncHandler(async (req, res) => {
     data: { expiredCount }
   });
 });
+
+// ==================== BOUTIQUE MONTHLY REPORT ====================
+
+/**
+ * @desc    Export boutique monthly report as PDF
+ * @route   GET /api/orders/boutique/report/pdf?month=1&year=2026
+ * @access  Private (boutique)
+ */
+exports.exportBoutiqueMonthlyReportPDF = asyncHandler(async (req, res) => {
+  const reportData = await buildBoutiqueMonthlyReport(req);
+  const buffer = await generateMonthlyReportPDF(reportData);
+
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename=rapport-${reportData.month}-${reportData.year}.pdf`);
+  res.send(buffer);
+});
+
+/**
+ * @desc    Export boutique monthly report as Excel
+ * @route   GET /api/orders/boutique/report/excel?month=1&year=2026
+ * @access  Private (boutique)
+ */
+exports.exportBoutiqueMonthlyReportExcel = asyncHandler(async (req, res) => {
+  const reportData = await buildBoutiqueMonthlyReport(req);
+  const buffer = await generateMonthlyReportExcel(reportData);
+
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename=rapport-${reportData.month}-${reportData.year}.xlsx`);
+  res.send(buffer);
+});
+
+/**
+ * Build monthly report data for the authenticated boutique user
+ */
+async function buildBoutiqueMonthlyReport(req) {
+  const boutiqueId = req.user.boutiqueId;
+  const now = new Date();
+  const month = parseInt(req.query.month) || now.getMonth() + 1;
+  const year = parseInt(req.query.year) || now.getFullYear();
+
+  // Date range for the month
+  const startDate = new Date(year, month - 1, 1);
+  const endDate = new Date(year, month, 1);
+
+  // Get boutique name
+  const boutique = await Boutique.findById(boutiqueId).select('name');
+  const boutiqueName = boutique?.name || 'Ma Boutique';
+
+  // Get all orders for this boutique in the given month
+  const orders = await Order.find({
+    'items.boutiqueId': boutiqueId,
+    createdAt: { $gte: startDate, $lt: endDate }
+  })
+    .populate('items.productId', 'name mainPhoto')
+    .sort({ createdAt: -1 });
+
+  // Filter items per order to only include this boutique's items
+  const processedOrders = [];
+  let totalRevenue = 0;
+  let totalProducts = 0;
+  let completedOrders = 0;
+  let cancelledOrders = 0;
+  const productMap = {};
+
+  for (const order of orders) {
+    const boutiqueItems = order.items.filter(
+      item => item.boutiqueId.toString() === boutiqueId.toString()
+    );
+    const boutiqueTotal = boutiqueItems.reduce((sum, item) => sum + item.totalPrice, 0);
+
+    processedOrders.push({
+      orderReference: order.orderReference,
+      createdAt: order.createdAt,
+      status: order.status,
+      paymentStatus: order.paymentStatus,
+      items: boutiqueItems,
+      boutiqueTotal
+    });
+
+    if (['completed', 'delivered'].includes(order.status)) {
+      totalRevenue += boutiqueTotal;
+      completedOrders++;
+    }
+    if (order.status === 'cancelled') {
+      cancelledOrders++;
+    }
+
+    // Aggregate products sold (only from non-cancelled orders)
+    if (order.status !== 'cancelled') {
+      for (const item of boutiqueItems) {
+        const pid = item.productId?._id?.toString() || item.productId?.toString() || 'unknown';
+        if (!productMap[pid]) {
+          productMap[pid] = {
+            productName: item.productName || item.productId?.name || 'Produit',
+            quantity: 0,
+            unitPrice: item.unitPrice,
+            totalRevenue: 0
+          };
+        }
+        productMap[pid].quantity += item.quantity;
+        productMap[pid].totalRevenue += item.totalPrice;
+      }
+    }
+
+    totalProducts += boutiqueItems.reduce((sum, item) => sum + item.quantity, 0);
+  }
+
+  // Sort products by quantity descending
+  const productsSold = Object.values(productMap).sort((a, b) => b.quantity - a.quantity);
+
+  return {
+    boutiqueName,
+    month,
+    year,
+    orders: processedOrders,
+    totalRevenue,
+    totalOrders: processedOrders.length,
+    totalProducts,
+    completedOrders,
+    cancelledOrders,
+    productsSold
+  };
+}

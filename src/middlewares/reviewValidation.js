@@ -19,6 +19,7 @@ const validateReviewId = (paramName = 'id') => [
 
 const createReview = [
   body('boutiqueId').isMongoId().withMessage('boutiqueId must be a valid MongoDB ObjectId'),
+  body('productId').optional({ nullable: true }).isMongoId().withMessage('productId must be a valid MongoDB ObjectId'),
   body('rating')
     .isInt({ min: 1, max: 5 })
     .withMessage('Rating must be an integer between 1 and 5')
@@ -76,6 +77,7 @@ const reportReview = [
 
 const listReviews = [
   query('boutiqueId').notEmpty().withMessage('boutiqueId is required').isMongoId().withMessage('boutiqueId must be a valid ObjectId'),
+  query('productId').optional(),
   query('status').optional().isIn(['published', 'hidden', 'reported', 'deleted']).withMessage('Invalid status'),
   query('page').optional().isInt({ min: 1 }).toInt(),
   query('limit').optional().isInt({ min: 1, max: 100 }).toInt(),
