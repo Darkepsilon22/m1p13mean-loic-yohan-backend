@@ -15,17 +15,16 @@ const verifyToken = async (req, res, next) => {
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({
         success: false,
-        message: 'Access denied. No token provided.'
+        message: 'Accès refusé. Aucun token fourni.'
       });
     }
 
-    // Extract token (remove 'Bearer ' prefix)
     const token = authHeader.split(' ')[1];
 
     if (!token) {
       return res.status(401).json({
         success: false,
-        message: 'Access denied. Invalid token format.'
+        message: 'Accès refusé. Format de token invalide.'
       });
     }
 
@@ -38,23 +37,21 @@ const verifyToken = async (req, res, next) => {
     if (!user) {
       return res.status(401).json({
         success: false,
-        message: 'User not found. Token is invalid.'
+        message: 'Utilisateur introuvable. Token invalide.'
       });
     }
 
-    // Check if user account is active
     if (user.status !== 'active') {
       return res.status(403).json({
         success: false,
-        message: `Account is ${user.status}. Please contact administrator.`
+        message: `Le compte est ${user.status}. Veuillez contacter l'administrateur.`
       });
     }
 
-    // Check if account is locked
     if (user.lockUntil && user.lockUntil > Date.now()) {
       return res.status(403).json({
         success: false,
-        message: 'Account is temporarily locked. Please try again later.'
+        message: 'Le compte est temporairement verrouillé. Veuillez réessayer plus tard.'
       });
     }
 
@@ -75,19 +72,19 @@ const verifyToken = async (req, res, next) => {
     if (error.name === 'JsonWebTokenError') {
       return res.status(401).json({
         success: false,
-        message: 'Invalid token.'
+        message: 'Token invalide. Veuillez vous reconnecter.'
       });
     }
     if (error.name === 'TokenExpiredError') {
       return res.status(401).json({
         success: false,
-        message: 'Token has expired. Please login again.'
+        message: 'Votre session a expiré. Veuillez vous reconnecter.'
       });
     }
 
     return res.status(500).json({
       success: false,
-      message: 'Server error during authentication.'
+      message: 'Erreur serveur lors de l\'authentification.'
     });
   }
 };

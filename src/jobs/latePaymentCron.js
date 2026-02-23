@@ -33,7 +33,7 @@ function startLatePaymentJob() {
     }
   });
 
-  console.log('[CRON] Late payment check job started (daily at 08:00)');
+  console.log('[CRON] Job de vérification des paiements en retard démarré (quotidien à 08:00)');
 }
 
 module.exports = { startLatePaymentJob };

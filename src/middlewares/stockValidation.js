@@ -2,175 +2,175 @@ const { body, param, query } = require('express-validator');
 const { handleValidationErrors } = require('./validation');
 const mongoose = require('mongoose');
 
-// Validate MongoDB ObjectId
+// Validation d'ObjectId MongoDB
 const isValidObjectId = (value) => mongoose.Types.ObjectId.isValid(value);
 
 /**
- * Validate productId parameter
+ * Validation du paramètre productId
  */
 exports.validateProductId = [
   param('productId')
-    .notEmpty().withMessage('Product ID is required')
-    .custom(isValidObjectId).withMessage('Invalid product ID format'),
+    .notEmpty().withMessage('L\'ID du produit est requis')
+    .custom(isValidObjectId).withMessage('Format d\'ID de produit invalide'),
   handleValidationErrors
 ];
 
 /**
- * Validate boutiqueId parameter
+ * Validation du paramètre boutiqueId
  */
 exports.validateBoutiqueId = [
   param('boutiqueId')
-    .notEmpty().withMessage('Boutique ID is required')
-    .custom(isValidObjectId).withMessage('Invalid boutique ID format'),
+    .notEmpty().withMessage('L\'ID de la boutique est requis')
+    .custom(isValidObjectId).withMessage('Format d\'ID de boutique invalide'),
   handleValidationErrors
 ];
 
 /**
- * Validate add stock request
+ * Validation de la requête d'ajout de stock
  */
 exports.addStock = [
   param('productId')
-    .notEmpty().withMessage('Product ID is required')
-    .custom(isValidObjectId).withMessage('Invalid product ID format'),
+    .notEmpty().withMessage('L\'ID du produit est requis')
+    .custom(isValidObjectId).withMessage('Format d\'ID de produit invalide'),
   body('quantity')
-    .notEmpty().withMessage('Quantity is required')
-    .isInt({ min: 1 }).withMessage('Quantity must be a positive integer'),
+    .notEmpty().withMessage('La quantité est requise')
+    .isInt({ min: 1 }).withMessage('La quantité doit être un entier positif'),
   body('reason')
     .optional()
-    .isString().withMessage('Reason must be a string')
-    .isLength({ max: 500 }).withMessage('Reason cannot exceed 500 characters'),
+    .isString().withMessage('La raison doit être une chaîne de caractères')
+    .isLength({ max: 500 }).withMessage('La raison ne peut pas dépasser 500 caractères'),
   body('reference')
     .optional()
-    .isString().withMessage('Reference must be a string')
-    .isLength({ max: 100 }).withMessage('Reference cannot exceed 100 characters'),
+    .isString().withMessage('La référence doit être une chaîne de caractères')
+    .isLength({ max: 100 }).withMessage('La référence ne peut pas dépasser 100 caractères'),
   handleValidationErrors
 ];
 
 /**
- * Validate remove stock request
+ * Validation de la requête de retrait de stock
  */
 exports.removeStock = [
   param('productId')
-    .notEmpty().withMessage('Product ID is required')
-    .custom(isValidObjectId).withMessage('Invalid product ID format'),
+    .notEmpty().withMessage('L\'ID du produit est requis')
+    .custom(isValidObjectId).withMessage('Format d\'ID de produit invalide'),
   body('quantity')
-    .notEmpty().withMessage('Quantity is required')
-    .isInt({ min: 1 }).withMessage('Quantity must be a positive integer'),
+    .notEmpty().withMessage('La quantité est requise')
+    .isInt({ min: 1 }).withMessage('La quantité doit être un entier positif'),
   body('reason')
     .optional()
-    .isString().withMessage('Reason must be a string')
-    .isLength({ max: 500 }).withMessage('Reason cannot exceed 500 characters'),
+    .isString().withMessage('La raison doit être une chaîne de caractères')
+    .isLength({ max: 500 }).withMessage('La raison ne peut pas dépasser 500 caractères'),
   body('reference')
     .optional()
-    .isString().withMessage('Reference must be a string')
-    .isLength({ max: 100 }).withMessage('Reference cannot exceed 100 characters'),
+    .isString().withMessage('La référence doit être une chaîne de caractères')
+    .isLength({ max: 100 }).withMessage('La référence ne peut pas dépasser 100 caractères'),
   handleValidationErrors
 ];
 
 /**
- * Validate adjust stock request
+ * Validation de la requête d'ajustement de stock
  */
 exports.adjustStock = [
   param('productId')
-    .notEmpty().withMessage('Product ID is required')
-    .custom(isValidObjectId).withMessage('Invalid product ID format'),
+    .notEmpty().withMessage('L\'ID du produit est requis')
+    .custom(isValidObjectId).withMessage('Format d\'ID de produit invalide'),
   body('newStock')
-    .notEmpty().withMessage('New stock is required')
-    .isInt({ min: 0 }).withMessage('New stock must be a non-negative integer'),
+    .notEmpty().withMessage('Le nouveau stock est requis')
+    .isInt({ min: 0 }).withMessage('Le nouveau stock doit être un entier positif ou nul'),
   body('reason')
     .optional()
-    .isString().withMessage('Reason must be a string')
-    .isLength({ max: 500 }).withMessage('Reason cannot exceed 500 characters'),
+    .isString().withMessage('La raison doit être une chaîne de caractères')
+    .isLength({ max: 500 }).withMessage('La raison ne peut pas dépasser 500 caractères'),
   body('reference')
     .optional()
-    .isString().withMessage('Reference must be a string')
-    .isLength({ max: 100 }).withMessage('Reference cannot exceed 100 characters'),
+    .isString().withMessage('La référence doit être une chaîne de caractères')
+    .isLength({ max: 100 }).withMessage('La référence ne peut pas dépasser 100 caractères'),
   handleValidationErrors
 ];
 
 /**
- * Validate initial stock request
+ * Validation de la requête de stock initial
  */
 exports.setInitialStock = [
   param('productId')
-    .notEmpty().withMessage('Product ID is required')
-    .custom(isValidObjectId).withMessage('Invalid product ID format'),
+    .notEmpty().withMessage('L\'ID du produit est requis')
+    .custom(isValidObjectId).withMessage('Format d\'ID de produit invalide'),
   body('stock')
-    .notEmpty().withMessage('Stock is required')
-    .isInt({ min: 0 }).withMessage('Stock must be a non-negative integer'),
+    .notEmpty().withMessage('Le stock est requis')
+    .isInt({ min: 0 }).withMessage('Le stock doit être un entier positif ou nul'),
   body('reason')
     .optional()
-    .isString().withMessage('Reason must be a string')
-    .isLength({ max: 500 }).withMessage('Reason cannot exceed 500 characters'),
+    .isString().withMessage('La raison doit être une chaîne de caractères')
+    .isLength({ max: 500 }).withMessage('La raison ne peut pas dépasser 500 caractères'),
   handleValidationErrors
 ];
 
 /**
- * Validate list boutique stock query
+ * Validation de la requête de liste de stock de boutique
  */
 exports.listBoutiqueStock = [
   param('boutiqueId')
-    .notEmpty().withMessage('Boutique ID is required')
-    .custom(isValidObjectId).withMessage('Invalid boutique ID format'),
+    .notEmpty().withMessage('L\'ID de la boutique est requis')
+    .custom(isValidObjectId).withMessage('Format d\'ID de boutique invalide'),
   query('page')
     .optional()
-    .isInt({ min: 1 }).withMessage('Page must be a positive integer'),
+    .isInt({ min: 1 }).withMessage('La page doit être un entier positif'),
   query('limit')
     .optional()
-    .isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
+    .isInt({ min: 1, max: 100 }).withMessage('La limite doit être entre 1 et 100'),
   query('lowStock')
     .optional()
-    .isIn(['true', 'false']).withMessage('lowStock must be true or false'),
+    .isIn(['true', 'false']).withMessage('lowStock doit être true ou false'),
   query('outOfStock')
     .optional()
-    .isIn(['true', 'false']).withMessage('outOfStock must be true or false'),
+    .isIn(['true', 'false']).withMessage('outOfStock doit être true ou false'),
   handleValidationErrors
 ];
 
 /**
- * Validate list boutique movements query
+ * Validation de la requête de liste des mouvements de boutique
  */
 exports.listBoutiqueMovements = [
   param('boutiqueId')
-    .notEmpty().withMessage('Boutique ID is required')
-    .custom(isValidObjectId).withMessage('Invalid boutique ID format'),
+    .notEmpty().withMessage('L\'ID de la boutique est requis')
+    .custom(isValidObjectId).withMessage('Format d\'ID de boutique invalide'),
   query('page')
     .optional()
-    .isInt({ min: 1 }).withMessage('Page must be a positive integer'),
+    .isInt({ min: 1 }).withMessage('La page doit être un entier positif'),
   query('limit')
     .optional()
-    .isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
+    .isInt({ min: 1, max: 100 }).withMessage('La limite doit être entre 1 et 100'),
   query('type')
     .optional()
-    .isIn(['in', 'out', 'adjustment', 'initial']).withMessage('Type must be in, out, adjustment, or initial'),
+    .isIn(['in', 'out', 'adjustment', 'initial']).withMessage('Le type doit être in, out, adjustment ou initial'),
   query('productId')
     .optional()
-    .custom(isValidObjectId).withMessage('Invalid product ID format'),
+    .custom(isValidObjectId).withMessage('Format d\'ID de produit invalide'),
   query('search')
     .optional()
-    .isString().withMessage('Search must be a string')
-    .isLength({ min: 1, max: 100 }).withMessage('Search must be between 1 and 100 characters'),
+    .isString().withMessage('La recherche doit être une chaîne de caractères')
+    .isLength({ min: 1, max: 100 }).withMessage('La recherche doit être entre 1 et 100 caractères'),
   query('startDate')
     .optional()
-    .isISO8601().withMessage('startDate must be a valid date'),
+    .isISO8601().withMessage('startDate doit être une date valide'),
   query('endDate')
     .optional()
-    .isISO8601().withMessage('endDate must be a valid date'),
+    .isISO8601().withMessage('endDate doit être une date valide'),
   handleValidationErrors
 ];
 
 /**
- * Validate product history query
+ * Validation de la requête d'historique de produit
  */
 exports.listProductHistory = [
   param('productId')
-    .notEmpty().withMessage('Product ID is required')
-    .custom(isValidObjectId).withMessage('Invalid product ID format'),
+    .notEmpty().withMessage('L\'ID du produit est requis')
+    .custom(isValidObjectId).withMessage('Format d\'ID de produit invalide'),
   query('page')
     .optional()
-    .isInt({ min: 1 }).withMessage('Page must be a positive integer'),
+    .isInt({ min: 1 }).withMessage('La page doit être un entier positif'),
   query('limit')
     .optional()
-    .isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
+    .isInt({ min: 1, max: 100 }).withMessage('La limite doit être entre 1 et 100'),
   handleValidationErrors
 ];

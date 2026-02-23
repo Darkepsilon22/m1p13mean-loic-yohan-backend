@@ -39,7 +39,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.get('/', (req, res) => {
   res.json({
     success: true,
-    message: 'API Centre Commercial - Backend is running',
+    message: 'API Centre Commercial - Backend en cours d\'exécution',
     version: '1.0.0',
     timestamp: new Date().toISOString()
   });

@@ -4,7 +4,7 @@ const slugify = require('slugify');
 const eventSchema = new mongoose.Schema({
   title: {
     type: String,
-    required: [true, 'Title is required'],
+    required: [true, 'Le titre est requis'],
     trim: true
   },
   slug: {
@@ -16,7 +16,7 @@ const eventSchema = new mongoose.Schema({
   },
   description: {
     type: String,
-    required: [true, 'Description is required'],
+    required: [true, 'La description est requise'],
     trim: true
   },
   shortDescription: {
@@ -25,22 +25,22 @@ const eventSchema = new mongoose.Schema({
   },
   image: {
     type: String,
-    required: [true, 'Image URL is required'],
+    required: [true, 'L\'URL de l\'image est requise'],
     trim: true
   },
   startDate: {
     type: Date,
-    required: [true, 'Start date is required']
+    required: [true, 'La date de début est requise']
   },
   endDate: {
     type: Date,
-    required: [true, 'End date is required']
+    required: [true, 'La date de fin est requise']
   },
   visibility: {
     type: String,
     enum: {
       values: ['public', 'boutiques'],
-      message: 'Visibility must be public or boutiques'
+      message: 'La visibilité doit être public ou boutiques'
     },
     required: true,
     default: 'public'
@@ -52,13 +52,13 @@ const eventSchema = new mongoose.Schema({
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: [true, 'createdBy (admin) is required']
+    required: [true, 'createdBy (admin) est requis']
   },
   status: {
     type: String,
     enum: {
       values: ['draft', 'published', 'ended', 'cancelled'],
-      message: 'Status must be draft, published, ended, or cancelled'
+      message: 'Le statut doit être draft, published, ended ou cancelled'
     },
     required: true,
     default: 'draft'
@@ -81,7 +81,7 @@ eventSchema.pre('validate', function() {
 
   // Validate dates
   if (this.startDate && this.endDate && this.endDate < this.startDate) {
-    throw new Error('End date must be after start date');
+    throw new Error('La date de fin doit être après la date de début');
   }
 });
 

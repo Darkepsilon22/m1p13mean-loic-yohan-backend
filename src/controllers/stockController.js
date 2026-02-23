@@ -15,18 +15,18 @@ exports.addStock = asyncHandler(async (req, res, next) => {
   const { quantity, reason, reference } = req.body;
 
   if (!productId) {
-    return next(new ApiError(400, 'Product ID is required'));
+    return next(new ApiError(400, 'L\'identifiant du produit est requis'));
   }
 
   const product = await Product.findById(productId);
   if (!product) {
-    return next(new ApiError(404, 'Product not found'));
+    return next(new ApiError(404, 'Produit introuvable'));
   }
 
   // Check ownership
   const boutique = await Boutique.findById(product.boutiqueId);
   if (req.user.role !== 'admin' && !boutique.userId.equals(req.user._id)) {
-    return next(new ApiError(403, 'You are not authorized to manage stock for this product'));
+    return next(new ApiError(403, 'Vous n\'êtes pas autorisé à gérer le stock de ce produit'));
   }
 
   const previousStock = product.stock;
@@ -54,7 +54,7 @@ exports.addStock = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    message: 'Stock added successfully',
+    message: 'Stock ajouté avec succès',
     data: {
       product: {
         _id: product._id,
@@ -77,23 +77,23 @@ exports.removeStock = asyncHandler(async (req, res, next) => {
   const { quantity, reason, reference } = req.body;
 
   if (!productId) {
-    return next(new ApiError(400, 'Product ID is required'));
+    return next(new ApiError(400, 'L\'identifiant du produit est requis'));
   }
 
   const product = await Product.findById(productId);
   if (!product) {
-    return next(new ApiError(404, 'Product not found'));
+    return next(new ApiError(404, 'Produit introuvable'));
   }
 
   // Check ownership
   const boutique = await Boutique.findById(product.boutiqueId);
   if (req.user.role !== 'admin' && !boutique.userId.equals(req.user._id)) {
-    return next(new ApiError(403, 'You are not authorized to manage stock for this product'));
+    return next(new ApiError(403, 'Vous n\'êtes pas autorisé à gérer le stock de ce produit'));
   }
 
   // Check if enough stock
   if (product.stock < quantity) {
-    return next(new ApiError(400, `Insufficient stock. Available: ${product.stock}, Requested: ${quantity}`));
+    return next(new ApiError(400, `Stock insuffisant. Disponible : ${product.stock}, demandé : ${quantity}`));
   }
 
   const previousStock = product.stock;
@@ -121,7 +121,7 @@ exports.removeStock = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    message: 'Stock removed successfully',
+    message: 'Stock retiré avec succès',
     data: {
       product: {
         _id: product._id,
@@ -145,18 +145,18 @@ exports.adjustStock = asyncHandler(async (req, res, next) => {
   const { newStock, reason, reference } = req.body;
 
   if (!productId) {
-    return next(new ApiError(400, 'Product ID is required'));
+    return next(new ApiError(400, 'L\'identifiant du produit est requis'));
   }
 
   const product = await Product.findById(productId);
   if (!product) {
-    return next(new ApiError(404, 'Product not found'));
+    return next(new ApiError(404, 'Produit introuvable'));
   }
 
   // Check ownership
   const boutique = await Boutique.findById(product.boutiqueId);
   if (req.user.role !== 'admin' && !boutique.userId.equals(req.user._id)) {
-    return next(new ApiError(403, 'You are not authorized to manage stock for this product'));
+    return next(new ApiError(403, 'Vous n\'êtes pas autorisé à gérer le stock de ce produit'));
   }
 
   const previousStock = product.stock;
@@ -174,7 +174,7 @@ exports.adjustStock = asyncHandler(async (req, res, next) => {
     quantity: quantityDiff,
     previousStock,
     newStock,
-    reason: reason || 'Stock adjustment/inventory',
+    reason: reason || 'Ajustement de stock / inventaire',
     reference,
     userId: req.user._id
   });
@@ -184,7 +184,7 @@ exports.adjustStock = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    message: 'Stock adjusted successfully',
+    message: 'Stock ajusté avec succès',
     data: {
       product: {
         _id: product._id,
@@ -208,13 +208,13 @@ exports.setInitialStock = asyncHandler(async (req, res, next) => {
 
   const product = await Product.findById(productId);
   if (!product) {
-    return next(new ApiError(404, 'Product not found'));
+    return next(new ApiError(404, 'Produit introuvable'));
   }
 
   // Check ownership
   const boutique = await Boutique.findById(product.boutiqueId);
   if (req.user.role !== 'admin' && !boutique.userId.equals(req.user._id)) {
-    return next(new ApiError(403, 'You are not authorized to manage stock for this product'));
+    return next(new ApiError(403, 'Vous n\'êtes pas autorisé à gérer le stock de ce produit'));
   }
 
   const previousStock = product.stock;
@@ -231,7 +231,7 @@ exports.setInitialStock = asyncHandler(async (req, res, next) => {
     quantity: stock,
     previousStock,
     newStock: stock,
-    reason: reason || 'Initial stock setup',
+    reason: reason || 'Initialisation du stock',
     userId: req.user._id
   });
 
@@ -239,7 +239,7 @@ exports.setInitialStock = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    message: 'Initial stock set successfully',
+    message: 'Stock initial défini avec succès',
     data: {
       product: {
         _id: product._id,
@@ -263,13 +263,13 @@ exports.getProductHistory = asyncHandler(async (req, res, next) => {
 
   const product = await Product.findById(productId);
   if (!product) {
-    return next(new ApiError(404, 'Product not found'));
+    return next(new ApiError(404, 'Produit introuvable'));
   }
 
   // Check ownership (or admin)
   const boutique = await Boutique.findById(product.boutiqueId);
   if (req.user.role !== 'admin' && !boutique.userId.equals(req.user._id)) {
-    return next(new ApiError(403, 'You are not authorized to view this product history'));
+    return next(new ApiError(403, 'Vous n\'êtes pas autorisé à consulter l\'historique de ce produit'));
   }
 
   const result = await StockMovement.getProductHistory(productId, { page, limit });
@@ -301,11 +301,11 @@ exports.getBoutiqueStock = asyncHandler(async (req, res, next) => {
   // Check ownership
   const boutique = await Boutique.findById(boutiqueId);
   if (!boutique) {
-    return next(new ApiError(404, 'Boutique not found'));
+    return next(new ApiError(404, 'Boutique introuvable'));
   }
 
   if (req.user.role !== 'admin' && !boutique.userId.equals(req.user._id)) {
-    return next(new ApiError(403, 'You are not authorized to view this boutique stock'));
+    return next(new ApiError(403, 'Vous n\'êtes pas autorisé à consulter le stock de cette boutique'));
   }
 
   const query = { boutiqueId, isArchived: false };
@@ -385,11 +385,11 @@ exports.getBoutiqueMovements = asyncHandler(async (req, res, next) => {
   // Check ownership
   const boutique = await Boutique.findById(boutiqueId);
   if (!boutique) {
-    return next(new ApiError(404, 'Boutique not found'));
+    return next(new ApiError(404, 'Boutique introuvable'));
   }
 
   if (req.user.role !== 'admin' && !boutique.userId.equals(req.user._id)) {
-    return next(new ApiError(403, 'You are not authorized to view this boutique movements'));
+    return next(new ApiError(403, 'Vous n\'êtes pas autorisé à consulter les mouvements de cette boutique'));
   }
 
   const query = { boutiqueId };
@@ -592,12 +592,12 @@ exports.getGlobalStats = asyncHandler(async (req, res) => {
 exports.exportStockPDF = asyncHandler(async (req, res, next) => {
   const boutique = await Boutique.findOne({ userId: req.user._id });
   if (!boutique) {
-    return next(new ApiError(404, 'Boutique not found'));
+    return next(new ApiError(404, 'Boutique introuvable'));
   }
 
-  const { dateDebut, dateFin, productIds: productIdsParam, category, type } = req.query;
+  const { dateDebut, dateFin, productIds: productIdsParam, category } = req.query;
   if (!dateDebut || !dateFin) {
-    return next(new ApiError(400, 'dateDebut and dateFin are required (YYYY-MM-DD)'));
+    return next(new ApiError(400, 'dateDebut et dateFin sont requis (YYYY-MM-DD)'));
   }
 
   const productIds = productIdsParam && productIdsParam.trim()
@@ -609,8 +609,7 @@ exports.exportStockPDF = asyncHandler(async (req, res, next) => {
     dateDebut,
     dateFin,
     productIds,
-    category || null,
-    type || null
+    category || null
   );
 
   const pdfBuffer = await stockExportService.generateStockPDF(movements, boutique.name);
@@ -630,12 +629,12 @@ exports.exportStockPDF = asyncHandler(async (req, res, next) => {
 exports.exportStockExcel = asyncHandler(async (req, res, next) => {
   const boutique = await Boutique.findOne({ userId: req.user._id });
   if (!boutique) {
-    return next(new ApiError(404, 'Boutique not found'));
+    return next(new ApiError(404, 'Boutique introuvable'));
   }
 
-  const { dateDebut, dateFin, productIds: productIdsParam, category, type } = req.query;
+  const { dateDebut, dateFin, productIds: productIdsParam, category } = req.query;
   if (!dateDebut || !dateFin) {
-    return next(new ApiError(400, 'dateDebut and dateFin are required (YYYY-MM-DD)'));
+    return next(new ApiError(400, 'dateDebut et dateFin sont requis (YYYY-MM-DD)'));
   }
 
   const productIds = productIdsParam && productIdsParam.trim()
@@ -647,8 +646,7 @@ exports.exportStockExcel = asyncHandler(async (req, res, next) => {
     dateDebut,
     dateFin,
     productIds,
-    category || null,
-    type || null
+    category || null
   );
 
   const excelBuffer = await stockExportService.generateStockExcel(movements, boutique.name);

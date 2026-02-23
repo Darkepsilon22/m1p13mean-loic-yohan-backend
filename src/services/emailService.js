@@ -67,11 +67,11 @@ const sendEmail = async (options) => {
       }
     });
 
-    console.log('Email sent via Brevo API:', response.data.messageId);
+    console.log('Email envoyé via l\'API Brevo :', response.data.messageId);
     return { success: true, messageId: response.data.messageId };
   } catch (error) {
-    console.error('Brevo API error:', error.response?.data || error.message);
-    throw new Error(`Failed to send email: ${error.response?.data?.message || error.message}`);
+    console.error('Erreur API Brevo :', error.response?.data || error.message);
+    throw new Error(`Échec de l'envoi de l'email : ${error.response?.data?.message || error.message}`);
   }
 };
 

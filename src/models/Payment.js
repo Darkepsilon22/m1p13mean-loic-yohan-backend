@@ -9,19 +9,19 @@ const paymentSchema = new mongoose.Schema({
   orderId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Order',
-    required: [true, 'Order is required']
+    required: [true, 'La commande est requise']
   },
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: [true, 'User is required']
+    required: [true, 'L\'utilisateur est requis']
   },
 
   // Amount details
   amount: {
     type: Number,
-    required: [true, 'Amount is required'],
-    min: [0, 'Amount cannot be negative']
+    required: [true, 'Le montant est requis'],
+    min: [0, 'Le montant ne peut pas être négatif']
   },
   currency: {
     type: String,
@@ -43,9 +43,9 @@ const paymentSchema = new mongoose.Schema({
     type: String,
     enum: {
       values: ['cash', 'card', 'stripe'],
-      message: 'Invalid payment method'
+      message: 'Méthode de paiement invalide'
     },
-    required: [true, 'Payment method is required']
+    required: [true, 'La méthode de paiement est requise']
   },
 
   // Status
@@ -53,7 +53,7 @@ const paymentSchema = new mongoose.Schema({
     type: String,
     enum: {
       values: ['pending', 'processing', 'success', 'failed', 'refunded', 'cancelled'],
-      message: 'Invalid payment status'
+      message: 'Statut de paiement invalide'
     },
     default: 'pending'
   },
@@ -186,19 +186,6 @@ paymentSchema.methods.markAsSuccess = async function(providerData = {}) {
 
   await this.save();
 
-  // Clear the user's cart after successful payment
-  const Cart = mongoose.model('Cart');
-  try {
-    const cart = await Cart.findOne({ userId: order.userId });
-    if (cart) {
-      await cart.clearCart();
-      console.log('🛒 Cart cleared for user after successful payment');
-    }
-  } catch (cartError) {
-    console.error('❌ Failed to clear cart:', cartError.message);
-    // Don't throw - payment is still successful even if cart clearing fails
-  }
-
   // Send invoice email
   if (order && order.customerEmail) {
     try {
@@ -225,9 +212,9 @@ paymentSchema.methods.markAsSuccess = async function(providerData = {}) {
       };
 
       await sendInvoiceEmail(order.customerEmail, order.customerName || 'Client', invoiceData);
-      console.log('📧 Invoice email sent for order:', order.orderReference);
+      console.log('📧 Email de facture envoyé pour la commande :', order.orderReference);
     } catch (emailError) {
-      console.error('❌ Failed to send invoice email:', emailError.message);
+      console.error('❌ Échec de l\'envoi de l\'email de facture :', emailError.message);
       // Don't throw - payment is still successful even if email fails
     }
   }
@@ -241,48 +228,11 @@ paymentSchema.methods.markAsFailed = async function(reason = '') {
   this.failedAt = new Date();
   if (reason) this.notes = reason;
 
-  // Update the related order - cancel it and restore stock
+  // Update the related order
   const Order = mongoose.model('Order');
-  const order = await Order.findById(this.orderId);
-
-  if (order && order.status === 'pending') {
-    order.paymentStatus = 'failed';
-    order.status = 'cancelled';
-    order.cancelledAt = new Date();
-    order.adminNotes = (order.adminNotes || '') + ` [Auto-annulé: paiement échoué - ${reason}]`;
-    await order.save();
-
-    // Restore stock for each item
-    const Product = mongoose.model('Product');
-    const StockMovement = mongoose.model('StockMovement');
-
-    for (const item of order.items) {
-      const product = await Product.findById(item.productId);
-      if (product) {
-        const previousStock = product.stock;
-        product.stock += item.quantity;
-        await product.save();
-
-        await StockMovement.create({
-          productId: product._id,
-          boutiqueId: item.boutiqueId,
-          type: 'in',
-          quantity: item.quantity,
-          previousStock,
-          newStock: product.stock,
-          reason: `Paiement échoué - ${order.orderReference} (${reason})`,
-          reference: order.orderReference,
-          userId: order.userId
-        });
-
-        console.log(`🔄 Stock restored for "${product.name}": ${previousStock} → ${product.stock} (payment failed: ${order.orderReference})`);
-      }
-    }
-  } else if (order) {
-    // Order already processed, just update payment status
-    order.paymentStatus = 'failed';
-    await order.save();
-  }
+  await Order.findByIdAndUpdate(this.orderId, {
+    paymentStatus: 'failed'
+  });
 
   return this.save();
 };
@@ -290,7 +240,7 @@ paymentSchema.methods.markAsFailed = async function(reason = '') {
 // Method to process refund
 paymentSchema.methods.processRefund = async function(amount, reason = '') {
   if (this.status !== 'success') {
-    throw new Error('Only successful payments can be refunded');
+    throw new Error('Seuls les paiements réussis peuvent être remboursés');
   }
 
   this.status = 'refunded';
@@ -373,7 +323,7 @@ paymentSchema.statics.expirePendingPayments = async function() {
   for (const payment of expiredPayments) {
     payment.status = 'failed';
     payment.failedAt = new Date();
-    payment.notes = 'Payment expired';
+    payment.notes = 'Paiement expiré';
     await payment.save();
   }
 

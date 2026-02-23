@@ -4,10 +4,10 @@ const slugify = require('slugify');
 const categorySchema = new mongoose.Schema({
   name: {
     type: String,
-    required: [true, 'Category name is required'],
+    required: [true, 'Le nom de la catégorie est requis'],
     trim: true,
     unique: true,
-    maxlength: [100, 'Category name cannot exceed 100 characters']
+    maxlength: [100, 'Le nom de la catégorie ne peut pas dépasser 100 caractères']
   },
   slug: {
     type: String,
@@ -18,7 +18,7 @@ const categorySchema = new mongoose.Schema({
   description: {
     type: String,
     trim: true,
-    maxlength: [500, 'Description cannot exceed 500 characters']
+    maxlength: [500, 'La description ne peut pas dépasser 500 caractères']
   },
   icon: {
     type: String,
@@ -32,7 +32,7 @@ const categorySchema = new mongoose.Schema({
         // Validate hex color format (e.g., #FF5733)
         return !v || /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(v);
       },
-      message: 'Color must be a valid hexadecimal color (e.g., #FF5733)'
+      message: 'La couleur doit être une couleur hexadécimale valide (ex. : #FF5733)'
     }
   },
   image: {
@@ -78,18 +78,18 @@ categorySchema.pre('validate', async function() {
   if (this.parentId) {
     // Check if parentId equals current _id
     if (this._id && this.parentId.toString() === this._id.toString()) {
-      throw new Error('A category cannot be its own parent');
+      throw new Error('Une catégorie ne peut pas être son propre parent');
     }
 
     // Check if parent exists
     const parent = await mongoose.model('Category').findById(this.parentId);
     if (!parent) {
-      throw new Error('Parent category not found');
+      throw new Error('Catégorie parente introuvable');
     }
 
     // Prevent deep nesting (max 2 levels: parent -> child)
     if (parent.parentId) {
-      throw new Error('Maximum category depth is 2 levels (parent and child only)');
+      throw new Error('La profondeur maximale des catégories est de 2 niveaux (parent et enfant uniquement)');
     }
   }
 });
@@ -108,13 +108,13 @@ categorySchema.pre('deleteOne', { document: true, query: false }, async function
   // Check for boutiques using this category
   const boutiqueCount = await Boutique.countDocuments({ categoryId: this._id });
   if (boutiqueCount > 0) {
-    throw new Error(`Cannot delete category: ${boutiqueCount} boutique(s) are using it`);
+    throw new Error(`Impossible de supprimer la catégorie : ${boutiqueCount} boutique(s) l'utilise(nt)`);
   }
 
   // Check for subcategories
   const childCount = await mongoose.model('Category').countDocuments({ parentId: this._id });
   if (childCount > 0) {
-    throw new Error(`Cannot delete category: ${childCount} subcategorie(s) exist`);
+    throw new Error(`Impossible de supprimer la catégorie : ${childCount} sous-catégorie(s) existe(nt)`);
   }
 });
 

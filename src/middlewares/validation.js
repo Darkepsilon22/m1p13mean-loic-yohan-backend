@@ -1,8 +1,8 @@
 const { body, param, query, validationResult } = require('express-validator');
 
 /**
- * Middleware to handle validation results
- * Returns 400 with errors if validation fails
+ * Middleware pour gérer les résultats de validation
+ * Retourne 400 avec les erreurs si la validation échoue
  */
 const handleValidationErrors = (req, res, next) => {
   const errors = validationResult(req);
@@ -10,7 +10,7 @@ const handleValidationErrors = (req, res, next) => {
   if (!errors.isEmpty()) {
     return res.status(400).json({
       success: false,
-      message: 'Validation failed',
+      message: 'Erreur de validation',
       errors: errors.array().map(err => ({
         field: err.path,
         message: err.msg
@@ -22,118 +22,118 @@ const handleValidationErrors = (req, res, next) => {
 };
 
 /**
- * Validation rules for user registration
+ * Règles de validation pour l'inscription d'utilisateur
  */
 const registerValidation = [
   body('email')
     .isEmail()
-    .withMessage('Please provide a valid email address')
+    .withMessage('Veuillez fournir une adresse e-mail valide')
     .normalizeEmail()
     .toLowerCase(),
 
   body('password')
     .isLength({ min: 8 })
-    .withMessage('Password must be at least 8 characters long')
+    .withMessage('Le mot de passe doit contenir au moins 8 caractères')
     .matches(/[a-z]/)
-    .withMessage('Password must contain at least one lowercase letter')
+    .withMessage('Le mot de passe doit contenir au moins une lettre minuscule')
     .matches(/[A-Z]/)
-    .withMessage('Password must contain at least one uppercase letter')
+    .withMessage('Le mot de passe doit contenir au moins une lettre majuscule')
     .matches(/[0-9]/)
-    .withMessage('Password must contain at least one number'),
+    .withMessage('Le mot de passe doit contenir au moins un chiffre'),
 
   body('firstName')
     .trim()
     .notEmpty()
-    .withMessage('First name is required')
+    .withMessage('Le prénom est requis')
     .isLength({ max: 50 })
-    .withMessage('First name cannot exceed 50 characters')
+    .withMessage('Le prénom ne peut pas dépasser 50 caractères')
     .matches(/^[a-zA-ZÀ-ÿ\s'-]+$/)
-    .withMessage('First name can only contain letters'),
+    .withMessage('Le prénom ne peut contenir que des lettres'),
 
   body('lastName')
     .trim()
     .notEmpty()
-    .withMessage('Last name is required')
+    .withMessage('Le nom est requis')
     .isLength({ max: 50 })
-    .withMessage('Last name cannot exceed 50 characters')
+    .withMessage('Le nom ne peut pas dépasser 50 caractères')
     .matches(/^[a-zA-ZÀ-ÿ\s'-]+$/)
-    .withMessage('Last name can only contain letters'),
+    .withMessage('Le nom ne peut contenir que des lettres'),
 
   body('role')
     .isIn(['admin', 'boutique', 'acheteur'])
-    .withMessage('Role must be admin, boutique, or acheteur'),
+    .withMessage('Le rôle doit être admin, boutique ou acheteur'),
 
   body('phone')
     .optional()
     .trim()
     .matches(/^[+]?[(]?[0-9]{1,4}[)]?[-\s./0-9]*$/)
-    .withMessage('Please provide a valid phone number'),
+    .withMessage('Veuillez fournir un numéro de téléphone valide'),
 
   handleValidationErrors
 ];
 
 /**
- * Validation rules for user login
+ * Règles de validation pour la connexion d'utilisateur
  */
 const loginValidation = [
   body('email')
     .isEmail()
-    .withMessage('Please provide a valid email address')
+    .withMessage('Veuillez fournir une adresse e-mail valide')
     .normalizeEmail()
     .toLowerCase(),
 
   body('password')
     .notEmpty()
-    .withMessage('Password is required'),
+    .withMessage('Le mot de passe est requis'),
 
   handleValidationErrors
 ];
 
 /**
- * Validation rules for profile update
+ * Règles de validation pour la mise à jour du profil
  */
 const updateProfileValidation = [
   body('firstName')
     .optional()
     .trim()
     .notEmpty()
-    .withMessage('First name cannot be empty')
+    .withMessage('Le prénom ne peut pas être vide')
     .isLength({ max: 50 })
-    .withMessage('First name cannot exceed 50 characters')
+    .withMessage('Le prénom ne peut pas dépasser 50 caractères')
     .matches(/^[a-zA-ZÀ-ÿ\s'-]+$/)
-    .withMessage('First name can only contain letters'),
+    .withMessage('Le prénom ne peut contenir que des lettres'),
 
   body('lastName')
     .optional()
     .trim()
     .notEmpty()
-    .withMessage('Last name cannot be empty')
+    .withMessage('Le nom ne peut pas être vide')
     .isLength({ max: 50 })
-    .withMessage('Last name cannot exceed 50 characters')
+    .withMessage('Le nom ne peut pas dépasser 50 caractères')
     .matches(/^[a-zA-ZÀ-ÿ\s'-]+$/)
-    .withMessage('Last name can only contain letters'),
+    .withMessage('Le nom ne peut contenir que des lettres'),
 
   body('phone')
     .optional()
     .trim()
     .matches(/^[+]?[(]?[0-9]{1,4}[)]?[-\s./0-9]*$/)
-    .withMessage('Please provide a valid phone number'),
+    .withMessage('Veuillez fournir un numéro de téléphone valide'),
 
   body('avatar')
     .optional()
     .isURL()
-    .withMessage('Avatar must be a valid URL'),
+    .withMessage('L\'avatar doit être une URL valide'),
 
   handleValidationErrors
 ];
 
 /**
- * Validation for forgot password (request reset link)
+ * Validation pour mot de passe oublié (demande de lien de réinitialisation)
  */
 const forgotPasswordValidation = [
   body('email')
     .isEmail()
-    .withMessage('Please provide a valid email address')
+    .withMessage('Veuillez fournir une adresse e-mail valide')
     .normalizeEmail()
     .toLowerCase(),
 
@@ -141,29 +141,29 @@ const forgotPasswordValidation = [
 ];
 
 /**
- * Validation for reset password (with token from email)
+ * Validation pour réinitialiser le mot de passe (avec jeton de l'e-mail)
  */
 const resetPasswordValidation = [
   body('token')
     .notEmpty()
-    .withMessage('Reset token is required'),
+    .withMessage('Le jeton de réinitialisation est requis'),
 
   body('newPassword')
     .isLength({ min: 8 })
-    .withMessage('New password must be at least 8 characters long')
+    .withMessage('Le nouveau mot de passe doit contenir au moins 8 caractères')
     .matches(/[a-z]/)
-    .withMessage('New password must contain at least one lowercase letter')
+    .withMessage('Le nouveau mot de passe doit contenir au moins une lettre minuscule')
     .matches(/[A-Z]/)
-    .withMessage('New password must contain at least one uppercase letter')
+    .withMessage('Le nouveau mot de passe doit contenir au moins une lettre majuscule')
     .matches(/[0-9]/)
-    .withMessage('New password must contain at least one number'),
+    .withMessage('Le nouveau mot de passe doit contenir au moins un chiffre'),
 
   body('confirmPassword')
     .notEmpty()
-    .withMessage('Password confirmation is required')
+    .withMessage('La confirmation du mot de passe est requise')
     .custom((value, { req }) => {
       if (value !== req.body.newPassword) {
-        throw new Error('Password confirmation does not match');
+        throw new Error('La confirmation du mot de passe ne correspond pas');
       }
       return true;
     }),
@@ -172,35 +172,35 @@ const resetPasswordValidation = [
 ];
 
 /**
- * Validation rules for password change
+ * Règles de validation pour le changement de mot de passe
  */
 const changePasswordValidation = [
   body('currentPassword')
     .notEmpty()
-    .withMessage('Current password is required'),
+    .withMessage('Le mot de passe actuel est requis'),
 
   body('newPassword')
     .isLength({ min: 8 })
-    .withMessage('New password must be at least 8 characters long')
+    .withMessage('Le nouveau mot de passe doit contenir au moins 8 caractères')
     .matches(/[a-z]/)
-    .withMessage('New password must contain at least one lowercase letter')
+    .withMessage('Le nouveau mot de passe doit contenir au moins une lettre minuscule')
     .matches(/[A-Z]/)
-    .withMessage('New password must contain at least one uppercase letter')
+    .withMessage('Le nouveau mot de passe doit contenir au moins une lettre majuscule')
     .matches(/[0-9]/)
-    .withMessage('New password must contain at least one number')
+    .withMessage('Le nouveau mot de passe doit contenir au moins un chiffre')
     .custom((value, { req }) => {
       if (value === req.body.currentPassword) {
-        throw new Error('New password must be different from current password');
+        throw new Error('Le nouveau mot de passe doit être différent du mot de passe actuel');
       }
       return true;
     }),
 
   body('confirmPassword')
     .notEmpty()
-    .withMessage('Password confirmation is required')
+    .withMessage('La confirmation du mot de passe est requise')
     .custom((value, { req }) => {
       if (value !== req.body.newPassword) {
-        throw new Error('Password confirmation does not match');
+        throw new Error('La confirmation du mot de passe ne correspond pas');
       }
       return true;
     }),
@@ -209,36 +209,36 @@ const changePasswordValidation = [
 ];
 
 /**
- * Validation for MongoDB ObjectId parameters
+ * Validation pour les paramètres ObjectId MongoDB
  */
 const validateObjectId = (paramName = 'id') => [
   param(paramName)
     .isMongoId()
-    .withMessage(`Invalid ${paramName} format`),
+    .withMessage(`Format ${paramName} invalide`),
 
   handleValidationErrors
 ];
 
 /**
- * Validation for pagination query parameters
+ * Validation pour les paramètres de requête de pagination
  */
 const paginationValidation = [
   query('page')
     .optional()
     .isInt({ min: 1 })
-    .withMessage('Page must be a positive integer')
+    .withMessage('La page doit être un entier positif')
     .toInt(),
 
   query('limit')
     .optional()
     .isInt({ min: 1, max: 100 })
-    .withMessage('Limit must be between 1 and 100')
+    .withMessage('La limite doit être entre 1 et 100')
     .toInt(),
 
   query('sort')
     .optional()
     .isIn(['createdAt', '-createdAt', 'name', '-name', 'email', '-email'])
-    .withMessage('Invalid sort field'),
+    .withMessage('Champ de tri invalide'),
 
   handleValidationErrors
 ];

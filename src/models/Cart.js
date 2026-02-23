@@ -4,23 +4,23 @@ const cartItemSchema = new mongoose.Schema({
   productId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Product',
-    required: [true, 'Product is required']
+    required: [true, 'Le produit est requis']
   },
   boutiqueId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Boutique',
-    required: [true, 'Boutique is required']
+    required: [true, 'La boutique est requise']
   },
   quantity: {
     type: Number,
-    required: [true, 'Quantity is required'],
-    min: [1, 'Quantity must be at least 1'],
+    required: [true, 'La quantité est requise'],
+    min: [1, 'La quantité doit être au moins 1'],
     default: 1
   },
   unitPrice: {
     type: Number,
-    required: [true, 'Unit price is required'],
-    min: [0, 'Unit price cannot be negative']
+    required: [true, 'Le prix unitaire est requis'],
+    min: [0, 'Le prix unitaire ne peut pas être négatif']
   },
   productName: {
     type: String,
@@ -44,7 +44,7 @@ const cartSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: [true, 'User is required'],
+    required: [true, 'L\'utilisateur est requis'],
     unique: true
   },
   items: [cartItemSchema],
@@ -91,21 +91,20 @@ cartSchema.virtual('itemsByBoutique').get(function() {
 });
 
 // Method to add item to cart
-cartSchema.methods.addItem = async function(product, quantity = 1, effectivePrice = null) {
-  const price = effectivePrice != null ? effectivePrice : product.price;
+cartSchema.methods.addItem = async function(product, quantity = 1) {
   const existingItem = this.items.find(
     item => item.productId.toString() === product._id.toString()
   );
 
   if (existingItem) {
     existingItem.quantity += quantity;
-    existingItem.unitPrice = price; // Update price (avec promo si applicable)
+    existingItem.unitPrice = product.price; // Update price
   } else {
     this.items.push({
       productId: product._id,
       boutiqueId: product.boutiqueId,
       quantity,
-      unitPrice: price,
+      unitPrice: product.price,
       productName: product.name,
       productImage: product.mainPhoto || (product.photos && product.photos[0])
     });
@@ -152,9 +151,7 @@ cartSchema.methods.clearCart = async function() {
 // Method to check stock availability for all items
 cartSchema.methods.validateStock = async function() {
   const Product = mongoose.model('Product');
-  const Promotion = mongoose.model('Promotion');
   const errors = [];
-  let priceUpdated = false;
 
   for (const item of this.items) {
     const product = await Product.findById(item.productId);
@@ -186,31 +183,14 @@ cartSchema.methods.validateStock = async function() {
       });
     }
 
-    // Calculer le prix effectif (avec promo si applicable)
-    let effectivePrice = product.price;
-    const now = new Date();
-    const promo = await Promotion.findOne({
-      products: product._id,
-      status: 'active',
-      startDate: { $lte: now },
-      endDate: { $gt: now }
-    });
-    if (promo) {
-      if (promo.type === 'percentage' && promo.value != null) {
-        effectivePrice = Math.round(product.price * (1 - promo.value / 100));
-      } else if (promo.type === 'fixed' && promo.value != null) {
-        effectivePrice = Math.max(0, Math.round(product.price - promo.value));
-      }
-    }
-
-    if (item.unitPrice !== effectivePrice) {
-      item.unitPrice = effectivePrice;
-      priceUpdated = true;
+    // Update price if changed
+    if (product.price !== item.unitPrice) {
+      item.unitPrice = product.price;
     }
   }
 
-  if (errors.length > 0 || priceUpdated) {
-    await this.save();
+  if (errors.length > 0) {
+    await this.save(); // Save price updates
   }
 
   return {

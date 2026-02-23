@@ -55,7 +55,7 @@ exports.getById = asyncHandler(async (req, res, next) => {
     .populate('createdBy', 'firstName lastName email');
 
   if (!event) {
-    return next(new ApiError(404, 'Event not found'));
+    return next(new ApiError(404, 'Événement introuvable'));
   }
 
   res.status(200).json({
@@ -80,7 +80,7 @@ exports.create = asyncHandler(async (req, res, next) => {
 
   res.status(201).json({
     success: true,
-    message: 'Event created successfully',
+    message: 'Événement créé avec succès',
     data: { event: populated }
   });
 });
@@ -91,26 +91,26 @@ exports.create = asyncHandler(async (req, res, next) => {
  * @access  Private (admin)
  */
 exports.update = asyncHandler(async (req, res, next) => {
-  const event = await Event.findById(req.params.id);
+  const body = { ...req.body };
+  delete body._id;
+  delete body.createdBy;
+
+  const event = await Event.findByIdAndUpdate(
+    req.params.id,
+    body,
+    { new: true, runValidators: true }
+  )
+    .populate('createdBy', 'firstName lastName email');
 
   if (!event) {
     return next(new ApiError(404, 'Événement introuvable'));
   }
 
   emitToAdmin('event:updated', { eventId: event._id, title: event.title });
-  const allowed = ['title', 'description', 'shortDescription', 'image', 'startDate', 'endDate', 'visibility', 'isFeatured'];
-  for (const key of allowed) {
-    if (req.body[key] !== undefined) {
-      event[key] = req.body[key];
-    }
-  }
-
-  await event.save();
-  await event.populate('createdBy', 'firstName lastName email');
 
   res.status(200).json({
     success: true,
-    message: 'Événement mis à jour',
+    message: 'Événement mis à jour avec succès',
     data: { event }
   });
 });
@@ -131,12 +131,12 @@ exports.patchStatus = asyncHandler(async (req, res, next) => {
     .populate('createdBy', 'firstName lastName email');
 
   if (!event) {
-    return next(new ApiError(404, 'Event not found'));
+    return next(new ApiError(404, 'Événement introuvable'));
   }
 
   res.status(200).json({
     success: true,
-    message: 'Event status updated successfully',
+    message: 'Statut de l\'événement mis à jour avec succès',
     data: { event }
   });
 });
@@ -150,14 +150,14 @@ exports.delete = asyncHandler(async (req, res, next) => {
   const event = await Event.findByIdAndDelete(req.params.id);
 
   if (!event) {
-    return next(new ApiError(404, 'Event not found'));
+    return next(new ApiError(404, 'Événement introuvable'));
   }
 
   emitToAdmin('event:deleted', { eventId: req.params.id, title: event.title });
 
   res.status(200).json({
     success: true,
-    message: 'Event deleted successfully'
+    message: 'Événement supprimé avec succès'
   });
 });
 
@@ -171,7 +171,7 @@ exports.updateStatuses = asyncHandler(async (req, res) => {
 
   res.status(200).json({
     success: true,
-    message: 'Event statuses updated successfully'
+    message: 'Statuts des événements mis à jour avec succès'
   });
 });
 
@@ -233,19 +233,19 @@ exports.publish = asyncHandler(async (req, res, next) => {
   const event = await Event.findById(req.params.id);
 
   if (!event) {
-    return next(new ApiError(404, 'Event not found'));
+    return next(new ApiError(404, 'Événement introuvable'));
   }
 
   if (event.status === 'published') {
-    return next(new ApiError(400, 'Event is already published'));
+    return next(new ApiError(400, 'L\'événement est déjà publié'));
   }
 
   if (event.status === 'cancelled') {
-    return next(new ApiError(400, 'Cannot publish a cancelled event'));
+    return next(new ApiError(400, 'Impossible de publier un événement annulé'));
   }
 
   if (event.status === 'ended') {
-    return next(new ApiError(400, 'Cannot publish an ended event'));
+    return next(new ApiError(400, 'Impossible de publier un événement terminé'));
   }
 
   event.status = 'published';
@@ -257,7 +257,7 @@ exports.publish = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    message: 'Event published successfully',
+    message: 'Événement publié avec succès',
     data: { event }
   });
 });
@@ -271,15 +271,15 @@ exports.cancel = asyncHandler(async (req, res, next) => {
   const event = await Event.findById(req.params.id);
 
   if (!event) {
-    return next(new ApiError(404, 'Event not found'));
+    return next(new ApiError(404, 'Événement introuvable'));
   }
 
   if (event.status === 'cancelled') {
-    return next(new ApiError(400, 'Event is already cancelled'));
+    return next(new ApiError(400, 'L\'événement est déjà annulé'));
   }
 
   if (event.status === 'ended') {
-    return next(new ApiError(400, 'Cannot cancel an ended event'));
+    return next(new ApiError(400, 'Impossible d\'annuler un événement terminé'));
   }
 
   event.status = 'cancelled';
@@ -291,44 +291,8 @@ exports.cancel = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    message: 'Event cancelled successfully',
+    message: 'Événement annulé avec succès',
     data: { event }
-  });
-});
-
-/**
- * @desc    Get active event banners (respects visibility based on user role)
- * @route   GET /api/events/banners
- * @access  Public (returns public events) / Private (returns public + boutiques events for boutique users)
- */
-exports.getBanners = asyncHandler(async (req, res) => {
-  const { limit = 10 } = req.query;
-  const now = new Date();
-
-  // Base filter: published events not yet ended (en cours + à venir)
-  const filter = {
-    status: 'published',
-    endDate: { $gte: now }
-  };
-
-  // Determine visibility based on user role
-  const userRole = req.user?.role;
-  if (userRole === 'boutique') {
-    // Boutique users see both 'public' and 'boutiques' events
-    filter.visibility = { $in: ['public', 'boutiques'] };
-  } else {
-    // Acheteur and non-authenticated users see only 'public' events
-    filter.visibility = 'public';
-  }
-
-  const events = await Event.find(filter)
-    .sort('startDate')
-    .limit(parseInt(limit))
-    .lean();
-
-  res.status(200).json({
-    success: true,
-    data: events
   });
 });
 

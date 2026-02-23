@@ -5,7 +5,7 @@ const handleValidationErrors = (req, res, next) => {
   if (!errors.isEmpty()) {
     return res.status(400).json({
       success: false,
-      message: 'Validation failed',
+      message: 'Erreur de validation',
       errors: errors.array().map(err => ({ field: err.path, message: err.msg }))
     });
   }
@@ -13,22 +13,21 @@ const handleValidationErrors = (req, res, next) => {
 };
 
 const validateReviewId = (paramName = 'id') => [
-  param(paramName).isMongoId().withMessage(`Invalid ${paramName} format`),
+  param(paramName).isMongoId().withMessage(`Format ${paramName} invalide`),
   handleValidationErrors
 ];
 
 const createReview = [
-  body('boutiqueId').isMongoId().withMessage('boutiqueId must be a valid MongoDB ObjectId'),
-  body('productId').optional({ nullable: true }).isMongoId().withMessage('productId must be a valid MongoDB ObjectId'),
+  body('boutiqueId').isMongoId().withMessage('boutiqueId doit être un ObjectId MongoDB valide'),
   body('rating')
     .isInt({ min: 1, max: 5 })
-    .withMessage('Rating must be an integer between 1 and 5')
+    .withMessage('La note doit être un entier entre 1 et 5')
     .toInt(),
   body('comment')
     .optional()
     .trim()
     .isLength({ max: 1000 })
-    .withMessage('Comment cannot exceed 1000 characters'),
+    .withMessage('Le commentaire ne peut pas dépasser 1000 caractères'),
   handleValidationErrors
 ];
 
@@ -36,13 +35,13 @@ const updateReview = [
   body('rating')
     .optional()
     .isInt({ min: 1, max: 5 })
-    .withMessage('Rating must be an integer between 1 and 5')
+    .withMessage('La note doit être un entier entre 1 et 5')
     .toInt(),
   body('comment')
     .optional()
     .trim()
     .isLength({ max: 1000 })
-    .withMessage('Comment cannot exceed 1000 characters'),
+    .withMessage('Le commentaire ne peut pas dépasser 1000 caractères'),
   handleValidationErrors
 ];
 
@@ -50,18 +49,18 @@ const patchResponse = [
   body('text')
     .trim()
     .notEmpty()
-    .withMessage('Response text is required')
+    .withMessage('Le texte de réponse est requis')
     .isLength({ max: 500 })
-    .withMessage('Response cannot exceed 500 characters'),
+    .withMessage('La réponse ne peut pas dépasser 500 caractères'),
   handleValidationErrors
 ];
 
 const patchStatus = [
   body('status')
     .notEmpty()
-    .withMessage('Status is required')
+    .withMessage('Le statut est requis')
     .isIn(['published', 'hidden', 'reported', 'deleted'])
-    .withMessage('Status must be published, hidden, reported, or deleted'),
+    .withMessage('Le statut doit être published, hidden, reported ou deleted'),
   handleValidationErrors
 ];
 
@@ -69,16 +68,15 @@ const reportReview = [
   body('reason')
     .trim()
     .notEmpty()
-    .withMessage('Report reason is required')
+    .withMessage('La raison du signalement est requise')
     .isLength({ max: 500 })
-    .withMessage('Reason cannot exceed 500 characters'),
+    .withMessage('La raison ne peut pas dépasser 500 caractères'),
   handleValidationErrors
 ];
 
 const listReviews = [
-  query('boutiqueId').notEmpty().withMessage('boutiqueId is required').isMongoId().withMessage('boutiqueId must be a valid ObjectId'),
-  query('productId').optional(),
-  query('status').optional().isIn(['published', 'hidden', 'reported', 'deleted']).withMessage('Invalid status'),
+  query('boutiqueId').notEmpty().withMessage('boutiqueId est requis').isMongoId().withMessage('boutiqueId doit être un ObjectId valide'),
+  query('status').optional().isIn(['published', 'hidden', 'reported', 'deleted']).withMessage('Statut invalide'),
   query('page').optional().isInt({ min: 1 }).toInt(),
   query('limit').optional().isInt({ min: 1, max: 100 }).toInt(),
   query('sort').optional().trim(),

@@ -1,7 +1,7 @@
 const { body, param, validationResult } = require('express-validator');
 const mongoose = require('mongoose');
 
-// Validation result handler
+// Gestionnaire des résultats de validation
 const handleValidationErrors = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -16,58 +16,58 @@ const handleValidationErrors = (req, res, next) => {
   next();
 };
 
-// Validate ObjectId parameter
+// Validation du paramètre ObjectId
 const validateObjectId = (paramName) => [
   param(paramName)
-    .notEmpty().withMessage(`${paramName} is required`)
+    .notEmpty().withMessage(`${paramName} est requis`)
     .custom((value) => {
       if (!mongoose.Types.ObjectId.isValid(value)) {
-        throw new Error(`Invalid ${paramName} format`);
+        throw new Error(`Format ${paramName} invalide`);
       }
       return true;
     }),
   handleValidationErrors
 ];
 
-// Add item to cart validation
+// Validation de l'ajout d'un article au panier
 const addItemToCart = [
   body('productId')
-    .notEmpty().withMessage('Product ID is required')
+    .notEmpty().withMessage('L\'ID du produit est requis')
     .custom((value) => {
       if (!mongoose.Types.ObjectId.isValid(value)) {
-        throw new Error('Invalid product ID format');
+        throw new Error('Format d\'ID de produit invalide');
       }
       return true;
     }),
   body('quantity')
     .optional()
-    .isInt({ min: 1 }).withMessage('Quantity must be at least 1'),
+    .isInt({ min: 1 }).withMessage('La quantité doit être au moins 1'),
   handleValidationErrors
 ];
 
-// Update item quantity validation
+// Validation de la mise à jour de la quantité d'un article
 const updateItemQuantity = [
   param('productId')
-    .notEmpty().withMessage('Product ID is required')
+    .notEmpty().withMessage('L\'ID du produit est requis')
     .custom((value) => {
       if (!mongoose.Types.ObjectId.isValid(value)) {
-        throw new Error('Invalid product ID format');
+        throw new Error('Format d\'ID de produit invalide');
       }
       return true;
     }),
   body('quantity')
-    .notEmpty().withMessage('Quantity is required')
-    .isInt({ min: 0 }).withMessage('Quantity must be 0 or greater'),
+    .notEmpty().withMessage('La quantité est requise')
+    .isInt({ min: 0 }).withMessage('La quantité doit être 0 ou supérieure'),
   handleValidationErrors
 ];
 
-// Remove item from cart validation
+// Validation de la suppression d'un article du panier
 const removeItemFromCart = [
   param('productId')
-    .notEmpty().withMessage('Product ID is required')
+    .notEmpty().withMessage('L\'ID du produit est requis')
     .custom((value) => {
       if (!mongoose.Types.ObjectId.isValid(value)) {
-        throw new Error('Invalid product ID format');
+        throw new Error('Format d\'ID de produit invalide');
       }
       return true;
     }),
