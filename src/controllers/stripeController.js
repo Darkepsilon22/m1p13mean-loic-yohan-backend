@@ -3,7 +3,6 @@ const Order = require('../models/Order');
 const Payment = require('../models/Payment');
 const { ApiError, asyncHandler } = require('../middlewares/errorHandler');
 const { emitToAdmin, emitToUser } = require('../socket');
-const { getBrandingSettings } = require('../services/stripeBrandingService');
 
 /**
  * @desc    Get Stripe publishable key
@@ -28,28 +27,28 @@ exports.createCheckoutSession = asyncHandler(async (req, res, next) => {
   const { orderId } = req.body;
 
   if (!orderId) {
-    return next(new ApiError(400, 'Order ID is required'));
+    return next(new ApiError(400, 'L\'identifiant de la commande est requis'));
   }
 
   // Find the order
   const order = await Order.findById(orderId).populate('items.boutiqueId', 'name');
 
   if (!order) {
-    return next(new ApiError(404, 'Order not found'));
+    return next(new ApiError(404, 'Commande introuvable'));
   }
 
   // Verify ownership
   if (order.userId.toString() !== req.user._id.toString()) {
-    return next(new ApiError(403, 'Not authorized'));
+    return next(new ApiError(403, 'Non autorisé'));
   }
 
   // Check order status
   if (order.status === 'cancelled') {
-    return next(new ApiError(400, 'This order has been cancelled'));
+    return next(new ApiError(400, 'Cette commande a été annulée'));
   }
 
   if (order.paymentStatus === 'success') {
-    return next(new ApiError(400, 'This order has already been paid'));
+    return next(new ApiError(400, 'Cette commande a déjà été payée'));
   }
 
   // Build line items for Stripe
@@ -85,13 +84,12 @@ exports.createCheckoutSession = asyncHandler(async (req, res, next) => {
 
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:4200';
 
-  // Create Stripe Checkout Session with branding
+  // Create Stripe Checkout Session
   const session = await stripe.checkout.sessions.create({
     payment_method_types: ['card'],
     mode: 'payment',
     line_items: lineItems,
     customer_email: order.customerEmail,
-    branding_settings: getBrandingSettings(),
     metadata: {
       orderId: order._id.toString(),
       orderReference: order.orderReference,
@@ -144,7 +142,7 @@ exports.verifyPayment = asyncHandler(async (req, res, next) => {
   const { sessionId } = req.params;
 
   if (!sessionId) {
-    return next(new ApiError(400, 'Session ID is required'));
+    return next(new ApiError(400, 'L\'identifiant de session est requis'));
   }
 
   // Retrieve the session from Stripe with expanded payment_intent
@@ -153,19 +151,19 @@ exports.verifyPayment = asyncHandler(async (req, res, next) => {
   });
 
   if (!session) {
-    return next(new ApiError(404, 'Stripe session not found'));
+    return next(new ApiError(404, 'Session Stripe introuvable'));
   }
 
   // Find the payment
   const payment = await Payment.findOne({ externalId: sessionId });
 
   if (!payment) {
-    return next(new ApiError(404, 'Payment record not found'));
+    return next(new ApiError(404, 'Enregistrement de paiement introuvable'));
   }
 
   // Verify ownership
   if (payment.userId.toString() !== req.user._id.toString()) {
-    return next(new ApiError(403, 'Not authorized'));
+    return next(new ApiError(403, 'Non autorisé'));
   }
 
   // session.status: 'complete' | 'expired' | 'open'
@@ -228,8 +226,8 @@ exports.stripeWebhook = asyncHandler(async (req, res, next) => {
       event = JSON.parse(req.body.toString());
     }
   } catch (err) {
-    console.error('Stripe webhook signature verification failed:', err.message);
-    return res.status(400).json({ success: false, message: 'Webhook signature verification failed' });
+    console.error('Échec de la vérification de la signature du webhook Stripe :', err.message);
+    return res.status(400).json({ success: false, message: 'Échec de la vérification de la signature du webhook' });
   }
 
   // Handle the event
@@ -252,12 +250,12 @@ exports.stripeWebhook = asyncHandler(async (req, res, next) => {
               customerEmail: session.customer_email
             }
           });
-          console.log(`✅ Payment confirmed via webhook: ${payment.reference}`);
+          console.log(`✅ Paiement confirmé via webhook : ${payment.reference}`);
           emitToAdmin('stripe:webhookProcessed', { type: event.type });
           if (payment && payment.userId) emitToUser(payment.userId.toString(), 'stripe:webhookProcessed', { type: event.type, reference: payment.reference });
         } else {
           // Async payment - mark as processing, wait for async_payment_succeeded
-          console.log(`⏳ Payment pending async confirmation: ${payment.reference}`);
+          console.log(`⏳ Paiement en attente de confirmation async : ${payment.reference}`);
         }
       }
       break;
@@ -278,7 +276,7 @@ exports.stripeWebhook = asyncHandler(async (req, res, next) => {
             customerEmail: session.customer_email
           }
         });
-        console.log(`✅ Async payment confirmed via webhook: ${payment.reference}`);
+        console.log(`✅ Paiement async confirmé via webhook : ${payment.reference}`);
       }
       break;
     }
@@ -288,8 +286,8 @@ exports.stripeWebhook = asyncHandler(async (req, res, next) => {
       const payment = await Payment.findOne({ externalId: session.id });
 
       if (payment && payment.status === 'processing') {
-        await payment.markAsFailed('Async payment failed');
-        console.log(`❌ Async payment failed via webhook: ${payment.reference}`);
+        await payment.markAsFailed('Paiement async échoué');
+        console.log(`❌ Paiement async échoué via webhook : ${payment.reference}`);
       }
       break;
     }
@@ -299,14 +297,14 @@ exports.stripeWebhook = asyncHandler(async (req, res, next) => {
       const payment = await Payment.findOne({ externalId: session.id });
 
       if (payment && payment.status === 'processing') {
-        await payment.markAsFailed('Stripe checkout session expired');
-        console.log(`❌ Payment expired via webhook: ${payment.reference}`);
+        await payment.markAsFailed('Session de paiement Stripe expirée');
+        console.log(`❌ Paiement expiré via webhook : ${payment.reference}`);
       }
       break;
     }
 
     default:
-      console.log(`Unhandled Stripe event type: ${event.type}`);
+      console.log(`Type d'événement Stripe non géré : ${event.type}`);
   }
 
   res.status(200).json({ received: true });

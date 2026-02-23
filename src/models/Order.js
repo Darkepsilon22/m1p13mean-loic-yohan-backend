@@ -21,17 +21,17 @@ const orderItemSchema = new mongoose.Schema({
   quantity: {
     type: Number,
     required: true,
-    min: [1, 'Quantity must be at least 1']
+    min: [1, 'La quantité doit être au moins 1']
   },
   unitPrice: {
     type: Number,
     required: true,
-    min: [0, 'Unit price cannot be negative']
+    min: [0, 'Le prix unitaire ne peut pas être négatif']
   },
   totalPrice: {
     type: Number,
     required: true,
-    min: [0, 'Total price cannot be negative']
+    min: [0, 'Le prix total ne peut pas être négatif']
   }
 }, { _id: true });
 
@@ -44,25 +44,25 @@ const orderSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: [true, 'User is required']
+    required: [true, 'L\'utilisateur est requis']
   },
   items: [orderItemSchema],
 
   // Customer information
   customerName: {
     type: String,
-    required: [true, 'Customer name is required'],
+    required: [true, 'Le nom du client est requis'],
     trim: true
   },
   customerEmail: {
     type: String,
-    required: [true, 'Customer email is required'],
+    required: [true, 'L\'email du client est requis'],
     trim: true,
     lowercase: true
   },
   customerPhone: {
     type: String,
-    required: [true, 'Customer phone is required'],
+    required: [true, 'Le téléphone du client est requis'],
     trim: true
   },
 
@@ -85,22 +85,22 @@ const orderSchema = new mongoose.Schema({
   subtotal: {
     type: Number,
     required: true,
-    min: [0, 'Subtotal cannot be negative']
+    min: [0, 'Le sous-total ne peut pas être négatif']
   },
   shippingFee: {
     type: Number,
     default: 0,
-    min: [0, 'Shipping fee cannot be negative']
+    min: [0, 'Les frais d\'expédition ne peuvent pas être négatifs']
   },
   discount: {
     type: Number,
     default: 0,
-    min: [0, 'Discount cannot be negative']
+    min: [0, 'La remise ne peut pas être négative']
   },
   totalAmount: {
     type: Number,
     required: true,
-    min: [0, 'Total amount cannot be negative']
+    min: [0, 'Le montant total ne peut pas être négatif']
   },
   currency: {
     type: String,
@@ -113,7 +113,7 @@ const orderSchema = new mongoose.Schema({
     type: String,
     enum: {
       values: ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'completed', 'cancelled', 'refunded'],
-      message: 'Invalid order status'
+      message: 'Statut de commande invalide'
     },
     default: 'pending'
   },
@@ -123,7 +123,7 @@ const orderSchema = new mongoose.Schema({
     type: String,
     enum: {
       values: ['pending', 'processing', 'success', 'failed', 'refunded'],
-      message: 'Invalid payment status'
+      message: 'Statut de paiement invalide'
     },
     default: 'pending'
   },
@@ -153,11 +153,11 @@ const orderSchema = new mongoose.Schema({
   // Notes
   customerNotes: {
     type: String,
-    maxlength: [500, 'Customer notes cannot exceed 500 characters']
+    maxlength: [500, 'Les notes du client ne peuvent pas dépasser 500 caractères']
   },
   adminNotes: {
     type: String,
-    maxlength: [500, 'Admin notes cannot exceed 500 characters']
+    maxlength: [500, 'Les notes de l\'administrateur ne peuvent pas dépasser 500 caractères']
   },
 
   // Timestamps for status changes
@@ -171,7 +171,7 @@ const orderSchema = new mongoose.Schema({
   // Order expiration (for unpaid orders)
   expiresAt: {
     type: Date,
-    default: () => new Date(Date.now() + 2 * 60 * 1000) // 2 minutes (TEST MODE - change to 15 in production)
+    default: () => new Date(Date.now() + 15 * 60 * 1000) // 15 minutes
   }
 }, {
   timestamps: true
@@ -308,42 +308,21 @@ orderSchema.statics.getByBoutique = async function(boutiqueId, filters = {}) {
 orderSchema.statics.expirePendingOrders = async function() {
   const expiredOrders = await this.find({
     status: 'pending',
-    paymentStatus: { $in: ['pending', 'processing'] },
+    paymentStatus: 'pending',
     expiresAt: { $lt: new Date() }
   });
 
-  const Product = mongoose.model('Product');
-  const StockMovement = mongoose.model('StockMovement');
-
   for (const order of expiredOrders) {
     order.status = 'cancelled';
-    order.cancelledAt = new Date();
-    order.adminNotes = (order.adminNotes || '') + ` [Auto-annulé: délai de paiement expiré]`;
+    order.adminNotes = (order.adminNotes || '') + ' [Annulation automatique : délai de paiement dépassé]';
     await order.save();
 
-    // Restore stock for each item and record stock movement
+    // Restore stock for each item
+    const Product = mongoose.model('Product');
     for (const item of order.items) {
-      const product = await Product.findById(item.productId);
-      if (product) {
-        const previousStock = product.stock;
-        product.stock += item.quantity;
-        await product.save();
-
-        // Create stock movement record
-        await StockMovement.create({
-          productId: product._id,
-          boutiqueId: item.boutiqueId,
-          type: 'in',
-          quantity: item.quantity,
-          previousStock,
-          newStock: product.stock,
-          reason: `Expiration commande - ${order.orderReference} (délai de paiement dépassé)`,
-          reference: order.orderReference,
-          userId: order.userId
-        });
-
-        console.log(`🔄 Stock restored for "${product.name}": ${previousStock} → ${product.stock} (order expired: ${order.orderReference})`);
-      }
+      await Product.findByIdAndUpdate(item.productId, {
+        $inc: { stock: item.quantity }
+      });
     }
   }
 

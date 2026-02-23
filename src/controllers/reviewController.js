@@ -10,22 +10,13 @@ const { emitToAdmin, emitToUser, emitToBoutique } = require('../socket');
  * @access  Public
  */
 exports.getAll = asyncHandler(async (req, res, next) => {
-  const { boutiqueId, productId, status, page = 1, limit = 20, sort = '-createdAt' } = req.query;
+  const { boutiqueId, status, page = 1, limit = 20, sort = '-createdAt' } = req.query;
 
   if (!boutiqueId) {
-    return next(new ApiError(400, 'boutiqueId query parameter is required'));
+    return next(new ApiError(400, 'Le paramètre boutiqueId est requis'));
   }
 
   const filter = { boutiqueId };
-
-  // productId=null => avis boutique uniquement (champ existe ET vaut null)
-  // productId=<id> => avis produit spécifique
-  if (productId === 'null' || productId === '') {
-    filter.productId = { $exists: true, $eq: null };
-  } else if (productId) {
-    filter.productId = productId;
-  }
-
   if (status) filter.status = status;
 
   const skip = (Math.max(1, parseInt(page, 10)) - 1) * Math.min(100, Math.max(1, parseInt(limit, 10)));
@@ -33,7 +24,7 @@ exports.getAll = asyncHandler(async (req, res, next) => {
 
   const [reviews, total] = await Promise.all([
     Review.find(filter)
-      .populate('userId', 'firstName lastName email')
+      .populate('userId', 'firstName lastName')
       .sort(sort)
       .skip(skip)
       .limit(limitNum)
@@ -62,11 +53,11 @@ exports.getAll = asyncHandler(async (req, res, next) => {
  */
 exports.getById = asyncHandler(async (req, res, next) => {
   const review = await Review.findById(req.params.id)
-    .populate('userId', 'firstName lastName email')
+    .populate('userId', 'firstName lastName')
     .populate('boutiqueId', 'name slug');
 
   if (!review) {
-    return next(new ApiError(404, 'Review not found'));
+    return next(new ApiError(404, 'Avis introuvable'));
   }
 
   res.status(200).json({
@@ -81,54 +72,38 @@ exports.getById = asyncHandler(async (req, res, next) => {
  * @access  Private (acheteur)
  */
 exports.create = asyncHandler(async (req, res, next) => {
-  const { boutiqueId, productId, rating, comment } = req.body;
+  const { boutiqueId, rating, comment } = req.body;
   const userId = req.user._id;
 
   const boutique = await Boutique.findById(boutiqueId);
   if (!boutique) {
-    return next(new ApiError(404, 'Boutique not found'));
+    return next(new ApiError(404, 'Boutique introuvable'));
   }
 
-  // Vérifier si productId est fourni et valide
-  if (productId) {
-    const Product = require('../models/Product');
-    const product = await Product.findById(productId);
-    if (!product) {
-      return next(new ApiError(404, 'Product not found'));
-    }
-  }
-
-  // Vérifier si l'utilisateur a déjà un avis (boutique ou produit selon le cas)
-  const existingQuery = { boutiqueId, userId, productId: productId || null };
-  const existing = await Review.findOne(existingQuery);
+  const existing = await Review.findOne({ boutiqueId, userId });
   if (existing) {
-    const target = productId ? 'ce produit' : 'cette boutique';
-    return next(new ApiError(400, `Vous avez déjà laissé un avis pour ${target}. Vous pouvez le modifier.`));
+    return next(new ApiError(400, 'Vous avez déjà laissé un avis pour cette boutique. Vous pouvez le modifier.'));
   }
 
   const review = await Review.create({
     boutiqueId,
-    productId: productId || null,
     userId,
     rating: Math.round(Number(rating)),
     comment: comment || undefined,
     status: 'published'
   });
 
-  // Recalculer le rating boutique seulement pour les avis boutique
-  if (!productId) {
-    await recalculateBoutiqueRating(boutiqueId);
-  }
+  await recalculateBoutiqueRating(boutiqueId);
 
   const populated = await Review.findById(review._id)
-    .populate('userId', 'firstName lastName email')
+    .populate('userId', 'firstName lastName')
     .populate('boutiqueId', 'name slug');
 
   emitToBoutique(review.boutiqueId.toString(), 'review:created', { reviewId: review._id, boutiqueId: review.boutiqueId, rating: review.rating });
 
   res.status(201).json({
     success: true,
-    message: 'Review created successfully',
+    message: 'Avis créé avec succès',
     data: { review: populated }
   });
 });
@@ -142,14 +117,14 @@ exports.update = asyncHandler(async (req, res, next) => {
   let review = await Review.findById(req.params.id);
 
   if (!review) {
-    return next(new ApiError(404, 'Review not found'));
+    return next(new ApiError(404, 'Avis introuvable'));
   }
 
   const isAuthor = review.userId && review.userId.toString() === req.user._id.toString();
   const isAdmin = req.user.role === 'admin';
 
   if (!isAuthor && !isAdmin) {
-    return next(new ApiError(403, 'You can only update your own review'));
+    return next(new ApiError(403, 'Vous ne pouvez modifier que votre propre avis'));
   }
 
   const { rating, comment } = req.body;
@@ -161,14 +136,14 @@ exports.update = asyncHandler(async (req, res, next) => {
   await recalculateBoutiqueRating(review.boutiqueId);
 
   const populated = await Review.findById(review._id)
-    .populate('userId', 'firstName lastName email')
+    .populate('userId', 'firstName lastName')
     .populate('boutiqueId', 'name slug');
 
   emitToBoutique(review.boutiqueId.toString(), 'review:updated', { reviewId: review._id, boutiqueId: review.boutiqueId });
 
   res.status(200).json({
     success: true,
-    message: 'Review updated successfully',
+    message: 'Avis mis à jour avec succès',
     data: { review: populated }
   });
 });
@@ -182,19 +157,19 @@ exports.patchResponse = asyncHandler(async (req, res, next) => {
   const review = await Review.findById(req.params.id);
 
   if (!review) {
-    return next(new ApiError(404, 'Review not found'));
+    return next(new ApiError(404, 'Avis introuvable'));
   }
 
   const boutique = await Boutique.findById(review.boutiqueId);
   if (!boutique) {
-    return next(new ApiError(404, 'Boutique not found'));
+    return next(new ApiError(404, 'Boutique introuvable'));
   }
 
   const isBoutiqueOwner = boutique.userId && boutique.userId.toString() === req.user._id.toString();
   const isAdmin = req.user.role === 'admin';
 
   if (!isBoutiqueOwner && !isAdmin) {
-    return next(new ApiError(403, 'Only the boutique owner or admin can respond to this review'));
+    return next(new ApiError(403, 'Seul le propriétaire de la boutique ou l\'administrateur peut répondre à cet avis'));
   }
 
   const { text } = req.body;
@@ -205,14 +180,14 @@ exports.patchResponse = asyncHandler(async (req, res, next) => {
   await review.save();
 
   const populated = await Review.findById(review._id)
-    .populate('userId', 'firstName lastName email')
+    .populate('userId', 'firstName lastName')
     .populate('boutiqueId', 'name slug');
 
   emitToUser(review.userId.toString(), 'review:responseAdded', { reviewId: review._id, boutiqueId: review.boutiqueId });
 
   res.status(200).json({
     success: true,
-    message: 'Response added successfully',
+    message: 'Réponse ajoutée avec succès',
     data: { review: populated }
   });
 });
@@ -228,7 +203,7 @@ exports.patchStatus = asyncHandler(async (req, res, next) => {
   const review = await Review.findById(req.params.id);
 
   if (!review) {
-    return next(new ApiError(404, 'Review not found'));
+    return next(new ApiError(404, 'Avis introuvable'));
   }
 
   const boutique = await Boutique.findById(review.boutiqueId);
@@ -237,16 +212,16 @@ exports.patchStatus = asyncHandler(async (req, res, next) => {
   const isBoutiqueOwner = boutique && boutique.userId && boutique.userId.toString() === req.user._id.toString();
 
   if (status === 'hidden' && !isAdmin && !isBoutiqueOwner) {
-    return next(new ApiError(403, 'Only admin or boutique owner can hide a review'));
+    return next(new ApiError(403, 'Seul l\'administrateur ou le propriétaire de la boutique peut masquer un avis'));
   }
   if (status === 'reported' && !isAdmin) {
-    return next(new ApiError(403, 'Only admin can set reported status'));
+    return next(new ApiError(403, 'Seul l\'administrateur peut définir le statut signalé'));
   }
   if (status === 'deleted' && !isAdmin && !isAuthor) {
-    return next(new ApiError(403, 'Only author or admin can delete a review'));
+    return next(new ApiError(403, 'Seul l\'auteur ou l\'administrateur peut supprimer un avis'));
   }
   if (status === 'published' && !isAdmin) {
-    return next(new ApiError(403, 'Only admin can republish a review'));
+    return next(new ApiError(403, 'Seul l\'administrateur peut republier un avis'));
   }
 
   const previousStatus = review.status;
@@ -258,14 +233,14 @@ exports.patchStatus = asyncHandler(async (req, res, next) => {
   }
 
   const populated = await Review.findById(review._id)
-    .populate('userId', 'firstName lastName email')
+    .populate('userId', 'firstName lastName')
     .populate('boutiqueId', 'name slug');
 
   emitToUser(review.userId.toString(), 'review:statusChanged', { reviewId: review._id, status: review.status });
 
   res.status(200).json({
     success: true,
-    message: 'Review status updated successfully',
+    message: 'Statut de l\'avis mis à jour avec succès',
     data: { review: populated }
   });
 });
@@ -281,14 +256,14 @@ exports.report = asyncHandler(async (req, res, next) => {
   const review = await Review.findById(req.params.id);
 
   if (!review) {
-    return next(new ApiError(404, 'Review not found'));
+    return next(new ApiError(404, 'Avis introuvable'));
   }
 
   // Check if user already reported this review
   const userId = req.user._id.toString();
   const alreadyReported = review.reportReasons.some(r => r.startsWith(`[${userId}]`));
   if (alreadyReported) {
-    return next(new ApiError(400, 'You have already reported this review'));
+    return next(new ApiError(400, 'Vous avez déjà signalé cet avis'));
   }
 
   // Add report with user ID prefix for tracking
@@ -311,63 +286,10 @@ exports.report = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    message: 'Review reported successfully',
+    message: 'Avis signalé avec succès',
     data: {
       reportCount: review.reportCount,
       status: review.status
-    }
-  });
-});
-
-/**
- * @desc    Get all reviews for the authenticated boutique owner's boutique
- * @route   GET /api/reviews/my-reviews
- * @access  Private (boutique owner)
- */
-exports.getMyReviews = asyncHandler(async (req, res, next) => {
-  const boutique = await Boutique.findOne({ userId: req.user._id });
-  if (!boutique) {
-    return next(new ApiError(404, 'Vous n\'avez pas de boutique'));
-  }
-
-  const { type, status, rating, page = 1, limit = 20, sort = '-createdAt' } = req.query;
-
-  const filter = { boutiqueId: boutique._id };
-
-  // Filtre par type : boutique (productId null) ou product (productId existe)
-  if (type === 'boutique') {
-    filter.productId = { $exists: true, $eq: null };
-  } else if (type === 'product') {
-    filter.productId = { $ne: null };
-  }
-
-  if (status) filter.status = status;
-  if (rating) filter.rating = parseInt(rating, 10);
-
-  const skip = (Math.max(1, parseInt(page, 10)) - 1) * Math.min(100, Math.max(1, parseInt(limit, 10)));
-  const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10)));
-
-  const [reviews, total] = await Promise.all([
-    Review.find(filter)
-      .populate('userId', 'firstName lastName email')
-      .populate('productId', 'name')
-      .sort(sort)
-      .skip(skip)
-      .limit(limitNum)
-      .lean(),
-    Review.countDocuments(filter)
-  ]);
-
-  res.status(200).json({
-    success: true,
-    data: {
-      reviews,
-      pagination: {
-        page: Math.floor(skip / limitNum) + 1,
-        limit: limitNum,
-        total,
-        pages: Math.ceil(total / limitNum) || 1
-      }
     }
   });
 });
@@ -381,14 +303,14 @@ exports.delete = asyncHandler(async (req, res, next) => {
   const review = await Review.findById(req.params.id);
 
   if (!review) {
-    return next(new ApiError(404, 'Review not found'));
+    return next(new ApiError(404, 'Avis introuvable'));
   }
 
   const isAuthor = review.userId && review.userId.toString() === req.user._id.toString();
   const isAdmin = req.user.role === 'admin';
 
   if (!isAuthor && !isAdmin) {
-    return next(new ApiError(403, 'You can only delete your own review'));
+    return next(new ApiError(403, 'Vous ne pouvez supprimer que votre propre avis'));
   }
 
   const boutiqueId = review.boutiqueId;
@@ -400,6 +322,6 @@ exports.delete = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    message: 'Review deleted successfully'
+    message: 'Avis supprimé avec succès'
   });
 });

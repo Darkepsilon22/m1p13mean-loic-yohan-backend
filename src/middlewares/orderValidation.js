@@ -1,7 +1,7 @@
 const { body, param, query, validationResult } = require('express-validator');
 const mongoose = require('mongoose');
 
-// Validation result handler
+// Gestionnaire des résultats de validation
 const handleValidationErrors = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -16,121 +16,121 @@ const handleValidationErrors = (req, res, next) => {
   next();
 };
 
-// Validate ObjectId parameter
+// Validation du paramètre ObjectId
 const validateOrderId = (paramName = 'id') => [
   param(paramName)
-    .notEmpty().withMessage('Order ID is required')
+    .notEmpty().withMessage('L\'ID de la commande est requis')
     .custom((value) => {
       if (!mongoose.Types.ObjectId.isValid(value)) {
-        throw new Error('Invalid order ID format');
+        throw new Error('Format d\'ID de commande invalide');
       }
       return true;
     }),
   handleValidationErrors
 ];
 
-// Validate order reference parameter
+// Validation du paramètre de référence de commande
 const validateOrderReference = [
   param('reference')
-    .notEmpty().withMessage('Order reference is required')
-    .matches(/^CC-\d{8}-\d{5}$/).withMessage('Invalid order reference format'),
+    .notEmpty().withMessage('La référence de commande est requise')
+    .matches(/^CC-\d{8}-\d{5}$/).withMessage('Format de référence de commande invalide'),
   handleValidationErrors
 ];
 
-// Create order validation
+// Validation de création de commande
 const createOrder = [
   body('shippingAddress')
-    .notEmpty().withMessage('Shipping address is required'),
+    .notEmpty().withMessage('L\'adresse de livraison est requise'),
   body('shippingAddress.street')
-    .notEmpty().withMessage('Street address is required')
-    .isLength({ max: 200 }).withMessage('Street cannot exceed 200 characters'),
+    .notEmpty().withMessage('L\'adresse de rue est requise')
+    .isLength({ max: 200 }).withMessage('La rue ne peut pas dépasser 200 caractères'),
   body('shippingAddress.city')
-    .notEmpty().withMessage('City is required')
-    .isLength({ max: 100 }).withMessage('City cannot exceed 100 characters'),
+    .notEmpty().withMessage('La ville est requise')
+    .isLength({ max: 100 }).withMessage('La ville ne peut pas dépasser 100 caractères'),
   body('shippingAddress.postalCode')
     .optional()
-    .isLength({ max: 20 }).withMessage('Postal code cannot exceed 20 characters'),
+    .isLength({ max: 20 }).withMessage('Le code postal ne peut pas dépasser 20 caractères'),
   body('shippingAddress.country')
     .optional()
-    .isLength({ max: 100 }).withMessage('Country cannot exceed 100 characters'),
+    .isLength({ max: 100 }).withMessage('Le pays ne peut pas dépasser 100 caractères'),
   body('shippingAddress.additionalInfo')
     .optional()
-    .isLength({ max: 500 }).withMessage('Additional info cannot exceed 500 characters'),
+    .isLength({ max: 500 }).withMessage('Les informations supplémentaires ne peuvent pas dépasser 500 caractères'),
   body('billingAddress')
     .optional(),
   body('billingAddress.street')
     .optional()
-    .isLength({ max: 200 }).withMessage('Billing street cannot exceed 200 characters'),
+    .isLength({ max: 200 }).withMessage('La rue de facturation ne peut pas dépasser 200 caractères'),
   body('billingAddress.city')
     .optional()
-    .isLength({ max: 100 }).withMessage('Billing city cannot exceed 100 characters'),
+    .isLength({ max: 100 }).withMessage('La ville de facturation ne peut pas dépasser 100 caractères'),
   body('customerName')
     .optional()
-    .isLength({ max: 100 }).withMessage('Customer name cannot exceed 100 characters'),
+    .isLength({ max: 100 }).withMessage('Le nom du client ne peut pas dépasser 100 caractères'),
   body('customerEmail')
     .optional()
-    .isEmail().withMessage('Invalid email format'),
+    .isEmail().withMessage('Format d\'e-mail invalide'),
   body('customerPhone')
     .optional()
-    .isLength({ max: 20 }).withMessage('Phone cannot exceed 20 characters'),
+    .isLength({ max: 20 }).withMessage('Le téléphone ne peut pas dépasser 20 caractères'),
   body('paymentMethod')
     .optional()
     .isIn(['mvola', 'orange', 'airtel', 'card', 'cash', 'pending'])
-    .withMessage('Invalid payment method'),
+    .withMessage('Méthode de paiement invalide'),
   body('customerNotes')
     .optional()
-    .isLength({ max: 500 }).withMessage('Customer notes cannot exceed 500 characters'),
+    .isLength({ max: 500 }).withMessage('Les notes du client ne peuvent pas dépasser 500 caractères'),
   handleValidationErrors
 ];
 
-// Update order status validation
+// Validation de mise à jour du statut de commande
 const updateOrderStatus = [
   param('id')
-    .notEmpty().withMessage('Order ID is required')
+    .notEmpty().withMessage('L\'ID de la commande est requis')
     .custom((value) => {
       if (!mongoose.Types.ObjectId.isValid(value)) {
-        throw new Error('Invalid order ID format');
+        throw new Error('Format d\'ID de commande invalide');
       }
       return true;
     }),
   body('status')
-    .notEmpty().withMessage('Status is required')
+    .notEmpty().withMessage('Le statut est requis')
     .isIn(['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'completed', 'cancelled', 'refunded'])
-    .withMessage('Invalid order status'),
+    .withMessage('Statut de commande invalide'),
   body('trackingNumber')
     .optional()
-    .isLength({ max: 100 }).withMessage('Tracking number cannot exceed 100 characters'),
+    .isLength({ max: 100 }).withMessage('Le numéro de suivi ne peut pas dépasser 100 caractères'),
   body('carrier')
     .optional()
-    .isLength({ max: 100 }).withMessage('Carrier cannot exceed 100 characters'),
+    .isLength({ max: 100 }).withMessage('Le transporteur ne peut pas dépasser 100 caractères'),
   body('adminNotes')
     .optional()
-    .isLength({ max: 500 }).withMessage('Admin notes cannot exceed 500 characters'),
+    .isLength({ max: 500 }).withMessage('Les notes administrateur ne peuvent pas dépasser 500 caractères'),
   handleValidationErrors
 ];
 
-// List orders validation (query params)
+// Validation de liste de commandes (paramètres de requête)
 const listOrders = [
   query('status')
     .optional()
     .isIn(['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'completed', 'cancelled', 'refunded'])
-    .withMessage('Invalid status filter'),
+    .withMessage('Filtre de statut invalide'),
   query('paymentStatus')
     .optional()
     .isIn(['pending', 'processing', 'success', 'failed', 'refunded'])
-    .withMessage('Invalid payment status filter'),
+    .withMessage('Filtre de statut de paiement invalide'),
   query('page')
     .optional()
-    .isInt({ min: 1 }).withMessage('Page must be a positive integer'),
+    .isInt({ min: 1 }).withMessage('La page doit être un entier positif'),
   query('limit')
     .optional()
-    .isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
+    .isInt({ min: 1, max: 100 }).withMessage('La limite doit être entre 1 et 100'),
   query('startDate')
     .optional()
-    .isISO8601().withMessage('Invalid start date format'),
+    .isISO8601().withMessage('Format de date de début invalide'),
   query('endDate')
     .optional()
-    .isISO8601().withMessage('Invalid end date format'),
+    .isISO8601().withMessage('Format de date de fin invalide'),
   handleValidationErrors
 ];
 

@@ -99,7 +99,7 @@ exports.getById = asyncHandler(async (req, res, next) => {
     });
 
   if (!category) {
-    return next(new ApiError(404, 'Category not found'));
+    return next(new ApiError(404, 'Catégorie introuvable'));
   }
 
   res.status(200).json({
@@ -123,7 +123,7 @@ exports.getBySlug = asyncHandler(async (req, res, next) => {
     });
 
   if (!category) {
-    return next(new ApiError(404, 'Category not found'));
+    return next(new ApiError(404, 'Catégorie introuvable'));
   }
 
   res.status(200).json({
@@ -144,7 +144,7 @@ exports.getChildren = asyncHandler(async (req, res, next) => {
   // Verify parent exists
   const parent = await Category.findById(req.params.id);
   if (!parent) {
-    return next(new ApiError(404, 'Parent category not found'));
+    return next(new ApiError(404, 'Catégorie parente introuvable'));
   }
 
   const children = await Category.getChildren(req.params.id, activeOnly);
@@ -212,17 +212,17 @@ exports.create = asyncHandler(async (req, res, next) => {
     name: { $regex: new RegExp(`^${name}$`, 'i') }
   });
   if (existingCategory) {
-    return next(new ApiError(400, 'A category with this name already exists'));
+    return next(new ApiError(400, 'Une catégorie avec ce nom existe déjà'));
   }
 
   // If parentId provided, verify it exists and is not a subcategory
   if (parentId) {
     const parent = await Category.findById(parentId);
     if (!parent) {
-      return next(new ApiError(400, 'Parent category not found'));
+      return next(new ApiError(400, 'Catégorie parente introuvable'));
     }
     if (parent.parentId) {
-      return next(new ApiError(400, 'Cannot create a subcategory of a subcategory. Maximum depth is 2 levels.'));
+      return next(new ApiError(400, 'Impossible de créer une sous-catégorie d\'une sous-catégorie. Profondeur maximale : 2 niveaux.'));
     }
   }
 
@@ -244,7 +244,7 @@ exports.create = asyncHandler(async (req, res, next) => {
 
   res.status(201).json({
     success: true,
-    message: 'Category created successfully',
+    message: 'Catégorie créée avec succès',
     data: { category: populated }
   });
 });
@@ -258,7 +258,7 @@ exports.update = asyncHandler(async (req, res, next) => {
   let category = await Category.findById(req.params.id);
 
   if (!category) {
-    return next(new ApiError(404, 'Category not found'));
+    return next(new ApiError(404, 'Catégorie introuvable'));
   }
 
   const { name, description, icon, color, image, parentId, order, isActive } = req.body;
@@ -270,7 +270,7 @@ exports.update = asyncHandler(async (req, res, next) => {
       _id: { $ne: category._id }
     });
     if (existingCategory) {
-      return next(new ApiError(400, 'A category with this name already exists'));
+      return next(new ApiError(400, 'Une catégorie avec ce nom existe déjà'));
     }
   }
 
@@ -279,23 +279,23 @@ exports.update = asyncHandler(async (req, res, next) => {
     if (parentId) {
       // Cannot set self as parent
       if (parentId === req.params.id) {
-        return next(new ApiError(400, 'A category cannot be its own parent'));
+        return next(new ApiError(400, 'Une catégorie ne peut pas être sa propre parente'));
       }
 
       const parent = await Category.findById(parentId);
       if (!parent) {
-        return next(new ApiError(400, 'Parent category not found'));
+        return next(new ApiError(400, 'Catégorie parente introuvable'));
       }
 
       // Cannot make a category a child if it has children
       const hasChildren = await Category.countDocuments({ parentId: req.params.id });
       if (hasChildren > 0) {
-        return next(new ApiError(400, 'Cannot move a category with subcategories. Remove subcategories first.'));
+        return next(new ApiError(400, 'Impossible de déplacer une catégorie avec des sous-catégories. Supprimez-les d\'abord.'));
       }
 
       // Cannot nest more than 2 levels
       if (parent.parentId) {
-        return next(new ApiError(400, 'Cannot create a subcategory of a subcategory. Maximum depth is 2 levels.'));
+        return next(new ApiError(400, 'Impossible de créer une sous-catégorie d\'une sous-catégorie. Profondeur maximale : 2 niveaux.'));
       }
     }
   }
@@ -323,7 +323,7 @@ exports.update = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    message: 'Category updated successfully',
+    message: 'Catégorie mise à jour avec succès',
     data: { category: populated }
   });
 });
@@ -337,13 +337,13 @@ exports.patchStatus = asyncHandler(async (req, res, next) => {
   const { isActive } = req.body;
 
   if (typeof isActive !== 'boolean') {
-    return next(new ApiError(400, 'isActive must be a boolean value'));
+    return next(new ApiError(400, 'isActive doit être une valeur booléenne'));
   }
 
   const category = await Category.findById(req.params.id);
 
   if (!category) {
-    return next(new ApiError(404, 'Category not found'));
+    return next(new ApiError(404, 'Catégorie introuvable'));
   }
 
   // If deactivating, optionally deactivate children too
@@ -361,7 +361,7 @@ exports.patchStatus = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    message: `Category ${isActive ? 'activated' : 'deactivated'} successfully`,
+    message: `Catégorie ${isActive ? 'activée' : 'désactivée'} avec succès`,
     data: { category }
   });
 });
@@ -375,7 +375,7 @@ exports.patchOrder = asyncHandler(async (req, res, next) => {
   const { order } = req.body;
 
   if (typeof order !== 'number' || order < 0) {
-    return next(new ApiError(400, 'Order must be a non-negative number'));
+    return next(new ApiError(400, 'L\'ordre doit être un nombre positif ou nul'));
   }
 
   const category = await Category.findByIdAndUpdate(
@@ -385,12 +385,12 @@ exports.patchOrder = asyncHandler(async (req, res, next) => {
   );
 
   if (!category) {
-    return next(new ApiError(404, 'Category not found'));
+    return next(new ApiError(404, 'Catégorie introuvable'));
   }
 
   res.status(200).json({
     success: true,
-    message: 'Category order updated successfully',
+    message: 'Ordre de la catégorie mis à jour avec succès',
     data: { category }
   });
 });
@@ -404,7 +404,7 @@ exports.reorder = asyncHandler(async (req, res, next) => {
   const { orders } = req.body;
 
   if (!Array.isArray(orders) || orders.length === 0) {
-    return next(new ApiError(400, 'Orders must be a non-empty array of { id, order } objects'));
+    return next(new ApiError(400, 'orders doit être un tableau non vide d\'objets { id, order }'));
   }
 
   const bulkOps = orders.map(({ id, order }) => ({
@@ -418,7 +418,7 @@ exports.reorder = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    message: 'Categories reordered successfully'
+    message: 'Catégories réordonnées avec succès'
   });
 });
 
@@ -431,19 +431,19 @@ exports.delete = asyncHandler(async (req, res, next) => {
   const category = await Category.findById(req.params.id);
 
   if (!category) {
-    return next(new ApiError(404, 'Category not found'));
+    return next(new ApiError(404, 'Catégorie introuvable'));
   }
 
   // Check for boutiques using this category
   const boutiqueCount = await Boutique.countDocuments({ categoryId: category._id });
   if (boutiqueCount > 0) {
-    return next(new ApiError(400, `Cannot delete category: ${boutiqueCount} boutique(s) are using it. Reassign them first.`));
+    return next(new ApiError(400, `Impossible de supprimer la catégorie : ${boutiqueCount} boutique(s) l'utilisent. Réaffectez-les d'abord.`));
   }
 
   // Check for subcategories
   const childCount = await Category.countDocuments({ parentId: category._id });
   if (childCount > 0) {
-    return next(new ApiError(400, `Cannot delete category: ${childCount} subcategorie(s) exist. Delete them first.`));
+    return next(new ApiError(400, `Impossible de supprimer la catégorie : ${childCount} sous-catégorie(s) existent. Supprimez-les d'abord.`));
   }
 
   await category.deleteOne();
@@ -452,6 +452,6 @@ exports.delete = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    message: 'Category deleted successfully'
+    message: 'Catégorie supprimée avec succès'
   });
 });

@@ -10,7 +10,7 @@ const startOrderExpirationJob = () => {
   cron.schedule('* * * * *', async () => {
     try {
       const now = new Date();
-      console.log(`⏰ [CRON] Checking for expired orders at ${now.toISOString()}...`);
+      console.log(`⏰ [CRON] Vérification des commandes expirées à ${now.toISOString()}...`);
 
       // Log pending orders before processing
       const pendingOrders = await Order.find({
@@ -19,27 +19,27 @@ const startOrderExpirationJob = () => {
       }).select('orderReference paymentStatus expiresAt').lean();
 
       if (pendingOrders.length > 0) {
-        console.log(`📋 [CRON] Found ${pendingOrders.length} pending order(s):`);
+        console.log(`📋 [CRON] ${pendingOrders.length} commande(s) en attente trouvée(s) :`);
         pendingOrders.forEach(o => {
-          const expired = o.expiresAt < now ? 'EXPIRED' : `expires in ${Math.round((o.expiresAt - now) / 1000)}s`;
-          console.log(`   - ${o.orderReference} (payment: ${o.paymentStatus}, ${expired})`);
+          const expired = o.expiresAt < now ? 'EXPIRÉE' : `expire dans ${Math.round((o.expiresAt - now) / 1000)}s`;
+          console.log(`   - ${o.orderReference} (paiement: ${o.paymentStatus}, ${expired})`);
         });
       }
 
       const expiredCount = await Order.expirePendingOrders();
 
       if (expiredCount > 0) {
-        console.log(`✅ [CRON] Expired ${expiredCount} order(s) and restored stock`);
+        console.log(`✅ [CRON] ${expiredCount} commande(s) expirée(s) et stock restauré`);
       } else {
-        console.log('✅ [CRON] No expired orders found');
+        console.log('✅ [CRON] Aucune commande expirée trouvée');
       }
     } catch (error) {
-      console.error('❌ [CRON] Error expiring orders:', error.message);
+      console.error('❌ [CRON] Erreur lors de l\'expiration des commandes :', error.message);
       console.error(error.stack);
     }
   });
 
-  console.log('🚀 Order expiration cron job started (runs every 1 minute - TEST MODE)');
+  console.log('🚀 Job d\'expiration des commandes démarré (s\'exécute toutes les minutes - MODE TEST)');
 };
 
 module.exports = { startOrderExpirationJob };

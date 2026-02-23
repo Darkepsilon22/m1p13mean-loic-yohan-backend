@@ -5,36 +5,36 @@ const crypto = require('crypto');
 const userSchema = new mongoose.Schema({
   email: {
     type: String,
-    required: [true, 'Email is required'],
+    required: [true, 'L\'email est requis'],
     unique: true,
     lowercase: true,
     trim: true,
-    match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please provide a valid email']
+    match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Veuillez fournir un email valide']
   },
   password: {
     type: String,
-    required: [true, 'Password is required'],
-    minlength: [8, 'Password must be at least 8 characters']
+    required: [true, 'Le mot de passe est requis'],
+    minlength: [8, 'Le mot de passe doit contenir au moins 8 caractères']
   },
   role: {
     type: String,
     enum: {
       values: ['admin', 'boutique', 'acheteur'],
-      message: 'Role must be admin, boutique, or acheteur'
+      message: 'Le rôle doit être admin, boutique ou acheteur'
     },
-    required: [true, 'Role is required']
+    required: [true, 'Le rôle est requis']
   },
   firstName: {
     type: String,
-    required: [true, 'First name is required'],
+    required: [true, 'Le prénom est requis'],
     trim: true,
-    maxlength: [50, 'First name cannot exceed 50 characters']
+    maxlength: [50, 'Le prénom ne peut pas dépasser 50 caractères']
   },
   lastName: {
     type: String,
-    required: [true, 'Last name is required'],
+    required: [true, 'Le nom est requis'],
     trim: true,
-    maxlength: [50, 'Last name cannot exceed 50 characters']
+    maxlength: [50, 'Le nom ne peut pas dépasser 50 caractères']
   },
   phone: {
     type: String,

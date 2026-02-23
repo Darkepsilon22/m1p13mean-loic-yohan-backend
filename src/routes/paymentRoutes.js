@@ -55,7 +55,7 @@ router.post('/stripe/create-checkout-session',
   verifyToken,
   isAcheteur,
   [
-    body('orderId').notEmpty().withMessage('Order ID is required'),
+    body('orderId').notEmpty().withMessage('L\'ID de commande est requis'),
     handleValidationErrors
   ],
   stripeController.createCheckoutSession
@@ -86,11 +86,11 @@ router.post('/initialize',
   verifyToken,
   isAcheteur,
   [
-    body('orderId').notEmpty().withMessage('Order ID is required'),
+    body('orderId').notEmpty().withMessage('L\'ID de commande est requis'),
     body('paymentMethod')
-      .notEmpty().withMessage('Payment method is required')
+      .notEmpty().withMessage('La méthode de paiement est requise')
       .isIn(['mvola', 'orange', 'airtel', 'card', 'cash', 'bank_transfer'])
-      .withMessage('Invalid payment method'),
+      .withMessage('Méthode de paiement invalide'),
     handleValidationErrors
   ],
   paymentController.initializePayment
@@ -105,10 +105,10 @@ router.get('/history',
   verifyToken,
   isAcheteur,
   [
-    query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
-    query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
+    query('page').optional().isInt({ min: 1 }).withMessage('La page doit être un entier positif'),
+    query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('La limite doit être entre 1 et 100'),
     query('status').optional().isIn(['pending', 'processing', 'success', 'failed', 'refunded', 'cancelled'])
-      .withMessage('Invalid status filter'),
+      .withMessage('Filtre de statut invalide'),
     handleValidationErrors
   ],
   paymentController.getPaymentHistory
@@ -126,15 +126,15 @@ router.get('/admin/all',
   verifyToken,
   isAdmin,
   [
-    query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
-    query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
+    query('page').optional().isInt({ min: 1 }).withMessage('La page doit être un entier positif'),
+    query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('La limite doit être entre 1 et 100'),
     query('status').optional().isIn(['pending', 'processing', 'success', 'failed', 'refunded', 'cancelled'])
-      .withMessage('Invalid status filter'),
+      .withMessage('Filtre de statut invalide'),
     query('paymentMethod').optional()
       .isIn(['mvola', 'orange', 'airtel', 'card', 'cash', 'bank_transfer'])
-      .withMessage('Invalid payment method filter'),
-    query('startDate').optional().isISO8601().withMessage('Invalid start date format'),
-    query('endDate').optional().isISO8601().withMessage('Invalid end date format'),
+      .withMessage('Filtre de méthode de paiement invalide'),
+    query('startDate').optional().isISO8601().withMessage('Format de date de début invalide'),
+    query('endDate').optional().isISO8601().withMessage('Format de date de fin invalide'),
     handleValidationErrors
   ],
   paymentController.getAllPayments
@@ -149,8 +149,8 @@ router.get('/admin/stats',
   verifyToken,
   isAdmin,
   [
-    query('startDate').optional().isISO8601().withMessage('Invalid start date format'),
-    query('endDate').optional().isISO8601().withMessage('Invalid end date format'),
+    query('startDate').optional().isISO8601().withMessage('Format de date de début invalide'),
+    query('endDate').optional().isISO8601().withMessage('Format de date de fin invalide'),
     handleValidationErrors
   ],
   paymentController.getPaymentStats
@@ -178,7 +178,7 @@ router.post('/admin/expire-pending',
 router.get('/:reference',
   verifyToken,
   [
-    param('reference').notEmpty().withMessage('Payment reference is required'),
+    param('reference').notEmpty().withMessage('La référence de paiement est requise'),
     handleValidationErrors
   ],
   paymentController.getPaymentStatus
@@ -193,9 +193,9 @@ router.post('/:reference/confirm',
   verifyToken,
   isAdmin,
   [
-    param('reference').notEmpty().withMessage('Payment reference is required'),
+    param('reference').notEmpty().withMessage('La référence de paiement est requise'),
     body('providerReference').optional().isString(),
-    body('notes').optional().isLength({ max: 500 }).withMessage('Notes cannot exceed 500 characters'),
+    body('notes').optional().isLength({ max: 500 }).withMessage('Les notes ne peuvent pas dépasser 500 caractères'),
     handleValidationErrors
   ],
   paymentController.confirmPayment
@@ -203,15 +203,15 @@ router.post('/:reference/confirm',
 
 /**
  * @route   POST /api/payments/:reference/fail
- * @desc    Mark payment as failed
+ * @desc    Marquer le paiement comme échoué
  * @access  Private (admin)
  */
 router.post('/:reference/fail',
   verifyToken,
   isAdmin,
   [
-    param('reference').notEmpty().withMessage('Payment reference is required'),
-    body('reason').optional().isLength({ max: 500 }).withMessage('Reason cannot exceed 500 characters'),
+    param('reference').notEmpty().withMessage('La référence de paiement est requise'),
+    body('reason').optional().isLength({ max: 500 }).withMessage('La raison ne peut pas dépasser 500 caractères'),
     handleValidationErrors
   ],
   paymentController.failPayment
@@ -226,9 +226,9 @@ router.post('/:reference/refund',
   verifyToken,
   isAdmin,
   [
-    param('reference').notEmpty().withMessage('Payment reference is required'),
-    body('amount').optional().isFloat({ min: 0 }).withMessage('Amount must be positive'),
-    body('reason').optional().isLength({ max: 500 }).withMessage('Reason cannot exceed 500 characters'),
+    param('reference').notEmpty().withMessage('La référence de paiement est requise'),
+    body('amount').optional().isFloat({ min: 0 }).withMessage('Le montant doit être positif'),
+    body('reason').optional().isLength({ max: 500 }).withMessage('La raison ne peut pas dépasser 500 caractères'),
     handleValidationErrors
   ],
   paymentController.refundPayment

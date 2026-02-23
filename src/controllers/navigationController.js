@@ -49,25 +49,16 @@ exports.createNode = asyncHandler(async (req, res, next) => {
     const space = await SpecialSpace.findById(specialSpaceId);
     if (!space) return next(new ApiError(404, 'Espace spécial non trouvé'));
   }
-  let node;
-  try {
-    node = await NavigationNode.create({
-      floorId,
-      type,
-      x,
-      y,
-      label,
-      specialSpaceId: specialSpaceId || null,
-      accessible: accessible !== undefined ? accessible : true,
-      metadata: metadata || {}
-    });
-  } catch (err) {
-    // Erreur du pre('save') hook (ex: noeud trop proche)
-    if (err.message && !err.statusCode) {
-      return next(new ApiError(400, err.message));
-    }
-    throw err;
-  }
+  const node = await NavigationNode.create({
+    floorId,
+    type,
+    x,
+    y,
+    label,
+    specialSpaceId: specialSpaceId || null,
+    accessible: accessible !== undefined ? accessible : true,
+    metadata: metadata || {}
+  });
   const populated = await NavigationNode.findById(node._id)
     .populate('floorId', 'name order')
     .populate('specialSpaceId', 'type name x y width height')
@@ -105,14 +96,7 @@ exports.updateNode = asyncHandler(async (req, res, next) => {
   }
   if (accessible !== undefined) node.accessible = accessible;
   if (metadata !== undefined) node.metadata = metadata;
-  try {
-    await node.save();
-  } catch (err) {
-    if (err.message && !err.statusCode) {
-      return next(new ApiError(400, err.message));
-    }
-    throw err;
-  }
+  await node.save();
   const populated = await NavigationNode.findById(node._id)
     .populate('floorId', 'name order')
     .populate('specialSpaceId', 'type name x y width height')

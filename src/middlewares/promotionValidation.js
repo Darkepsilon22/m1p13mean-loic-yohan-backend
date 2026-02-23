@@ -5,7 +5,7 @@ const handleValidationErrors = (req, res, next) => {
   if (!errors.isEmpty()) {
     return res.status(400).json({
       success: false,
-      message: 'Validation failed',
+      message: 'Erreur de validation',
       errors: errors.array().map(err => ({ field: err.path, message: err.msg }))
     });
   }
@@ -13,73 +13,73 @@ const handleValidationErrors = (req, res, next) => {
 };
 
 const validatePromotionId = (paramName = 'id') => [
-  param(paramName).isMongoId().withMessage(`Invalid ${paramName} format`),
+  param(paramName).isMongoId().withMessage(`Format ${paramName} invalide`),
   handleValidationErrors
 ];
 
 const createPromotion = [
   body('boutiqueId')
     .notEmpty()
-    .withMessage('Boutique ID is required')
+    .withMessage('L\'ID de la boutique est requis')
     .isMongoId()
-    .withMessage('Invalid boutique ID format'),
+    .withMessage('Format d\'ID de boutique invalide'),
   body('title')
     .trim()
     .notEmpty()
-    .withMessage('Promotion title is required')
+    .withMessage('Le titre de la promotion est requis')
     .isLength({ max: 200 })
-    .withMessage('Title cannot exceed 200 characters'),
+    .withMessage('Le titre ne peut pas dépasser 200 caractères'),
   body('description')
     .optional()
     .trim()
     .isLength({ max: 1000 })
-    .withMessage('Description cannot exceed 1000 characters'),
+    .withMessage('La description ne peut pas dépasser 1000 caractères'),
   body('type')
     .notEmpty()
-    .withMessage('Promotion type is required')
+    .withMessage('Le type de promotion est requis')
     .isIn(['percentage', 'fixed', 'special'])
-    .withMessage('Type must be percentage, fixed, or special'),
+    .withMessage('Le type doit être percentage, fixed ou special'),
   body('value')
     .custom((value, { req }) => {
       const type = req.body.type;
       if ((type === 'percentage' || type === 'fixed') && (value === null || value === undefined)) {
-        throw new Error('Value is required for percentage and fixed promotions');
+        throw new Error('La valeur est requise pour les promotions percentage et fixed');
       }
       if (type === 'percentage' && (value < 1 || value > 99)) {
-        throw new Error('Percentage must be between 1 and 99 (RG32)');
+        throw new Error('Le pourcentage doit être entre 1 et 99 (RG32)');
       }
       if (value !== undefined && value !== null && value < 0) {
-        throw new Error('Value must be at least 0');
+        throw new Error('La valeur doit être au moins 0');
       }
       return true;
     }),
   body('products')
     .optional()
     .isArray()
-    .withMessage('Products must be an array'),
+    .withMessage('Les produits doivent être un tableau'),
   body('products.*')
     .optional()
     .isMongoId()
-    .withMessage('Each product ID must be a valid MongoDB ObjectId'),
+    .withMessage('Chaque ID de produit doit être un ObjectId MongoDB valide'),
   body('image')
     .optional()
     .isURL()
-    .withMessage('Image must be a valid URL'),
+    .withMessage('L\'image doit être une URL valide'),
   body('startDate')
     .notEmpty()
-    .withMessage('Start date is required (RG30)')
+    .withMessage('La date de début est requise (RG30)')
     .isISO8601()
-    .withMessage('Start date must be a valid date'),
+    .withMessage('La date de début doit être une date valide'),
   body('endDate')
     .notEmpty()
-    .withMessage('End date is required (RG30)')
+    .withMessage('La date de fin est requise (RG30)')
     .isISO8601()
-    .withMessage('End date must be a valid date')
+    .withMessage('La date de fin doit être une date valide')
     .custom((endDate, { req }) => {
       const startDate = new Date(req.body.startDate);
       const end = new Date(endDate);
       if (end <= startDate) {
-        throw new Error('End date must be after start date (RG31)');
+        throw new Error('La date de fin doit être après la date de début (RG31)');
       }
       return true;
     }),
@@ -91,56 +91,56 @@ const updatePromotion = [
     .optional()
     .trim()
     .notEmpty()
-    .withMessage('Title cannot be empty')
+    .withMessage('Le titre ne peut pas être vide')
     .isLength({ max: 200 })
-    .withMessage('Title cannot exceed 200 characters'),
+    .withMessage('Le titre ne peut pas dépasser 200 caractères'),
   body('description')
     .optional()
     .trim()
     .isLength({ max: 1000 })
-    .withMessage('Description cannot exceed 1000 characters'),
+    .withMessage('La description ne peut pas dépasser 1000 caractères'),
   body('type')
     .optional()
     .isIn(['percentage', 'fixed', 'special'])
-    .withMessage('Type must be percentage, fixed, or special'),
+    .withMessage('Le type doit être percentage, fixed ou special'),
   body('value')
     .optional()
     .custom((value, { req }) => {
       const type = req.body.type;
       if (type === 'percentage' && value !== undefined && (value < 1 || value > 99)) {
-        throw new Error('Percentage must be between 1 and 99 (RG32)');
+        throw new Error('Le pourcentage doit être entre 1 et 99 (RG32)');
       }
       if (value !== undefined && value !== null && value < 0) {
-        throw new Error('Value must be at least 0');
+        throw new Error('La valeur doit être au moins 0');
       }
       return true;
     }),
   body('products')
     .optional()
     .isArray()
-    .withMessage('Products must be an array'),
+    .withMessage('Les produits doivent être un tableau'),
   body('products.*')
     .optional()
     .isMongoId()
-    .withMessage('Each product ID must be a valid MongoDB ObjectId'),
+    .withMessage('Chaque ID de produit doit être un ObjectId MongoDB valide'),
   body('image')
     .optional()
     .isURL()
-    .withMessage('Image must be a valid URL'),
+    .withMessage('L\'image doit être une URL valide'),
   body('startDate')
     .optional()
     .isISO8601()
-    .withMessage('Start date must be a valid date'),
+    .withMessage('La date de début doit être une date valide'),
   body('endDate')
     .optional()
     .isISO8601()
-    .withMessage('End date must be a valid date')
+    .withMessage('La date de fin doit être une date valide')
     .custom((endDate, { req }) => {
       if (req.body.startDate && endDate) {
         const startDate = new Date(req.body.startDate);
         const end = new Date(endDate);
         if (end <= startDate) {
-          throw new Error('End date must be after start date (RG31)');
+          throw new Error('La date de fin doit être après la date de début (RG31)');
         }
       }
       return true;
@@ -152,28 +152,28 @@ const listPromotions = [
   query('boutiqueId')
     .optional()
     .isMongoId()
-    .withMessage('Invalid boutique ID format'),
+    .withMessage('Format d\'ID de boutique invalide'),
   query('status')
     .optional()
     .isIn(['scheduled', 'active', 'ended', 'cancelled'])
-    .withMessage('Invalid status value'),
+    .withMessage('Valeur de statut invalide'),
   query('type')
     .optional()
     .isIn(['percentage', 'fixed', 'special'])
-    .withMessage('Invalid type value'),
+    .withMessage('Valeur de type invalide'),
   query('activeOnly')
     .optional()
     .isIn(['true', 'false'])
-    .withMessage('activeOnly must be true or false'),
+    .withMessage('activeOnly doit être true ou false'),
   query('page')
     .optional()
     .isInt({ min: 1 })
-    .withMessage('Page must be a positive integer')
+    .withMessage('La page doit être un entier positif')
     .toInt(),
   query('limit')
     .optional()
     .isInt({ min: 1, max: 100 })
-    .withMessage('Limit must be between 1 and 100')
+    .withMessage('La limite doit être entre 1 et 100')
     .toInt(),
   handleValidationErrors
 ];

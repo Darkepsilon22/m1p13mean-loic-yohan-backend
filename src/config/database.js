@@ -7,36 +7,34 @@ const connectDB = async () => {
   try {
     const conn = await mongoose.connect(process.env.MONGO_URI);
 
-    console.log(`MongoDB Connected: ${conn.connection.host}`);
+    console.log(`MongoDB connecté : ${conn.connection.host}`);
 
-    // Handle connection events
     mongoose.connection.on('error', (err) => {
-      console.error(`MongoDB connection error: ${err}`);
+      console.error(`Erreur de connexion MongoDB : ${err}`);
     });
 
     mongoose.connection.on('disconnected', () => {
-      console.warn('MongoDB disconnected. Attempting to reconnect...');
+      console.warn('MongoDB déconnecté. Tentative de reconnexion...');
     });
 
     mongoose.connection.on('reconnected', () => {
-      console.log('MongoDB reconnected');
+      console.log('MongoDB reconnecté');
     });
 
-    // Graceful shutdown
     process.on('SIGINT', async () => {
       try {
         await mongoose.connection.close();
-        console.log('MongoDB connection closed through app termination');
+        console.log('Connexion MongoDB fermée proprement');
         process.exit(0);
       } catch (err) {
-        console.error('Error closing MongoDB connection:', err);
+        console.error('Erreur lors de la fermeture de la connexion MongoDB :', err);
         process.exit(1);
       }
     });
 
     return conn;
   } catch (error) {
-    console.error(`Error connecting to MongoDB: ${error.message}`);
+    console.error(`Erreur de connexion à MongoDB : ${error.message}`);
     process.exit(1);
   }
 };
