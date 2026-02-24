@@ -98,7 +98,6 @@ exports.create = asyncHandler(async (req, res, next) => {
     }
   }
 
-  // Vérifier si l'utilisateur a déjà un avis (boutique ou produit selon le cas)
   const existingQuery = { boutiqueId, userId, productId: productId || null };
   const existing = await Review.findOne(existingQuery);
   if (existing) {
