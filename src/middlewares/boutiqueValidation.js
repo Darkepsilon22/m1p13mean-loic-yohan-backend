@@ -1,7 +1,7 @@
 const { body, param, query, validationResult } = require('express-validator');
 
 /**
- * Middleware to handle validation results for boutique routes
+ * Middleware pour gérer les résultats de validation pour les routes boutique
  */
 const handleValidationErrors = (req, res, next) => {
   const errors = validationResult(req);
@@ -9,7 +9,7 @@ const handleValidationErrors = (req, res, next) => {
   if (!errors.isEmpty()) {
     return res.status(400).json({
       success: false,
-      message: 'Validation failed',
+      message: 'Erreur de validation',
       errors: errors.array().map(err => ({
         field: err.path,
         message: err.msg
@@ -21,45 +21,45 @@ const handleValidationErrors = (req, res, next) => {
 };
 
 /**
- * Validation for MongoDB ObjectId (boutique routes)
+ * Validation pour ObjectId MongoDB (routes boutique)
  */
 const validateBoutiqueId = (paramName = 'id') => [
   param(paramName)
     .isMongoId()
-    .withMessage(`Invalid ${paramName} format`),
+    .withMessage(`Format ${paramName} invalide`),
   handleValidationErrors
 ];
 
 /**
- * Validation rules for boutique creation (POST /api/boutiques)
+ * Règles de validation pour la création de boutique (POST /api/boutiques)
  */
 const createBoutique = [
   body('userId')
     .optional()
     .isMongoId()
-    .withMessage('userId must be a valid MongoDB ObjectId'),
+    .withMessage('userId doit être un ObjectId MongoDB valide'),
 
   body('name')
     .optional()
     .trim()
     .isLength({ max: 200 })
-    .withMessage('Name cannot exceed 200 characters'),
+    .withMessage('Le nom ne peut pas dépasser 200 caractères'),
 
   body('description')
     .optional()
     .trim()
     .isLength({ max: 2000 })
-    .withMessage('Description cannot exceed 2000 characters'),
+    .withMessage('La description ne peut pas dépasser 2000 caractères'),
 
   body('shortDescription')
     .optional()
     .trim()
     .isLength({ max: 200 })
-    .withMessage('Short description cannot exceed 200 characters'),
+    .withMessage('La description courte ne peut pas dépasser 200 caractères'),
 
   body('categoryId')
     .isMongoId()
-    .withMessage('categoryId must be a valid MongoDB ObjectId'),
+    .withMessage('categoryId doit être un ObjectId MongoDB valide'),
 
   body('logo')
     .optional()
@@ -72,7 +72,7 @@ const createBoutique = [
   body('photos')
     .optional()
     .isArray()
-    .withMessage('Photos must be an array'),
+    .withMessage('Les photos doivent être un tableau'),
   body('photos.*')
     .optional()
     .trim(),
@@ -85,7 +85,7 @@ const createBoutique = [
     .optional()
     .trim()
     .isEmail()
-    .withMessage('Contact email must be valid'),
+    .withMessage('L\'e-mail de contact doit être valide'),
 
   body('contact.website').optional().trim(),
   body('contact.facebook').optional().trim(),
@@ -94,7 +94,7 @@ const createBoutique = [
   body('location.floor')
     .optional()
     .isInt({ min: 0 })
-    .withMessage('Floor must be a non-negative integer')
+    .withMessage('L\'étage doit être un entier positif ou nul')
     .toInt(),
 
   body('location.zone')
@@ -108,9 +108,9 @@ const createBoutique = [
   body('location.mapCoordinates.x').optional().isNumeric().toFloat(),
   body('location.mapCoordinates.y').optional().isNumeric().toFloat(),
 
-  body('zoneId').optional().isMongoId().withMessage('zoneId must be a valid ObjectId'),
-  body('floorId').optional().isMongoId().withMessage('floorId must be a valid ObjectId'),
-  body('mapShape').optional().isObject().withMessage('mapShape must be an object'),
+  body('zoneId').optional().isMongoId().withMessage('zoneId doit être un ObjectId valide'),
+  body('floorId').optional().isMongoId().withMessage('floorId doit être un ObjectId valide'),
+  body('mapShape').optional().isObject().withMessage('mapShape doit être un objet'),
   body('mapShape.x').optional().isNumeric().toFloat(),
   body('mapShape.y').optional().isNumeric().toFloat(),
   body('mapShape.width').optional().isFloat({ min: 0 }).toFloat(),
@@ -119,44 +119,44 @@ const createBoutique = [
   body('openingHours')
     .optional()
     .isArray()
-    .withMessage('Opening hours must be an array of 7 objects (Mon-Sun)'),
+    .withMessage('Les heures d\'ouverture doivent être un tableau de 7 objets (Lun-Dim)'),
 
   body('status')
     .optional()
     .isIn(['pending', 'active', 'inactive', 'rejected'])
-    .withMessage('Invalid status'),
+    .withMessage('Statut invalide'),
 
   handleValidationErrors
 ];
 
 /**
- * Validation rules for boutique update (PUT /api/boutiques/:id)
+ * Règles de validation pour la mise à jour de boutique (PUT /api/boutiques/:id)
  */
 const updateBoutique = [
   body('name')
     .optional()
     .trim()
     .notEmpty()
-    .withMessage('Name cannot be empty')
+    .withMessage('Le nom ne peut pas être vide')
     .isLength({ max: 200 })
-    .withMessage('Name cannot exceed 200 characters'),
+    .withMessage('Le nom ne peut pas dépasser 200 caractères'),
 
   body('description')
     .optional()
     .trim()
     .isLength({ max: 2000 })
-    .withMessage('Description cannot exceed 2000 characters'),
+    .withMessage('La description ne peut pas dépasser 2000 caractères'),
 
   body('shortDescription')
     .optional()
     .trim()
     .isLength({ max: 200 })
-    .withMessage('Short description cannot exceed 200 characters'),
+    .withMessage('La description courte ne peut pas dépasser 200 caractères'),
 
   body('categoryId')
     .optional()
     .isMongoId()
-    .withMessage('categoryId must be a valid MongoDB ObjectId'),
+    .withMessage('categoryId doit être un ObjectId MongoDB valide'),
 
   body('logo').optional().trim(),
   body('coverImage').optional().trim(),
@@ -164,7 +164,7 @@ const updateBoutique = [
   body('photos.*').optional().trim(),
 
   body('contact.phone').optional().trim(),
-  body('contact.email').optional().trim().isEmail().withMessage('Contact email must be valid'),
+  body('contact.email').optional().trim().isEmail().withMessage('L\'e-mail de contact doit être valide'),
   body('contact.website').optional().trim(),
   body('contact.facebook').optional().trim(),
   body('contact.instagram').optional().trim(),
@@ -175,9 +175,9 @@ const updateBoutique = [
   body('location.mapCoordinates.x').optional().isNumeric().toFloat(),
   body('location.mapCoordinates.y').optional().isNumeric().toFloat(),
 
-  body('zoneId').optional().isMongoId().withMessage('zoneId must be a valid ObjectId'),
-  body('floorId').optional().isMongoId().withMessage('floorId must be a valid ObjectId'),
-  body('mapShape').optional().isObject().withMessage('mapShape must be an object'),
+  body('zoneId').optional().isMongoId().withMessage('zoneId doit être un ObjectId valide'),
+  body('floorId').optional().isMongoId().withMessage('floorId doit être un ObjectId valide'),
+  body('mapShape').optional().isObject().withMessage('mapShape doit être un objet'),
   body('mapShape.x').optional().isNumeric().toFloat(),
   body('mapShape.y').optional().isNumeric().toFloat(),
   body('mapShape.width').optional().isFloat({ min: 0 }).toFloat(),
@@ -190,50 +190,50 @@ const updateBoutique = [
 ];
 
 /**
- * Validation rules for boutique status (PATCH /api/boutiques/:id/status)
+ * Règles de validation pour le statut de boutique (PATCH /api/boutiques/:id/status)
  */
 const patchBoutiqueStatus = [
   body('status')
     .notEmpty()
-    .withMessage('Status is required')
+    .withMessage('Le statut est requis')
     .isIn(['pending', 'active', 'inactive', 'rejected'])
-    .withMessage('Status must be pending, active, inactive, or rejected'),
+      .withMessage('Le statut doit être en attente, actif, inactif ou rejeté'),
 
   body('rejectionReason')
     .optional()
     .trim()
     .isLength({ max: 500 })
-    .withMessage('Rejection reason cannot exceed 500 characters'),
+    .withMessage('La raison du rejet ne peut pas dépasser 500 caractères'),
 
   handleValidationErrors
 ];
 
 /**
- * Validation rules for boutique location (PATCH /api/boutiques/:id/location)
+ * Règles de validation pour l'emplacement de boutique (PATCH /api/boutiques/:id/location)
  */
 const updateBoutiqueLocation = [
   body('floor')
     .optional()
     .isInt({ min: 0 })
-    .withMessage('Floor must be a non-negative integer')
+    .withMessage('L\'étage doit être un entier positif ou nul')
     .toInt(),
 
   body('zone')
     .optional()
     .trim()
     .notEmpty()
-    .withMessage('Zone cannot be empty'),
+    .withMessage('La zone ne peut pas être vide'),
 
   body('number')
     .optional()
     .trim()
     .notEmpty()
-    .withMessage('Number cannot be empty'),
+    .withMessage('Le numéro ne peut pas être vide'),
 
   body('mapCoordinates')
     .optional()
     .isObject()
-    .withMessage('mapCoordinates must be an object'),
+    .withMessage('mapCoordinates doit être un objet'),
   body('mapCoordinates.x').optional().isNumeric().toFloat(),
   body('mapCoordinates.y').optional().isNumeric().toFloat(),
 
@@ -241,13 +241,13 @@ const updateBoutiqueLocation = [
 ];
 
 /**
- * Validation for boutique list query params (GET /api/boutiques)
+ * Validation pour les paramètres de requête de liste de boutiques (GET /api/boutiques)
  */
 const listBoutiques = [
-  query('category').optional().isMongoId().withMessage('category must be a valid ObjectId'),
-  query('status').optional().isIn(['pending', 'active', 'inactive', 'rejected']).withMessage('Invalid status'),
+  query('category').optional().isMongoId().withMessage('category doit être un ObjectId valide'),
+  query('status').optional().isIn(['pending', 'active', 'inactive', 'rejected']).withMessage('Statut invalide'),
   query('floor').optional().isInt({ min: 0 }).toInt(),
-  query('floorId').optional().isMongoId().withMessage('floorId must be a valid ObjectId'),
+  query('floorId').optional().isMongoId().withMessage('floorId doit être un ObjectId valide'),
   query('zone').optional().trim(),
   query('page').optional().isInt({ min: 1 }).toInt(),
   query('limit').optional().isInt({ min: 1, max: 100 }).toInt(),

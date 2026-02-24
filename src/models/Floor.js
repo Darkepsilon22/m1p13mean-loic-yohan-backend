@@ -3,19 +3,19 @@ const mongoose = require('mongoose');
 const floorSchema = new mongoose.Schema({
   name: {
     type: String,
-    required: [true, 'Floor name is required'],
+    required: [true, 'Le nom de l\'étage est requis'],
     trim: true,
-    maxlength: [100, 'Floor name cannot exceed 100 characters']
+    maxlength: [100, 'Le nom de l\'étage ne peut pas dépasser 100 caractères']
   },
   width: {
     type: Number,
-    required: [true, 'Width is required'],
-    min: [1, 'Width must be positive']
+    required: [true, 'La largeur est requise'],
+    min: [1, 'La largeur doit être positive']
   },
   height: {
     type: Number,
-    required: [true, 'Height is required'],
-    min: [1, 'Height must be positive']
+    required: [true, 'La hauteur est requise'],
+    min: [1, 'La hauteur doit être positive']
   },
   order: {
     type: Number,

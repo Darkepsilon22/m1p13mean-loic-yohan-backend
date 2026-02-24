@@ -33,7 +33,7 @@ exports.register = asyncHandler(async (req, res, next) => {
   // Check if user already exists
   const existingUser = await User.findOne({ email: email.toLowerCase() });
   if (existingUser) {
-    return next(new ApiError(400, 'Email already registered'));
+    return next(new ApiError(400, 'Cet email est déjà enregistré'));
   }
 
   // Handle admin role creation
@@ -46,10 +46,10 @@ exports.register = asyncHandler(async (req, res, next) => {
     if (adminSecretKey !== ADMIN_SECRET_KEY) {
       // Si pas de clé ou clé incorrecte, convertir en acheteur
       userRole = 'acheteur';
-      console.warn(`Attempt to create admin account without valid secret key: ${email}`);
+      console.warn(`Tentative de création de compte admin sans clé secrète valide : ${email}`);
     } else {
       // Clé valide, permettre la création d'admin
-      console.log(`Admin account creation authorized for: ${email}`);
+      console.log(`Création de compte admin autorisée pour : ${email}`);
     }
   }
 
@@ -77,7 +77,7 @@ exports.register = asyncHandler(async (req, res, next) => {
 
     res.status(201).json({
       success: true,
-      message: 'Registration successful. Please check your email to verify your account.',
+      message: 'Inscription réussie. Veuillez vérifier votre email pour activer votre compte.',
       data: {
         user: {
           id: user._id,
@@ -89,13 +89,13 @@ exports.register = asyncHandler(async (req, res, next) => {
       }
     });
   } catch (emailError) {
-    console.error('Email sending failed:', emailError);
+    console.error('Échec de l\'envoi de l\'email :', emailError);
 
     emitToAdmin('user:registered', { userId: user._id, email: user.email, firstName: user.firstName, lastName: user.lastName, role: user.role });
 
     res.status(201).json({
       success: true,
-      message: 'Registration successful. Email verification could not be sent. Please request a new verification email.',
+      message: 'Inscription réussie. L\'email de vérification n\'a pas pu être envoyé. Veuillez demander un nouvel email de vérification.',
       data: {
         user: {
           id: user._id,
@@ -120,7 +120,7 @@ exports.createAdmin = asyncHandler(async (req, res, next) => {
   // Check if user already exists
   const existingUser = await User.findOne({ email: email.toLowerCase() });
   if (existingUser) {
-    return next(new ApiError(400, 'Email already registered'));
+    return next(new ApiError(400, 'Cet email est déjà enregistré'));
   }
 
   // Create admin user directly (status active, email verified)
@@ -137,7 +137,7 @@ exports.createAdmin = asyncHandler(async (req, res, next) => {
 
   res.status(201).json({
     success: true,
-    message: 'Admin account created successfully',
+    message: 'Compte administrateur créé avec succès',
     data: {
       user: {
         id: user._id,
@@ -172,7 +172,7 @@ exports.verifyEmail = asyncHandler(async (req, res, next) => {
   });
 
   if (!user) {
-    return next(new ApiError(400, 'Invalid or expired verification token'));
+    return next(new ApiError(400, 'Lien de vérification invalide ou expiré'));
   }
 
   // Update user - Admin gets active status immediately
@@ -192,7 +192,7 @@ exports.verifyEmail = asyncHandler(async (req, res, next) => {
       await sendWelcomeEmail(user.email, user.firstName);
     }
   } catch (error) {
-    console.error('Post-verification email failed:', error);
+    console.error('Échec de l\'email post-vérification :', error);
   }
 
   // Generate token for auto-login
@@ -201,8 +201,8 @@ exports.verifyEmail = asyncHandler(async (req, res, next) => {
   res.status(200).json({
     success: true,
     message: user.role === 'boutique'
-      ? 'Email verified successfully. Your boutique account is pending admin approval.'
-      : 'Email verified successfully. You can now login.',
+      ? 'Email vérifié avec succès. Votre compte boutique est en attente d\'approbation par l\'administrateur.'
+      : 'Email vérifié avec succès. Vous pouvez maintenant vous connecter.',
     data: {
       user,
       token: authToken
@@ -221,11 +221,11 @@ exports.resendVerification = asyncHandler(async (req, res, next) => {
   const user = await User.findOne({ email: email.toLowerCase() });
 
   if (!user) {
-    return next(new ApiError(404, 'No account found with this email'));
+    return next(new ApiError(404, 'Aucun compte trouvé avec cet email'));
   }
 
   if (user.isEmailVerified) {
-    return next(new ApiError(400, 'Email is already verified'));
+    return next(new ApiError(400, 'L\'email est déjà vérifié'));
   }
 
   // Generate new verification token
@@ -237,7 +237,7 @@ exports.resendVerification = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    message: 'Verification email sent successfully'
+    message: 'Email de vérification envoyé avec succès'
   });
 });
 
@@ -255,7 +255,7 @@ exports.forgotPassword = asyncHandler(async (req, res, next) => {
   if (!user) {
     return res.status(200).json({
       success: true,
-      message: 'If an account exists with this email, you will receive a password reset link.'
+      message: 'Si un compte existe avec cet email, vous recevrez un lien de réinitialisation.'
     });
   }
 
@@ -263,7 +263,7 @@ exports.forgotPassword = asyncHandler(async (req, res, next) => {
   if (user.status === 'blocked') {
     return res.status(200).json({
       success: true,
-      message: 'If an account exists with this email, you will receive a password reset link.'
+      message: 'Si un compte existe avec cet email, vous recevrez un lien de réinitialisation.'
     });
   }
 
@@ -276,13 +276,13 @@ exports.forgotPassword = asyncHandler(async (req, res, next) => {
     user.resetPasswordToken = null;
     user.resetPasswordExpires = null;
     await user.save({ validateBeforeSave: false });
-    console.error('Password reset email failed:', err);
-    return next(new ApiError(500, 'Failed to send reset email. Please try again later.'));
+    console.error('Échec de l\'email de réinitialisation :', err);
+    return next(new ApiError(500, 'Envoi de l\'email de réinitialisation impossible. Veuillez réessayer plus tard.'));
   }
 
   res.status(200).json({
     success: true,
-    message: 'If an account exists with this email, you will receive a password reset link.'
+    message: 'Si un compte existe avec cet email, vous recevrez un lien de réinitialisation.'
   });
 });
 
@@ -305,7 +305,7 @@ exports.resetPassword = asyncHandler(async (req, res, next) => {
   }).select('+password');
 
   if (!user) {
-    return next(new ApiError(400, 'Invalid or expired reset token. Please request a new password reset.'));
+    return next(new ApiError(400, 'Lien de réinitialisation invalide ou expiré. Veuillez demander une nouvelle réinitialisation.'));
   }
 
   user.password = newPassword;
@@ -315,7 +315,7 @@ exports.resetPassword = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    message: 'Password reset successfully. You can now log in with your new password.'
+    message: 'Mot de passe réinitialisé avec succès. Vous pouvez maintenant vous connecter.'
   });
 });
 
@@ -331,31 +331,31 @@ exports.login = asyncHandler(async (req, res, next) => {
   const user = await User.findOne({ email: email.toLowerCase() }).select('+password');
 
   if (!user) {
-    return next(new ApiError(401, 'Invalid email or password'));
+    return next(new ApiError(401, 'Email ou mot de passe incorrect'));
   }
 
   // Check if email is verified
   if (!user.isEmailVerified) {
-    return next(new ApiError(403, 'Please verify your email before logging in'));
+    return next(new ApiError(403, 'Veuillez vérifier votre email avant de vous connecter'));
   }
 
   // Check if account is locked
   if (user.isLocked) {
     const remainingTime = Math.ceil((user.lockUntil - Date.now()) / 60000);
-    return next(new ApiError(423, `Account is locked. Try again in ${remainingTime} minutes.`));
+    return next(new ApiError(423, `Compte verrouillé. Réessayez dans ${remainingTime} minute(s).`));
   }
 
   // Check if account is active
   if (user.status === 'inactive') {
-    return next(new ApiError(403, 'Your account has been deactivated. Please contact administrator.'));
+    return next(new ApiError(403, 'Votre compte a été désactivé. Veuillez contacter l\'administrateur.'));
   }
 
   if (user.status === 'pending') {
-    return next(new ApiError(403, 'Your account is pending approval. Please wait for admin validation.'));
+    return next(new ApiError(403, 'Votre compte est en attente d\'approbation. Veuillez attendre la validation par l\'administrateur.'));
   }
 
   if (user.status === 'blocked') {
-    return next(new ApiError(403, 'Your account has been blocked. Please contact administrator.'));
+    return next(new ApiError(403, 'Votre compte a été bloqué. Veuillez contacter l\'administrateur.'));
   }
 
   // Check password
@@ -366,9 +366,9 @@ exports.login = asyncHandler(async (req, res, next) => {
 
     const attemptsLeft = 5 - (user.loginAttempts + 1);
     if (attemptsLeft > 0) {
-      return next(new ApiError(401, `Invalid email or password. ${attemptsLeft} attempts remaining.`));
+      return next(new ApiError(401, `Email ou mot de passe incorrect. ${attemptsLeft} tentative(s) restante(s).`));
     } else {
-      return next(new ApiError(423, 'Account locked due to too many failed attempts. Try again in 15 minutes.'));
+      return next(new ApiError(423, 'Compte verrouillé après trop de tentatives. Réessayez dans 15 minutes.'));
     }
   }
 
@@ -382,15 +382,15 @@ exports.login = asyncHandler(async (req, res, next) => {
 
     res.status(200).json({
       success: true,
-      message: 'OTP sent to your email. Please verify to complete login.',
+      message: 'Code OTP envoyé à votre email. Veuillez le vérifier pour terminer la connexion.',
       data: {
         email: user.email,
         otpRequired: true
       }
     });
   } catch (emailError) {
-    console.error('OTP email failed:', emailError);
-    return next(new ApiError(500, 'Failed to send OTP. Please try again.'));
+    console.error('Échec de l\'envoi de l\'OTP :', emailError);
+    return next(new ApiError(500, 'Envoi du code OTP impossible. Veuillez réessayer.'));
   }
 });
 
@@ -405,19 +405,19 @@ exports.verifyOTP = asyncHandler(async (req, res, next) => {
   const user = await User.findOne({ email: email.toLowerCase() });
 
   if (!user) {
-    return next(new ApiError(404, 'User not found'));
+    return next(new ApiError(404, 'Utilisateur introuvable'));
   }
 
   // Check if OTP exists
   if (!user.otp || !user.otpExpires) {
-    return next(new ApiError(400, 'No OTP requested. Please login again.'));
+    return next(new ApiError(400, 'Aucun code OTP demandé. Veuillez vous reconnecter.'));
   }
 
   // Check OTP attempts
   if (user.otpAttempts >= 3) {
     user.clearOTP();
     await user.save({ validateBeforeSave: false });
-    return next(new ApiError(429, 'Too many failed attempts. Please login again.'));
+    return next(new ApiError(429, 'Trop de tentatives échouées. Veuillez vous reconnecter.'));
   }
 
   // Verify OTP
@@ -426,7 +426,7 @@ exports.verifyOTP = asyncHandler(async (req, res, next) => {
     await user.save({ validateBeforeSave: false });
 
     const attemptsLeft = 3 - user.otpAttempts;
-    return next(new ApiError(401, `Invalid or expired OTP. ${attemptsLeft} attempts remaining.`));
+    return next(new ApiError(401, `Code OTP invalide ou expiré. ${attemptsLeft} tentative(s) restante(s).`));
   }
 
   // Clear OTP and reset login attempts
@@ -439,7 +439,7 @@ exports.verifyOTP = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    message: 'Login successful',
+    message: 'Connexion réussie',
     data: {
       user,
       token
@@ -458,11 +458,11 @@ exports.resendOTP = asyncHandler(async (req, res, next) => {
   const user = await User.findOne({ email: email.toLowerCase() });
 
   if (!user) {
-    return next(new ApiError(404, 'User not found'));
+    return next(new ApiError(404, 'Utilisateur introuvable'));
   }
 
   if (!user.isEmailVerified) {
-    return next(new ApiError(403, 'Please verify your email first'));
+    return next(new ApiError(403, 'Veuillez d\'abord vérifier votre email'));
   }
 
   // Generate new OTP
@@ -474,7 +474,7 @@ exports.resendOTP = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    message: 'New OTP sent to your email'
+    message: 'Nouveau code OTP envoyé à votre email'
   });
 });
 
@@ -521,7 +521,7 @@ exports.updateProfile = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    message: 'Profile updated successfully',
+    message: 'Profil mis à jour avec succès',
     data: { user }
   });
 });
@@ -540,7 +540,7 @@ exports.changePassword = asyncHandler(async (req, res, next) => {
   // Check current password
   const isPasswordValid = await user.comparePassword(currentPassword);
   if (!isPasswordValid) {
-    return next(new ApiError(401, 'Current password is incorrect'));
+    return next(new ApiError(401, 'Le mot de passe actuel est incorrect'));
   }
 
   // Update password
@@ -552,7 +552,7 @@ exports.changePassword = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    message: 'Password changed successfully',
+    message: 'Mot de passe modifié avec succès',
     data: { token }
   });
 });
@@ -565,7 +565,7 @@ exports.changePassword = asyncHandler(async (req, res, next) => {
 exports.logout = asyncHandler(async (req, res, next) => {
   res.status(200).json({
     success: true,
-    message: 'Logged out successfully'
+    message: 'Déconnexion réussie'
   });
 });
 
@@ -580,7 +580,7 @@ exports.addFavorite = asyncHandler(async (req, res, next) => {
   const user = await User.findById(req.user._id);
 
   if (user.favorites.includes(boutiqueId)) {
-    return next(new ApiError(400, 'Boutique already in favorites'));
+    return next(new ApiError(400, 'Boutique déjà dans les favoris'));
   }
 
   user.favorites.push(boutiqueId);
@@ -588,7 +588,7 @@ exports.addFavorite = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    message: 'Boutique added to favorites',
+    message: 'Boutique ajoutée aux favoris',
     data: { favorites: user.favorites }
   });
 });
@@ -604,7 +604,7 @@ exports.removeFavorite = asyncHandler(async (req, res, next) => {
   const user = await User.findById(req.user._id);
 
   if (!user.favorites.includes(boutiqueId)) {
-    return next(new ApiError(400, 'Boutique not in favorites'));
+    return next(new ApiError(400, 'Boutique absente des favoris'));
   }
 
   user.favorites = user.favorites.filter(
@@ -614,7 +614,7 @@ exports.removeFavorite = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    message: 'Boutique removed from favorites',
+    message: 'Boutique retirée des favoris',
     data: { favorites: user.favorites }
   });
 });
@@ -642,7 +642,7 @@ exports.getFavorites = asyncHandler(async (req, res, next) => {
 exports.verifyToken = asyncHandler(async (req, res, next) => {
   res.status(200).json({
     success: true,
-    message: 'Token is valid',
+    message: 'Token valide',
     data: { user: req.user }
   });
 });
@@ -730,18 +730,18 @@ exports.updateUserStatus = asyncHandler(async (req, res, next) => {
 
   const validStatuses = ['active', 'inactive', 'blocked', 'pending'];
   if (!validStatuses.includes(status)) {
-    return next(new ApiError(400, `Invalid status. Must be one of: ${validStatuses.join(', ')}`));
+    return next(new ApiError(400, `Statut invalide. Valeurs possibles : ${validStatuses.join(', ')}`));
   }
 
   const user = await User.findById(userId);
 
   if (!user) {
-    return next(new ApiError(404, 'User not found'));
+    return next(new ApiError(404, 'Utilisateur introuvable'));
   }
 
   // Prevent admin from changing their own status
   if (user._id.toString() === req.user._id.toString()) {
-    return next(new ApiError(400, 'You cannot change your own status'));
+    return next(new ApiError(400, 'Vous ne pouvez pas modifier votre propre statut'));
   }
 
   const previousStatus = user.status;
@@ -758,7 +758,7 @@ exports.updateUserStatus = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    message: `User status updated from '${previousStatus}' to '${status}'`,
+    message: `Statut de l'utilisateur mis à jour de '${previousStatus}' à '${status}'`,
     data: { user }
   });
 });
@@ -774,15 +774,15 @@ exports.approveUser = asyncHandler(async (req, res, next) => {
   const user = await User.findById(userId);
 
   if (!user) {
-    return next(new ApiError(404, 'User not found'));
+    return next(new ApiError(404, 'Utilisateur introuvable'));
   }
 
   if (user.status === 'active') {
-    return next(new ApiError(400, 'User is already active'));
+    return next(new ApiError(400, 'L\'utilisateur est déjà actif'));
   }
 
   if (!user.isEmailVerified) {
-    return next(new ApiError(400, 'User has not verified their email yet'));
+    return next(new ApiError(400, 'L\'utilisateur n\'a pas encore vérifié son email'));
   }
 
   user.status = 'active';
@@ -802,7 +802,7 @@ exports.approveUser = asyncHandler(async (req, res, next) => {
     }
     await sendApprovalEmail(user.email, user.firstName, boutiqueName);
   } catch (emailError) {
-    console.error('Failed to send approval email:', emailError);
+    console.error('Échec de l\'envoi de l\'email d\'approbation :', emailError);
     // Don't fail the request if email fails
   }
 
@@ -810,7 +810,7 @@ exports.approveUser = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    message: 'User approved successfully',
+    message: 'Utilisateur approuvé avec succès',
     data: { user }
   });
 });
@@ -827,18 +827,18 @@ exports.rejectUser = asyncHandler(async (req, res, next) => {
   const user = await User.findById(userId);
 
   if (!user) {
-    return next(new ApiError(404, 'User not found'));
+    return next(new ApiError(404, 'Utilisateur introuvable'));
   }
 
   user.status = 'inactive';
-  user.statusReason = reason || 'Account rejected by administrator';
+  user.statusReason = reason || 'Compte rejeté par l\'administrateur';
   await user.save({ validateBeforeSave: false });
 
   // Send rejection notification email
   try {
     await sendRejectionEmail(user.email, user.firstName, reason);
   } catch (emailError) {
-    console.error('Failed to send rejection email:', emailError);
+    console.error('Échec de l\'envoi de l\'email de rejet :', emailError);
     // Don't fail the request if email fails
   }
 
@@ -846,7 +846,7 @@ exports.rejectUser = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    message: 'User rejected successfully',
+    message: 'Utilisateur rejeté avec succès',
     data: { user }
   });
 });
@@ -863,28 +863,28 @@ exports.blockUser = asyncHandler(async (req, res, next) => {
   const user = await User.findById(userId);
 
   if (!user) {
-    return next(new ApiError(404, 'User not found'));
+    return next(new ApiError(404, 'Utilisateur introuvable'));
   }
 
   // Prevent admin from blocking themselves
   if (user._id.toString() === req.user._id.toString()) {
-    return next(new ApiError(400, 'You cannot block your own account'));
+    return next(new ApiError(400, 'Vous ne pouvez pas bloquer votre propre compte'));
   }
 
   // Prevent blocking other admins
   if (user.role === 'admin') {
-    return next(new ApiError(400, 'Cannot block an admin account'));
+    return next(new ApiError(400, 'Impossible de bloquer un compte administrateur'));
   }
 
   user.status = 'blocked';
-  user.statusReason = reason || 'Account blocked by administrator';
+  user.statusReason = reason || 'Compte bloqué par l\'administrateur';
   await user.save({ validateBeforeSave: false });
 
   emitToUser(userId, 'user:blocked', { userId, reason: user.statusReason });
 
   res.status(200).json({
     success: true,
-    message: 'User blocked successfully',
+    message: 'Utilisateur bloqué avec succès',
     data: { user }
   });
 });
@@ -900,11 +900,11 @@ exports.unblockUser = asyncHandler(async (req, res, next) => {
   const user = await User.findById(userId);
 
   if (!user) {
-    return next(new ApiError(404, 'User not found'));
+    return next(new ApiError(404, 'Utilisateur introuvable'));
   }
 
   if (user.status !== 'blocked') {
-    return next(new ApiError(400, 'User is not blocked'));
+    return next(new ApiError(400, 'L\'utilisateur n\'est pas bloqué'));
   }
 
   user.status = 'active';
@@ -915,7 +915,7 @@ exports.unblockUser = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    message: 'User unblocked successfully',
+    message: 'Utilisateur débloqué avec succès',
     data: { user }
   });
 });

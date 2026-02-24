@@ -4,54 +4,54 @@ const stockMovementSchema = new mongoose.Schema({
   productId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Product',
-    required: [true, 'Product is required']
+    required: [true, 'Le produit est requis']
   },
   boutiqueId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Boutique',
-    required: [true, 'Boutique is required']
+    required: [true, 'La boutique est requise']
   },
   type: {
     type: String,
     enum: {
       values: ['in', 'out', 'adjustment', 'initial'],
-      message: 'Type must be in, out, adjustment, or initial'
+      message: 'Le type doit être in, out, adjustment ou initial'
     },
-    required: [true, 'Movement type is required']
+    required: [true, 'Le type de mouvement est requis']
   },
   quantity: {
     type: Number,
-    required: [true, 'Quantity is required'],
+    required: [true, 'La quantité est requise'],
     validate: {
       validator: function(v) {
         // For 'out' type, quantity should be negative or we handle it in controller
         return v !== 0;
       },
-      message: 'Quantity cannot be zero'
+      message: 'La quantité ne peut pas être zéro'
     }
   },
   previousStock: {
     type: Number,
-    required: [true, 'Previous stock is required']
+    required: [true, 'Le stock précédent est requis']
   },
   newStock: {
     type: Number,
-    required: [true, 'New stock is required']
+    required: [true, 'Le nouveau stock est requis']
   },
   reason: {
     type: String,
     trim: true,
-    maxlength: [500, 'Reason cannot exceed 500 characters']
+    maxlength: [500, 'La raison ne peut pas dépasser 500 caractères']
   },
   reference: {
     type: String,
     trim: true,
-    maxlength: [100, 'Reference cannot exceed 100 characters']
+    maxlength: [100, 'La référence ne peut pas dépasser 100 caractères']
   },
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: [true, 'User who made the movement is required']
+    required: [true, 'L\'utilisateur qui a effectué le mouvement est requis']
   }
 }, {
   timestamps: true
