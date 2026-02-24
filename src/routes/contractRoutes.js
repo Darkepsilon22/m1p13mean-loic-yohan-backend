@@ -8,6 +8,8 @@ const { isAdmin, isBoutique, isAdminOrBoutique } = require('../middlewares/roles
 
 router.get('/my/active', verifyToken, isBoutique, contractController.getMyContract);
 router.get('/my/history', verifyToken, isBoutique, contractController.getMyHistory);
+router.get('/my/history/export/excel', verifyToken, isBoutique, contractController.exportMyHistoryExcel);
+router.get('/my/history/export/pdf', verifyToken, isBoutique, contractController.exportMyHistoryPDF);
 router.post('/my/:id/pay-deposit', verifyToken, isBoutique, contractController.payDeposit);
 
 // ==================== ADMIN ROUTES ====================
