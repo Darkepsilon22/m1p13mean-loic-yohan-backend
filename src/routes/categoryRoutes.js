@@ -1,5 +1,7 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 const categoryController = require('../controllers/categoryController');
 const { verifyToken } = require('../middlewares/auth');
 const { isAdmin } = require('../middlewares/roles');
@@ -74,6 +76,8 @@ router.use(isAdmin);
  * @access  Private (Admin only)
  * @body    name (required), description, icon, color, image, parentId, order, isActive
  */
+router.get('/import/template', categoryController.importTemplate);
+router.post('/import', upload.single('file'), categoryController.importExcel);
 router.post('/', createCategory, categoryController.create);
 
 /**

@@ -1,5 +1,6 @@
 const Category = require('../models/Category');
 const Boutique = require('../models/Boutique');
+const ExcelJS = require('exceljs');
 const { ApiError, asyncHandler } = require('../middlewares/errorHandler');
 const { emitToAdmin, emitToPublic } = require('../socket');
 
@@ -453,5 +454,102 @@ exports.delete = asyncHandler(async (req, res, next) => {
   res.status(200).json({
     success: true,
     message: 'Category deleted successfully'
+  });
+});
+
+/**
+ * @desc    Download Excel template for category import
+ * @route   GET /api/categories/import/template
+ * @access  Private (Admin)
+ */
+exports.importTemplate = asyncHandler(async (req, res) => {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Catégories');
+
+  sheet.columns = [
+    { header: 'Nom *', key: 'name', width: 30 },
+    { header: 'Description', key: 'description', width: 40 },
+    { header: 'Icône', key: 'icon', width: 20 },
+    { header: 'Couleur (hex)', key: 'color', width: 15 },
+    { header: 'Ordre', key: 'order', width: 10 },
+    { header: 'Active (oui/non)', key: 'isActive', width: 15 }
+  ];
+
+  const headerRow = sheet.getRow(1);
+  headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+  headerRow.eachCell(cell => {
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0ABDE3' } };
+  });
+
+  sheet.addRow({ name: 'Exemple Catégorie', description: 'Description', icon: 'feather icon-tag', color: '#FF5733', order: 1, isActive: 'oui' });
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', 'attachment; filename=template-categories.xlsx');
+  res.send(Buffer.from(buffer));
+});
+
+/**
+ * @desc    Import categories from Excel file
+ * @route   POST /api/categories/import
+ * @access  Private (Admin)
+ */
+exports.importExcel = asyncHandler(async (req, res, next) => {
+  if (!req.file) {
+    return next(new ApiError(400, 'Fichier Excel requis'));
+  }
+
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(req.file.buffer);
+  const sheet = workbook.worksheets[0];
+
+  if (!sheet) {
+    return next(new ApiError(400, 'Le fichier ne contient aucune feuille'));
+  }
+
+  const results = { created: 0, errors: [] };
+  const rows = [];
+
+  sheet.eachRow((row, rowNumber) => {
+    if (rowNumber === 1) return;
+    rows.push({ rowNumber, values: row.values });
+  });
+
+  for (const { rowNumber, values } of rows) {
+    try {
+      const name = values[1] ? String(values[1]).trim() : '';
+
+      if (!name) {
+        results.errors.push({ row: rowNumber, message: 'Nom requis' });
+        continue;
+      }
+
+      const existing = await Category.findOne({ name: { $regex: new RegExp(`^${name}$`, 'i') } });
+      if (existing) {
+        results.errors.push({ row: rowNumber, message: `Catégorie "${name}" existe déjà` });
+        continue;
+      }
+
+      const isActiveVal = values[6] ? String(values[6]).trim().toLowerCase() : 'oui';
+
+      await Category.create({
+        name,
+        description: values[2] ? String(values[2]).trim() : '',
+        icon: values[3] ? String(values[3]).trim() : '',
+        color: values[4] ? String(values[4]).trim() : '',
+        order: values[5] != null && !isNaN(Number(values[5])) ? Number(values[5]) : 0,
+        isActive: isActiveVal !== 'non' && isActiveVal !== 'false' && isActiveVal !== '0'
+      });
+
+      results.created++;
+    } catch (err) {
+      results.errors.push({ row: rowNumber, message: err.message });
+    }
+  }
+
+  res.status(200).json({
+    success: true,
+    message: `${results.created} catégorie(s) importée(s)`,
+    data: results
   });
 });

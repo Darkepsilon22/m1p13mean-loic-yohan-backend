@@ -1,5 +1,7 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 const productController = require('../controllers/productController');
 const { verifyToken } = require('../middlewares/auth');
 const { isAdmin, isAdminOrBoutique } = require('../middlewares/roles');
@@ -34,6 +36,8 @@ router.get('/:id', validateProductId('id'), productController.getById);
 // Protected routes requiring boutique ownership
 router.use(isAdminOrBoutique);
 
+router.get('/import/template', productController.importTemplate);
+router.post('/import', upload.single('file'), productController.importExcel);
 router.post('/', createProduct, productController.create);
 router.put('/:id', validateProductId('id'), updateProduct, productController.update);
 router.patch('/:id/availability', validateProductId('id'), patchAvailability, productController.patchAvailability);

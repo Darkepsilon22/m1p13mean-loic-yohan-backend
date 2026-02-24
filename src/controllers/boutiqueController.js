@@ -4,6 +4,7 @@ const User = require('../models/User');
 const Zone = require('../models/Zone');
 const ReservationBoutique = require('../models/ReservationBoutique');
 const BoutiqueReservationService = require('../services/boutiqueReservationService');
+const ExcelJS = require('exceljs');
 const { ApiError, asyncHandler } = require('../middlewares/errorHandler');
 const { emitToAdmin, emitToUser, emitToBoutique } = require('../socket');
 
@@ -643,4 +644,122 @@ exports.rejectReservation = asyncHandler(async (req, res, next) => {
   } catch (error) {
     return next(new ApiError(400, error.message));
   }
+});
+
+/**
+ * @desc    Download Excel template for emplacement import
+ * @route   GET /api/boutiques/import/template
+ * @access  Private (Admin)
+ */
+exports.importTemplate = asyncHandler(async (req, res) => {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Emplacements');
+
+  sheet.columns = [
+    { header: 'Nom *', key: 'name', width: 30 },
+    { header: 'Description', key: 'description', width: 40 },
+    { header: 'Catégorie (nom) *', key: 'category', width: 20 },
+    { header: 'Étage', key: 'floor', width: 10 },
+    { header: 'Zone', key: 'zone', width: 15 },
+    { header: 'Numéro', key: 'number', width: 10 },
+    { header: 'Surface (m²)', key: 'surface', width: 12 },
+    { header: 'Prix (Ar)', key: 'price', width: 15 }
+  ];
+
+  const headerRow = sheet.getRow(1);
+  headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+  headerRow.eachCell(cell => {
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0ABDE3' } };
+  });
+
+  sheet.addRow({ name: 'Emplacement A1', description: 'Emplacement au rez-de-chaussée', category: 'Mode', floor: 0, zone: 'A', number: '01', surface: 25, price: 450000 });
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', 'attachment; filename=template-emplacements.xlsx');
+  res.send(Buffer.from(buffer));
+});
+
+/**
+ * @desc    Import emplacements from Excel file
+ * @route   POST /api/boutiques/import
+ * @access  Private (Admin)
+ */
+exports.importExcel = asyncHandler(async (req, res, next) => {
+  if (!req.file) {
+    return next(new ApiError(400, 'Fichier Excel requis'));
+  }
+
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(req.file.buffer);
+  const sheet = workbook.worksheets[0];
+
+  if (!sheet) {
+    return next(new ApiError(400, 'Le fichier ne contient aucune feuille'));
+  }
+
+  const allCategories = await Category.find({}).lean();
+  const categoryMap = {};
+  allCategories.forEach(c => { categoryMap[c.name.toLowerCase()] = c._id; });
+
+  const results = { created: 0, errors: [] };
+  const rows = [];
+
+  sheet.eachRow((row, rowNumber) => {
+    if (rowNumber === 1) return;
+    rows.push({ rowNumber, values: row.values });
+  });
+
+  for (const { rowNumber, values } of rows) {
+    try {
+      const name = values[1] ? String(values[1]).trim() : '';
+      const categoryName = values[3] ? String(values[3]).trim() : '';
+
+      if (!name) {
+        results.errors.push({ row: rowNumber, message: 'Nom requis' });
+        continue;
+      }
+      if (!categoryName) {
+        results.errors.push({ row: rowNumber, message: 'Catégorie requise' });
+        continue;
+      }
+
+      const categoryId = categoryMap[categoryName.toLowerCase()];
+      if (!categoryId) {
+        results.errors.push({ row: rowNumber, message: `Catégorie "${categoryName}" introuvable` });
+        continue;
+      }
+
+      const floorVal = values[4] != null && !isNaN(Number(values[4])) ? Number(values[4]) : 0;
+      const zoneVal = values[5] ? String(values[5]).trim() : '';
+      const numberVal = values[6] ? String(values[6]).trim() : '';
+      const surfaceVal = values[7] != null && !isNaN(Number(values[7])) ? Number(values[7]) : null;
+      const priceVal = values[8] != null && !isNaN(Number(values[8])) ? Number(values[8]) : null;
+
+      const doc = new Boutique({
+        name,
+        description: values[2] ? String(values[2]).trim() : '',
+        categoryId,
+        location: { floor: floorVal, zone: zoneVal, number: numberVal },
+        surface: surfaceVal,
+        price: priceVal,
+        openingHours: defaultOpeningHours(),
+        status: 'active',
+        emplacementStatus: 'libre'
+      });
+      // Remove userId so sparse index ignores this document
+      doc.userId = undefined;
+      await doc.save();
+
+      results.created++;
+    } catch (err) {
+      results.errors.push({ row: rowNumber, message: err.message });
+    }
+  }
+
+  res.status(200).json({
+    success: true,
+    message: `${results.created} emplacement(s) importé(s)`,
+    data: results
+  });
 });

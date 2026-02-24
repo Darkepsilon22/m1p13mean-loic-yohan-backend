@@ -9,6 +9,19 @@ const connectDB = async () => {
 
     console.log(`MongoDB Connected: ${conn.connection.host}`);
 
+    // Fix userId index: ensure it is sparse (not unique) to allow multiple null values
+    try {
+      const boutiqueCollection = conn.connection.collection('boutiques');
+      const indexes = await boutiqueCollection.indexes();
+      const userIdIdx = indexes.find(i => i.name === 'userId_1');
+      if (userIdIdx && userIdIdx.unique) {
+        await boutiqueCollection.dropIndex('userId_1');
+        console.log('Dropped old unique userId index on boutiques');
+      }
+    } catch (e) {
+      // Index might not exist yet, ignore
+    }
+
     // Handle connection events
     mongoose.connection.on('error', (err) => {
       console.error(`MongoDB connection error: ${err}`);
