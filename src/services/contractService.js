@@ -55,7 +55,7 @@ class ContractService {
           boutiqueLocation: contract.boutiqueSnapshot?.location
         });
       }
-    } catch (e) { console.error('Erreur email (contrat créé) :', e.message); }
+    } catch (e) { console.error('Email error (contract.created):', e.message); }
 
     return contract;
   }
@@ -149,7 +149,7 @@ class ContractService {
           deadline
         });
       }
-    } catch (e) { console.error('Erreur email (contrat signé) :', e.message); }
+    } catch (e) { console.error('Email error (contract.signed):', e.message); }
 
     return contract;
   }
@@ -218,7 +218,7 @@ class ContractService {
             deadline
           });
         }
-      } catch (e) { console.error('Erreur email (dépôt partiel) :', e.message); }
+      } catch (e) { console.error('Email error (deposit.partial):', e.message); }
     }
 
     return contract;
@@ -280,7 +280,7 @@ class ContractService {
           monthlyRent: contract.monthlyRent
         });
       }
-    } catch (e) { console.error('Erreur email (contrat activé) :', e.message); }
+    } catch (e) { console.error('Email error (contract.activated):', e.message); }
 
     return contract;
   }
@@ -398,7 +398,7 @@ class ContractService {
             terminatedAt: contract.terminatedAt
           });
         }
-      } catch (e) { console.error('Erreur email (contrat résilié) :', e.message); }
+      } catch (e) { console.error('Email error (contract.terminated):', e.message); }
 
       return contract;
     } catch (error) {

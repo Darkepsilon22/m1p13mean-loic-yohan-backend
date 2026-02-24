@@ -17,7 +17,7 @@ function startDepositDeadlineJob() {
     }
   });
 
-  console.log('[CRON] Job de vérification des délais de dépôt démarré (quotidien à 07:00)');
+  console.log('[CRON] Deposit deadline check job started (daily at 07:00)');
 }
 
 module.exports = { startDepositDeadlineJob };

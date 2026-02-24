@@ -6,40 +6,40 @@ const specialSpaceSchema = new mongoose.Schema({
   floorId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Floor',
-    required: [true, 'L\'étage est requis']
+    required: [true, 'Floor is required']
   },
   type: {
     type: String,
-    required: [true, 'Le type est requis'],
+    required: [true, 'Type is required'],
     enum: {
       values: SPECIAL_SPACE_TYPES,
-      message: `Le type doit être l'un des suivants : ${SPECIAL_SPACE_TYPES.join(', ')}`
+      message: `Type must be one of: ${SPECIAL_SPACE_TYPES.join(', ')}`
     }
   },
   name: {
     type: String,
     trim: true,
-    maxlength: [100, 'Le nom ne peut pas dépasser 100 caractères']
+    maxlength: [100, 'Name cannot exceed 100 characters']
   },
   x: {
     type: Number,
-    required: [true, 'La coordonnée X est requise'],
+    required: [true, 'X coordinate is required'],
     min: 0
   },
   y: {
     type: Number,
-    required: [true, 'La coordonnée Y est requise'],
+    required: [true, 'Y coordinate is required'],
     min: 0
   },
   width: {
     type: Number,
-    required: [true, 'La largeur est requise'],
-    min: [1, 'La largeur doit être positive']
+    required: [true, 'Width is required'],
+    min: [1, 'Width must be positive']
   },
   height: {
     type: Number,
-    required: [true, 'La hauteur est requise'],
-    min: [1, 'La hauteur doit être positive']
+    required: [true, 'Height is required'],
+    min: [1, 'Height must be positive']
   }
 }, {
   timestamps: true

@@ -4,38 +4,38 @@ const zoneSchema = new mongoose.Schema({
   floorId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Floor',
-    required: [true, 'L\'étage est requis']
+    required: [true, 'Floor is required']
   },
   name: {
     type: String,
-    required: [true, 'Le nom de la zone est requis'],
+    required: [true, 'Zone name is required'],
     trim: true,
-    maxlength: [100, 'Le nom de la zone ne peut pas dépasser 100 caractères']
+    maxlength: [100, 'Zone name cannot exceed 100 characters']
   },
   surfaceTotal: {
     type: Number,
-    required: [true, 'La surface totale est requise'],
-    min: [1, 'La surface doit être positive']
+    required: [true, 'Total surface is required'],
+    min: [1, 'Surface must be positive']
   },
   x: {
     type: Number,
-    required: [true, 'La coordonnée X est requise'],
+    required: [true, 'X coordinate is required'],
     min: 0
   },
   y: {
     type: Number,
-    required: [true, 'La coordonnée Y est requise'],
+    required: [true, 'Y coordinate is required'],
     min: 0
   },
   width: {
     type: Number,
-    required: [true, 'La largeur est requise'],
-    min: [1, 'La largeur doit être positive']
+    required: [true, 'Width is required'],
+    min: [1, 'Width must be positive']
   },
   height: {
     type: Number,
-    required: [true, 'La hauteur est requise'],
-    min: [1, 'La hauteur doit être positive']
+    required: [true, 'Height is required'],
+    min: [1, 'Height must be positive']
   }
 }, {
   timestamps: true

@@ -1,28 +1,28 @@
 /**
- * Middleware de contrôle d'accès basé sur les rôles
- * Doit être utilisé après le middleware verifyToken
+ * Role-based access control middleware
+ * Must be used after verifyToken middleware
  */
 
 /**
- * Vérifie si l'utilisateur a l'un des rôles autorisés
- * @param {...string} allowedRoles - Rôles autorisés à accéder à la route
- * @returns {Function} Fonction middleware Express
+ * Check if user has one of the allowed roles
+ * @param {...string} allowedRoles - Roles that are allowed to access the route
+ * @returns {Function} Express middleware function
  */
 const authorize = (...allowedRoles) => {
   return (req, res, next) => {
-    // Vérifie si l'utilisateur est attaché à la requête (devrait être fait par verifyToken)
+    // Check if user is attached to request (should be done by verifyToken)
     if (!req.user) {
       return res.status(401).json({
         success: false,
-        message: 'Authentification requise.'
+        message: 'Authentication required.'
       });
     }
 
-    // Vérifie si le rôle de l'utilisateur est dans les rôles autorisés
+    // Check if user's role is in the allowed roles
     if (!allowedRoles.includes(req.user.role)) {
       return res.status(403).json({
         success: false,
-        message: `Accès refusé. Cette action nécessite l'un de ces rôles : ${allowedRoles.join(', ')}.`
+        message: `Access denied. This action requires one of these roles: ${allowedRoles.join(', ')}.`
       });
     }
 
@@ -31,20 +31,20 @@ const authorize = (...allowedRoles) => {
 };
 
 /**
- * Vérifie si l'utilisateur est un administrateur
+ * Check if user is an admin
  */
 const isAdmin = (req, res, next) => {
   if (!req.user) {
     return res.status(401).json({
       success: false,
-        message: 'Authentification requise.'
+      message: 'Authentication required.'
     });
   }
 
   if (req.user.role !== 'admin') {
     return res.status(403).json({
       success: false,
-      message: 'Accès refusé. Rôle administrateur requis.'
+      message: 'Access denied. Admin role required.'
     });
   }
 
@@ -52,20 +52,20 @@ const isAdmin = (req, res, next) => {
 };
 
 /**
- * Vérifie si l'utilisateur est propriétaire d'une boutique
+ * Check if user is a boutique owner
  */
 const isBoutique = (req, res, next) => {
   if (!req.user) {
     return res.status(401).json({
       success: false,
-        message: 'Authentification requise.'
+      message: 'Authentication required.'
     });
   }
 
   if (req.user.role !== 'boutique') {
     return res.status(403).json({
       success: false,
-      message: 'Accès refusé. Rôle boutique requis.'
+      message: 'Access denied. Boutique role required.'
     });
   }
 
@@ -73,20 +73,20 @@ const isBoutique = (req, res, next) => {
 };
 
 /**
- * Vérifie si l'utilisateur est un acheteur
+ * Check if user is an acheteur (buyer)
  */
 const isAcheteur = (req, res, next) => {
   if (!req.user) {
     return res.status(401).json({
       success: false,
-        message: 'Authentification requise.'
+      message: 'Authentication required.'
     });
   }
 
   if (req.user.role !== 'acheteur') {
     return res.status(403).json({
       success: false,
-      message: 'Accès refusé. Rôle acheteur requis.'
+      message: 'Access denied. Acheteur role required.'
     });
   }
 
@@ -94,16 +94,16 @@ const isAcheteur = (req, res, next) => {
 };
 
 /**
- * Vérifie si l'utilisateur est administrateur ou propriétaire de la ressource
- * Utile pour les routes où les utilisateurs peuvent modifier leurs propres ressources
- * @param {string} userIdParam - Nom du paramètre URL contenant l'ID utilisateur
+ * Check if user is admin or the resource owner
+ * Useful for routes where users can edit their own resources
+ * @param {string} userIdParam - Name of the URL parameter containing the user ID
  */
 const isAdminOrOwner = (userIdParam = 'id') => {
   return (req, res, next) => {
     if (!req.user) {
       return res.status(401).json({
         success: false,
-        message: 'Authentification requise.'
+        message: 'Authentication required.'
       });
     }
 
@@ -114,7 +114,7 @@ const isAdminOrOwner = (userIdParam = 'id') => {
     if (!isOwner && !isAdmin) {
       return res.status(403).json({
         success: false,
-        message: 'Accès refusé. Vous ne pouvez accéder qu\'à vos propres ressources.'
+        message: 'Access denied. You can only access your own resources.'
       });
     }
 
@@ -123,21 +123,21 @@ const isAdminOrOwner = (userIdParam = 'id') => {
 };
 
 /**
- * Vérifie si l'utilisateur est administrateur ou boutique
- * Pour les routes accessibles aux administrateurs et aux propriétaires de boutique
+ * Check if user is admin or boutique
+ * For routes accessible to both admins and boutique owners
  */
 const isAdminOrBoutique = (req, res, next) => {
   if (!req.user) {
     return res.status(401).json({
       success: false,
-        message: 'Authentification requise.'
+      message: 'Authentication required.'
     });
   }
 
   if (req.user.role !== 'admin' && req.user.role !== 'boutique') {
     return res.status(403).json({
       success: false,
-      message: 'Accès refusé. Rôle administrateur ou boutique requis.'
+      message: 'Access denied. Admin or Boutique role required.'
     });
   }
 

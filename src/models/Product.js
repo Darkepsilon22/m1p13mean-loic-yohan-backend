@@ -5,13 +5,13 @@ const productSchema = new mongoose.Schema({
   boutiqueId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Boutique',
-    required: [true, 'La boutique est requise']
+    required: [true, 'Boutique is required']
   },
   name: {
     type: String,
-    required: [true, 'Le nom du produit est requis'],
+    required: [true, 'Product name is required'],
     trim: true,
-    maxlength: [200, 'Le nom ne peut pas dépasser 200 caractères']
+    maxlength: [200, 'Name cannot exceed 200 characters']
   },
   slug: {
     type: String,
@@ -21,16 +21,16 @@ const productSchema = new mongoose.Schema({
   description: {
     type: String,
     trim: true,
-    maxlength: [2000, 'La description ne peut pas dépasser 2000 caractères']
+    maxlength: [2000, 'Description cannot exceed 2000 characters']
   },
   price: {
     type: Number,
-    required: [true, 'Le prix est requis'],
-    min: [0, 'Le prix doit être au moins 0']
+    required: [true, 'Price is required'],
+    min: [0, 'Price must be at least 0']
   },
   originalPrice: {
     type: Number,
-    min: [0, 'Le prix original doit être au moins 0']
+    min: [0, 'Original price must be at least 0']
   },
   photos: {
     type: [String],
@@ -38,7 +38,7 @@ const productSchema = new mongoose.Schema({
       validator: function(v) {
         return v.length <= 5;
       },
-      message: 'Le tableau de photos ne peut pas dépasser 5 éléments (RG22)'
+      message: 'Photos array cannot exceed 5 items (RG22)'
     }
   },
   mainPhoto: {
@@ -47,23 +47,23 @@ const productSchema = new mongoose.Schema({
   categoryInternal: {
     type: String,
     trim: true,
-    maxlength: [100, 'La catégorie interne ne peut pas dépasser 100 caractères']
+    maxlength: [100, 'Internal category cannot exceed 100 characters']
   },
   stock: {
     type: Number,
     default: 0,
-    min: [0, 'Le stock ne peut pas être négatif']
+    min: [0, 'Stock cannot be negative']
   },
   lowStockThreshold: {
     type: Number,
     default: 5,
-    min: [0, 'Le seuil de stock faible ne peut pas être négatif']
+    min: [0, 'Low stock threshold cannot be negative']
   },
   availability: {
     type: String,
     enum: {
       values: ['available', 'outOfStock', 'onOrder'],
-      message: 'La disponibilité doit être available, outOfStock ou onOrder'
+      message: 'Availability must be available, outOfStock, or onOrder'
     },
     default: 'available'
   },

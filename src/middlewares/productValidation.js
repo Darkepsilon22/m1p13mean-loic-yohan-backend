@@ -5,7 +5,7 @@ const handleValidationErrors = (req, res, next) => {
   if (!errors.isEmpty()) {
     return res.status(400).json({
       success: false,
-      message: 'Erreur de validation',
+      message: 'Validation failed',
       errors: errors.array().map(err => ({ field: err.path, message: err.msg }))
     });
   }
@@ -13,68 +13,68 @@ const handleValidationErrors = (req, res, next) => {
 };
 
 const validateProductId = (paramName = 'id') => [
-  param(paramName).isMongoId().withMessage(`Format ${paramName} invalide`),
+  param(paramName).isMongoId().withMessage(`Invalid ${paramName} format`),
   handleValidationErrors
 ];
 
 const createProduct = [
   body('boutiqueId')
     .notEmpty()
-    .withMessage('L\'ID de la boutique est requis')
+    .withMessage('Boutique ID is required')
     .isMongoId()
-    .withMessage('Format d\'ID de boutique invalide'),
+    .withMessage('Invalid boutique ID format'),
   body('name')
     .trim()
     .notEmpty()
-    .withMessage('Le nom du produit est requis')
+    .withMessage('Product name is required')
     .isLength({ max: 200 })
-    .withMessage('Le nom ne peut pas dépasser 200 caractères'),
+    .withMessage('Name cannot exceed 200 characters'),
   body('description')
     .optional()
     .trim()
     .isLength({ max: 2000 })
-    .withMessage('La description ne peut pas dépasser 2000 caractères'),
+    .withMessage('Description cannot exceed 2000 characters'),
   body('price')
     .notEmpty()
-    .withMessage('Le prix est requis (RG20)')
+    .withMessage('Price is required (RG20)')
     .isFloat({ min: 0 })
-    .withMessage('Le prix doit être au moins 0 (RG21)')
+    .withMessage('Price must be at least 0 (RG21)')
     .toFloat(),
   body('originalPrice')
     .optional()
     .isFloat({ min: 0 })
-    .withMessage('Le prix original doit être au moins 0')
+    .withMessage('Original price must be at least 0')
     .toFloat(),
   body('photos')
     .optional()
     .isArray({ max: 5 })
-    .withMessage('Les photos ne peuvent pas dépasser 5 éléments (RG22)'),
+    .withMessage('Photos cannot exceed 5 items (RG22)'),
   body('photos.*')
     .optional()
     .isURL()
-    .withMessage('Chaque photo doit être une URL valide'),
+    .withMessage('Each photo must be a valid URL'),
   body('categoryInternal')
     .optional()
     .trim()
     .isLength({ max: 100 })
-    .withMessage('La catégorie interne ne peut pas dépasser 100 caractères'),
+    .withMessage('Internal category cannot exceed 100 characters'),
   body('availability')
     .optional()
     .isIn(['available', 'outOfStock', 'onOrder'])
-    .withMessage('La disponibilité doit être available, outOfStock ou onOrder'),
+    .withMessage('Availability must be available, outOfStock, or onOrder'),
   body('isFeatured')
     .optional()
     .isBoolean()
-    .withMessage('isFeatured doit être un booléen'),
+    .withMessage('isFeatured must be a boolean'),
   body('stock')
     .optional()
     .isInt({ min: 0 })
-    .withMessage('Le stock doit être un entier positif ou nul')
+    .withMessage('Stock must be a non-negative integer')
     .toInt(),
   body('lowStockThreshold')
     .optional()
     .isInt({ min: 0 })
-    .withMessage('Le seuil de stock bas doit être un entier positif ou nul')
+    .withMessage('Low stock threshold must be a non-negative integer')
     .toInt(),
   handleValidationErrors
 ];
@@ -84,58 +84,58 @@ const updateProduct = [
     .optional()
     .trim()
     .notEmpty()
-    .withMessage('Le nom ne peut pas être vide')
+    .withMessage('Name cannot be empty')
     .isLength({ max: 200 })
-    .withMessage('Le nom ne peut pas dépasser 200 caractères'),
+    .withMessage('Name cannot exceed 200 characters'),
   body('description')
     .optional()
     .trim()
     .isLength({ max: 2000 })
-    .withMessage('La description ne peut pas dépasser 2000 caractères'),
+    .withMessage('Description cannot exceed 2000 characters'),
   body('price')
     .optional()
     .isFloat({ min: 0 })
-    .withMessage('Le prix doit être au moins 0 (RG21)')
+    .withMessage('Price must be at least 0 (RG21)')
     .toFloat(),
   body('originalPrice')
     .optional()
     .isFloat({ min: 0 })
-    .withMessage('Le prix original doit être au moins 0')
+    .withMessage('Original price must be at least 0')
     .toFloat(),
   body('photos')
     .optional()
     .isArray({ max: 5 })
-    .withMessage('Les photos ne peuvent pas dépasser 5 éléments (RG22)'),
+    .withMessage('Photos cannot exceed 5 items (RG22)'),
   body('photos.*')
     .optional()
     .isURL()
-    .withMessage('Chaque photo doit être une URL valide'),
+    .withMessage('Each photo must be a valid URL'),
   body('mainPhoto')
     .optional()
     .isURL()
-    .withMessage('La photo principale doit être une URL valide'),
+    .withMessage('Main photo must be a valid URL'),
   body('categoryInternal')
     .optional()
     .trim()
     .isLength({ max: 100 })
-    .withMessage('La catégorie interne ne peut pas dépasser 100 caractères'),
+    .withMessage('Internal category cannot exceed 100 characters'),
   body('availability')
     .optional()
     .isIn(['available', 'outOfStock', 'onOrder'])
-    .withMessage('La disponibilité doit être available, outOfStock ou onOrder'),
+    .withMessage('Availability must be available, outOfStock, or onOrder'),
   body('isFeatured')
     .optional()
     .isBoolean()
-    .withMessage('isFeatured doit être un booléen'),
+    .withMessage('isFeatured must be a boolean'),
   body('stock')
     .optional()
     .isInt({ min: 0 })
-    .withMessage('Le stock doit être un entier positif ou nul')
+    .withMessage('Stock must be a non-negative integer')
     .toInt(),
   body('lowStockThreshold')
     .optional()
     .isInt({ min: 0 })
-    .withMessage('Le seuil de stock bas doit être un entier positif ou nul')
+    .withMessage('Low stock threshold must be a non-negative integer')
     .toInt(),
   handleValidationErrors
 ];
@@ -143,9 +143,9 @@ const updateProduct = [
 const patchAvailability = [
   body('availability')
     .notEmpty()
-    .withMessage('La disponibilité est requise')
+    .withMessage('Availability is required')
     .isIn(['available', 'outOfStock', 'onOrder'])
-    .withMessage('La disponibilité doit être available, outOfStock ou onOrder'),
+    .withMessage('Availability must be available, outOfStock, or onOrder'),
   handleValidationErrors
 ];
 
@@ -153,32 +153,32 @@ const listProducts = [
   query('boutiqueId')
     .optional()
     .isMongoId()
-    .withMessage('Format d\'ID de boutique invalide'),
+    .withMessage('Invalid boutique ID format'),
   query('minPrice')
     .optional()
     .isFloat({ min: 0 })
-    .withMessage('minPrice doit être un nombre positif'),
+    .withMessage('minPrice must be a positive number'),
   query('maxPrice')
     .optional()
     .isFloat({ min: 0 })
-    .withMessage('maxPrice doit être un nombre positif'),
+    .withMessage('maxPrice must be a positive number'),
   query('availability')
     .optional()
     .isIn(['available', 'outOfStock', 'onOrder'])
-    .withMessage('Valeur de disponibilité invalide'),
+    .withMessage('Invalid availability value'),
   query('isFeatured')
     .optional()
     .isIn(['true', 'false'])
-    .withMessage('isFeatured doit être true ou false'),
+    .withMessage('isFeatured must be true or false'),
   query('page')
     .optional()
     .isInt({ min: 1 })
-    .withMessage('La page doit être un entier positif')
+    .withMessage('Page must be a positive integer')
     .toInt(),
   query('limit')
     .optional()
     .isInt({ min: 1, max: 100 })
-    .withMessage('La limite doit être entre 1 et 100')
+    .withMessage('Limit must be between 1 and 100')
     .toInt(),
   handleValidationErrors
 ];

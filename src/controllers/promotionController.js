@@ -125,7 +125,7 @@ exports.getById = asyncHandler(async (req, res, next) => {
     .populate('products', 'name slug price mainPhoto availability');
 
   if (!promotion) {
-    return next(new ApiError(404, 'Promotion introuvable'));
+    return next(new ApiError(404, 'Promotion not found'));
   }
 
   res.status(200).json({
@@ -185,23 +185,23 @@ exports.create = asyncHandler(async (req, res, next) => {
   // Check if boutique exists and belongs to user
   const boutique = await Boutique.findById(boutiqueId);
   if (!boutique) {
-    return next(new ApiError(404, 'Boutique introuvable'));
+    return next(new ApiError(404, 'Boutique not found'));
   }
 
   // Check ownership (unless admin)
   if (req.user.role !== 'admin' && !boutique.userId.equals(req.user._id)) {
-    return next(new ApiError(403, 'Vous n\'êtes pas autorisé à créer des promotions pour cette boutique'));
+    return next(new ApiError(403, 'You are not authorized to create promotions for this boutique'));
   }
 
   // Check boutique status
   if (boutique.status !== 'active') {
-    return next(new ApiError(400, 'Impossible de créer des promotions pour une boutique inactive'));
+    return next(new ApiError(400, 'Cannot create promotions for inactive boutique'));
   }
 
   // Check max active promotions (RG34)
   const canCreate = await Promotion.canCreateActivePromotion(boutiqueId);
   if (!canCreate) {
-    return next(new ApiError(400, 'Maximum 5 promotions actives par boutique (RG34)'));
+    return next(new ApiError(400, 'Maximum 5 active promotions allowed per boutique (RG34)'));
   }
 
   // Validate products belong to this boutique
@@ -213,7 +213,7 @@ exports.create = asyncHandler(async (req, res, next) => {
     });
 
     if (productCount !== products.length) {
-      return next(new ApiError(400, 'Certains produits n\'existent pas ou n\'appartiennent pas à cette boutique'));
+      return next(new ApiError(400, 'Some products do not exist or do not belong to this boutique'));
     }
   }
 
@@ -233,7 +233,7 @@ exports.create = asyncHandler(async (req, res, next) => {
 
   res.status(201).json({
     success: true,
-    message: 'Promotion créée avec succès',
+    message: 'Promotion created successfully',
     data: promotion
   });
 });
@@ -247,18 +247,18 @@ exports.update = asyncHandler(async (req, res, next) => {
   let promotion = await Promotion.findById(req.params.id);
 
   if (!promotion) {
-    return next(new ApiError(404, 'Promotion introuvable'));
+    return next(new ApiError(404, 'Promotion not found'));
   }
 
   // Check ownership
   const boutique = await Boutique.findById(promotion.boutiqueId);
   if (req.user.role !== 'admin' && !boutique.userId.equals(req.user._id)) {
-    return next(new ApiError(403, 'Vous n\'êtes pas autorisé à modifier cette promotion'));
+    return next(new ApiError(403, 'You are not authorized to update this promotion'));
   }
 
   // Cannot update ended or cancelled promotions
   if (promotion.status === 'ended' || promotion.status === 'cancelled') {
-    return next(new ApiError(400, 'Impossible de modifier des promotions terminées ou annulées'));
+    return next(new ApiError(400, 'Cannot update ended or cancelled promotions'));
   }
 
   const allowedFields = ['title', 'description', 'type', 'value', 'products', 'image', 'startDate', 'endDate'];
@@ -283,7 +283,7 @@ exports.update = asyncHandler(async (req, res, next) => {
     });
 
     if (productCount !== updates.products.length) {
-      return next(new ApiError(400, 'Certains produits n\'existent pas ou n\'appartiennent pas à cette boutique'));
+      return next(new ApiError(400, 'Some products do not exist or do not belong to this boutique'));
     }
   }
 
@@ -297,7 +297,7 @@ exports.update = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    message: 'Promotion mise à jour avec succès',
+    message: 'Promotion updated successfully',
     data: promotion
   });
 });
@@ -311,18 +311,18 @@ exports.cancel = asyncHandler(async (req, res, next) => {
   let promotion = await Promotion.findById(req.params.id);
 
   if (!promotion) {
-    return next(new ApiError(404, 'Promotion introuvable'));
+    return next(new ApiError(404, 'Promotion not found'));
   }
 
   // Check ownership
   const boutique = await Boutique.findById(promotion.boutiqueId);
   if (req.user.role !== 'admin' && !boutique.userId.equals(req.user._id)) {
-    return next(new ApiError(403, 'Vous n\'êtes pas autorisé à annuler cette promotion'));
+    return next(new ApiError(403, 'You are not authorized to cancel this promotion'));
   }
 
   // Cannot cancel already ended or cancelled promotions
   if (promotion.status === 'ended' || promotion.status === 'cancelled') {
-    return next(new ApiError(400, 'Cette promotion est déjà terminée ou annulée'));
+    return next(new ApiError(400, 'Promotion is already ended or cancelled'));
   }
 
   promotion = await Promotion.findByIdAndUpdate(
@@ -335,7 +335,7 @@ exports.cancel = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    message: 'Promotion annulée avec succès',
+    message: 'Promotion cancelled successfully',
     data: promotion
   });
 });
@@ -349,18 +349,18 @@ exports.delete = asyncHandler(async (req, res, next) => {
   const promotion = await Promotion.findById(req.params.id);
 
   if (!promotion) {
-    return next(new ApiError(404, 'Promotion introuvable'));
+    return next(new ApiError(404, 'Promotion not found'));
   }
 
   // Check ownership
   const boutique = await Boutique.findById(promotion.boutiqueId);
   if (req.user.role !== 'admin' && !boutique.userId.equals(req.user._id)) {
-    return next(new ApiError(403, 'Vous n\'êtes pas autorisé à supprimer cette promotion'));
+    return next(new ApiError(403, 'You are not authorized to delete this promotion'));
   }
 
   // Only allow deleting scheduled promotions, others should be cancelled
   if (promotion.status !== 'scheduled' && req.user.role !== 'admin') {
-    return next(new ApiError(400, 'Seules les promotions programmées peuvent être supprimées. Utilisez annuler pour les autres.'));
+    return next(new ApiError(400, 'Only scheduled promotions can be deleted. Use cancel instead.'));
   }
 
   await Promotion.findByIdAndDelete(req.params.id);
@@ -369,7 +369,7 @@ exports.delete = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    message: 'Promotion supprimée avec succès'
+    message: 'Promotion deleted successfully'
   });
 });
 
@@ -384,11 +384,11 @@ exports.getStats = asyncHandler(async (req, res, next) => {
   // Check ownership
   const boutique = await Boutique.findById(boutiqueId);
   if (!boutique) {
-    return next(new ApiError(404, 'Boutique introuvable'));
+    return next(new ApiError(404, 'Boutique not found'));
   }
 
   if (req.user.role !== 'admin' && !boutique.userId.equals(req.user._id)) {
-    return next(new ApiError(403, 'Vous n\'êtes pas autorisé à consulter ces statistiques'));
+    return next(new ApiError(403, 'You are not authorized to view these stats'));
   }
 
   const stats = await Promotion.aggregate([
@@ -450,6 +450,6 @@ exports.updateStatuses = asyncHandler(async (req, res) => {
 
   res.status(200).json({
     success: true,
-    message: 'Statuts des promotions mis à jour avec succès'
+    message: 'Promotion statuses updated successfully'
   });
 });

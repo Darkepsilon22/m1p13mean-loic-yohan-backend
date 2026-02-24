@@ -4,30 +4,30 @@ const promotionSchema = new mongoose.Schema({
   boutiqueId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Boutique',
-    required: [true, 'La boutique est requise']
+    required: [true, 'Boutique is required']
   },
   title: {
     type: String,
-    required: [true, 'Le titre de la promotion est requis'],
+    required: [true, 'Promotion title is required'],
     trim: true,
-    maxlength: [200, 'Le titre ne peut pas dépasser 200 caractères']
+    maxlength: [200, 'Title cannot exceed 200 characters']
   },
   description: {
     type: String,
     trim: true,
-    maxlength: [1000, 'La description ne peut pas dépasser 1000 caractères']
+    maxlength: [1000, 'Description cannot exceed 1000 characters']
   },
   type: {
     type: String,
     enum: {
       values: ['percentage', 'fixed', 'special'],
-      message: 'Le type doit être percentage, fixed ou special'
+      message: 'Type must be percentage, fixed, or special'
     },
-    required: [true, 'Le type de promotion est requis']
+    required: [true, 'Promotion type is required']
   },
   value: {
     type: Number,
-    min: [0, 'La valeur doit être au moins 0'],
+    min: [0, 'Value must be at least 0'],
     validate: {
       validator: function(v) {
         // Value is required for percentage and fixed types
@@ -42,9 +42,9 @@ const promotionSchema = new mongoose.Schema({
       },
       message: function(props) {
         if (this.type === 'percentage') {
-          return 'Le pourcentage doit être entre 1 et 99 (RG32)';
+          return 'Percentage must be between 1 and 99 (RG32)';
         }
-        return 'La valeur est requise pour les promotions de type percentage et fixed';
+        return 'Value is required for percentage and fixed promotions';
       }
     }
   },
@@ -57,24 +57,24 @@ const promotionSchema = new mongoose.Schema({
   },
   startDate: {
     type: Date,
-    required: [true, 'La date de début est requise (RG30)']
+    required: [true, 'Start date is required (RG30)']
   },
   endDate: {
     type: Date,
-    required: [true, 'La date de fin est requise (RG30)'],
+    required: [true, 'End date is required (RG30)'],
     validate: {
       validator: function(v) {
         // End date must be after start date (RG31)
         return v > this.startDate;
       },
-      message: 'La date de fin doit être après la date de début (RG31)'
+      message: 'End date must be after start date (RG31)'
     }
   },
   status: {
     type: String,
     enum: {
       values: ['scheduled', 'active', 'ended', 'cancelled'],
-      message: 'Le statut doit être scheduled, active, ended ou cancelled'
+      message: 'Status must be scheduled, active, ended, or cancelled'
     },
     default: 'scheduled'
   }

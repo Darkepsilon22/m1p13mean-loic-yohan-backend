@@ -17,7 +17,7 @@ function startInvoiceGenerationJob() {
     }
   });
 
-  console.log('[CRON] Job de génération des factures démarré (quotidien à 00:00)');
+  console.log('[CRON] Invoice generation job started (daily at 00:00)');
 }
 
 module.exports = { startInvoiceGenerationJob };

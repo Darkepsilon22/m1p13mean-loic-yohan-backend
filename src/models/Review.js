@@ -4,16 +4,21 @@ const reviewSchema = new mongoose.Schema({
   boutiqueId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Boutique',
-    required: [true, 'La boutique est requise']
+    required: [true, 'Boutique is required']
+  },
+  productId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Product',
+    default: null
   },
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: [true, 'L\'utilisateur (auteur) est requis']
+    required: [true, 'User (author) is required']
   },
   rating: {
     type: Number,
-    required: [true, 'La note est requise'],
+    required: [true, 'Rating is required'],
     min: 1,
     max: 5,
     set: (v) => (v != null ? Math.round(v) : v)
@@ -21,13 +26,13 @@ const reviewSchema = new mongoose.Schema({
   comment: {
     type: String,
     trim: true,
-    maxlength: [1000, 'Le commentaire ne peut pas dépasser 1000 caractères']
+    maxlength: [1000, 'Comment cannot exceed 1000 characters']
   },
   response: {
     text: {
       type: String,
       trim: true,
-      maxlength: [500, 'La réponse ne peut pas dépasser 500 caractères']
+      maxlength: [500, 'Response cannot exceed 500 characters']
     },
     respondedAt: { type: Date }
   },
@@ -35,7 +40,7 @@ const reviewSchema = new mongoose.Schema({
     type: String,
     enum: {
       values: ['published', 'hidden', 'reported', 'deleted'],
-      message: 'Le statut doit être publié, masqué, signalé ou supprimé'
+      message: 'Status must be published, hidden, reported, or deleted'
     },
     required: true,
     default: 'published'
@@ -52,10 +57,28 @@ const reviewSchema = new mongoose.Schema({
   timestamps: true
 });
 
-reviewSchema.index({ boutiqueId: 1, userId: 1 }, { unique: true });
+reviewSchema.index({ boutiqueId: 1, productId: 1, userId: 1 }, { unique: true });
+reviewSchema.index({ boutiqueId: 1, productId: 1 });
 reviewSchema.index({ boutiqueId: 1 });
 reviewSchema.index({ status: 1 });
 reviewSchema.index({ rating: -1 });
 reviewSchema.index({ createdAt: -1 });
 
-module.exports = mongoose.model('Review', reviewSchema);
+const Review = mongoose.model('Review', reviewSchema);
+
+// Migration: supprimer l'ancien index unique {boutiqueId, userId} s'il existe
+Review.collection.dropIndex('boutiqueId_1_userId_1').catch(() => {
+  // L'index n'existe plus, c'est OK
+});
+
+// Migration: ajouter productId: null aux anciens avis qui n'ont pas ce champ
+Review.updateMany(
+  { productId: { $exists: false } },
+  { $set: { productId: null } }
+).then(result => {
+  if (result.modifiedCount > 0) {
+    console.log(`[Review migration] ${result.modifiedCount} ancien(s) avis mis à jour avec productId: null`);
+  }
+}).catch(() => {});
+
+module.exports = Review;

@@ -9,7 +9,7 @@ const handleValidationErrors = (req, res, next) => {
   if (!errors.isEmpty()) {
     return res.status(400).json({
       success: false,
-      message: 'Erreur de validation',
+      message: 'Validation failed',
       errors: errors.array().map(err => ({
         field: err.path,
         message: err.msg
@@ -26,7 +26,7 @@ const handleValidationErrors = (req, res, next) => {
 const validateCategoryId = (paramName = 'id') => [
   param(paramName)
     .isMongoId()
-    .withMessage(`Format ${paramName} invalide`),
+    .withMessage(`Invalid ${paramName} format`),
   handleValidationErrors
 ];
 
@@ -37,33 +37,33 @@ const createCategory = [
   body('name')
     .trim()
     .notEmpty()
-    .withMessage('Le nom de la catégorie est requis')
+    .withMessage('Category name is required')
     .isLength({ max: 100 })
-    .withMessage('Le nom de la catégorie ne peut pas dépasser 100 caractères'),
+    .withMessage('Category name cannot exceed 100 characters'),
 
   body('description')
     .optional()
     .trim()
     .isLength({ max: 500 })
-    .withMessage('La description ne peut pas dépasser 500 caractères'),
+    .withMessage('Description cannot exceed 500 characters'),
 
   body('icon')
     .optional()
     .trim()
     .isLength({ max: 100 })
-    .withMessage('Le nom de l\'icône ne peut pas dépasser 100 caractères'),
+    .withMessage('Icon name cannot exceed 100 characters'),
 
   body('color')
     .optional()
     .trim()
     .matches(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/)
-    .withMessage('La couleur doit être une couleur hexadécimale valide (ex. : #FF5733)'),
+    .withMessage('Color must be a valid hexadecimal color (e.g., #FF5733)'),
 
   body('image')
     .optional()
     .trim()
     .isURL()
-    .withMessage('L\'image doit être une URL valide'),
+    .withMessage('Image must be a valid URL'),
 
   body('parentId')
     .optional({ nullable: true })
@@ -71,18 +71,18 @@ const createCategory = [
       if (value === null || value === '') return true;
       return /^[0-9a-fA-F]{24}$/.test(value);
     })
-    .withMessage('parentId doit être un ObjectId MongoDB valide ou null'),
+    .withMessage('parentId must be a valid MongoDB ObjectId or null'),
 
   body('order')
     .optional()
     .isInt({ min: 0 })
-    .withMessage('L\'ordre doit être un entier positif ou nul')
+    .withMessage('Order must be a non-negative integer')
     .toInt(),
 
   body('isActive')
     .optional()
     .isBoolean()
-    .withMessage('isActive doit être une valeur booléenne')
+    .withMessage('isActive must be a boolean value')
     .toBoolean(),
 
   handleValidationErrors
@@ -96,21 +96,21 @@ const updateCategory = [
     .optional()
     .trim()
     .notEmpty()
-    .withMessage('Le nom de la catégorie ne peut pas être vide')
+    .withMessage('Category name cannot be empty')
     .isLength({ max: 100 })
-    .withMessage('Le nom de la catégorie ne peut pas dépasser 100 caractères'),
+    .withMessage('Category name cannot exceed 100 characters'),
 
   body('description')
     .optional()
     .trim()
     .isLength({ max: 500 })
-    .withMessage('La description ne peut pas dépasser 500 caractères'),
+    .withMessage('Description cannot exceed 500 characters'),
 
   body('icon')
     .optional()
     .trim()
     .isLength({ max: 100 })
-    .withMessage('Le nom de l\'icône ne peut pas dépasser 100 caractères'),
+    .withMessage('Icon name cannot exceed 100 characters'),
 
   body('color')
     .optional()
@@ -118,7 +118,7 @@ const updateCategory = [
       if (value === '' || value === null) return true;
       return /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(value);
     })
-    .withMessage('La couleur doit être une couleur hexadécimale valide (ex. : #FF5733) ou vide'),
+    .withMessage('Color must be a valid hexadecimal color (e.g., #FF5733) or empty'),
 
   body('image')
     .optional()
@@ -131,7 +131,7 @@ const updateCategory = [
         return false;
       }
     })
-    .withMessage('L\'image doit être une URL valide ou vide'),
+    .withMessage('Image must be a valid URL or empty'),
 
   body('parentId')
     .optional({ nullable: true })
@@ -139,18 +139,18 @@ const updateCategory = [
       if (value === null || value === '') return true;
       return /^[0-9a-fA-F]{24}$/.test(value);
     })
-    .withMessage('parentId doit être un ObjectId MongoDB valide ou null'),
+    .withMessage('parentId must be a valid MongoDB ObjectId or null'),
 
   body('order')
     .optional()
     .isInt({ min: 0 })
-    .withMessage('L\'ordre doit être un entier positif ou nul')
+    .withMessage('Order must be a non-negative integer')
     .toInt(),
 
   body('isActive')
     .optional()
     .isBoolean()
-    .withMessage('isActive doit être une valeur booléenne')
+    .withMessage('isActive must be a boolean value')
     .toBoolean(),
 
   handleValidationErrors
@@ -162,9 +162,9 @@ const updateCategory = [
 const patchCategoryStatus = [
   body('isActive')
     .notEmpty()
-    .withMessage('isActive est requis')
+    .withMessage('isActive is required')
     .isBoolean()
-    .withMessage('isActive doit être une valeur booléenne')
+    .withMessage('isActive must be a boolean value')
     .toBoolean(),
 
   handleValidationErrors
@@ -176,9 +176,9 @@ const patchCategoryStatus = [
 const patchCategoryOrder = [
   body('order')
     .notEmpty()
-    .withMessage('L\'ordre est requis')
+    .withMessage('Order is required')
     .isInt({ min: 0 })
-    .withMessage('L\'ordre doit être un entier positif ou nul')
+    .withMessage('Order must be a non-negative integer')
     .toInt(),
 
   handleValidationErrors
@@ -190,15 +190,15 @@ const patchCategoryOrder = [
 const reorderCategories = [
   body('orders')
     .isArray({ min: 1 })
-    .withMessage('Les ordres doivent être un tableau non vide'),
+    .withMessage('Orders must be a non-empty array'),
 
   body('orders.*.id')
     .isMongoId()
-    .withMessage('Chaque élément d\'ordre doit avoir un identifiant valide'),
+    .withMessage('Each order item must have a valid id'),
 
   body('orders.*.order')
     .isInt({ min: 0 })
-    .withMessage('Chaque élément d\'ordre doit avoir une valeur d\'ordre positive ou nulle')
+    .withMessage('Each order item must have a non-negative order value')
     .toInt(),
 
   handleValidationErrors
@@ -211,35 +211,35 @@ const listCategories = [
   query('active')
     .optional()
     .isIn(['true', 'false'])
-    .withMessage('active doit être true ou false'),
+    .withMessage('active must be true or false'),
 
   query('parent')
     .optional()
     .isMongoId()
-    .withMessage('parent doit être un ObjectId valide'),
+    .withMessage('parent must be a valid ObjectId'),
 
   query('root')
     .optional()
     .isIn(['true', 'false'])
-    .withMessage('root doit être true ou false'),
+    .withMessage('root must be true or false'),
 
   query('page')
     .optional()
     .isInt({ min: 1 })
-    .withMessage('La page doit être un entier positif')
+    .withMessage('page must be a positive integer')
     .toInt(),
 
   query('limit')
     .optional()
     .isInt({ min: 1, max: 100 })
-    .withMessage('La limite doit être entre 1 et 100')
+    .withMessage('limit must be between 1 and 100')
     .toInt(),
 
   query('sort')
     .optional()
     .trim()
     .isIn(['order', '-order', 'name', '-name', 'createdAt', '-createdAt'])
-    .withMessage('Valeur de tri invalide'),
+    .withMessage('Invalid sort value'),
 
   handleValidationErrors
 ];
@@ -251,9 +251,9 @@ const validateSlug = [
   param('slug')
     .trim()
     .notEmpty()
-    .withMessage('Le slug est requis')
+    .withMessage('Slug is required')
     .isSlug()
-    .withMessage('Format de slug invalide'),
+    .withMessage('Invalid slug format'),
   handleValidationErrors
 ];
 

@@ -1,7 +1,31 @@
 const Cart = require('../models/Cart');
 const Product = require('../models/Product');
+const Promotion = require('../models/Promotion');
 const { ApiError, asyncHandler } = require('../middlewares/errorHandler');
 const { emitToUser } = require('../socket');
+
+/**
+ * Calcule le prix effectif d'un produit en tenant compte des promotions actives
+ */
+async function getEffectivePrice(product) {
+  const now = new Date();
+  const promo = await Promotion.findOne({
+    products: product._id,
+    status: 'active',
+    startDate: { $lte: now },
+    endDate: { $gt: now }
+  });
+
+  if (!promo) return product.price;
+
+  if (promo.type === 'percentage' && promo.value != null) {
+    return Math.round(product.price * (1 - promo.value / 100));
+  }
+  if (promo.type === 'fixed' && promo.value != null) {
+    return Math.max(0, Math.round(product.price - promo.value));
+  }
+  return product.price;
+}
 
 /**
  * @desc    Get user's cart
@@ -10,6 +34,22 @@ const { emitToUser } = require('../socket');
  */
 exports.getCart = asyncHandler(async (req, res) => {
   const cart = await Cart.getOrCreateCart(req.user._id);
+
+  // Mettre à jour les prix avec les promotions actives
+  let priceUpdated = false;
+  for (const item of cart.items) {
+    const product = await Product.findById(item.productId);
+    if (product) {
+      const effectivePrice = await getEffectivePrice(product);
+      if (item.unitPrice !== effectivePrice) {
+        item.unitPrice = effectivePrice;
+        priceUpdated = true;
+      }
+    }
+  }
+  if (priceUpdated) {
+    await cart.save();
+  }
 
   await cart.populate([
     { path: 'items.productId', select: 'name price stock mainPhoto availability isArchived' },
@@ -47,7 +87,7 @@ exports.addItem = asyncHandler(async (req, res, next) => {
   }
 
   if (product.isArchived) {
-    return next(new ApiError(400, 'Le produit n\'est plus disponible'));
+    return next(new ApiError(400, 'Ce produit n\'est plus disponible'));
   }
 
   if (product.availability === 'outOfStock') {
@@ -67,10 +107,11 @@ exports.addItem = asyncHandler(async (req, res, next) => {
   const totalQuantity = (existingItem?.quantity || 0) + quantity;
 
   if (totalQuantity > product.stock) {
-    return next(new ApiError(400, `Impossible d'ajouter ${quantity} articles. Stock disponible : ${product.stock}, Déjà dans le panier : ${existingItem?.quantity || 0}`));
+    return next(new ApiError(400, `Impossible d'ajouter ${quantity} article(s). Stock disponible : ${product.stock}, Déjà dans le panier : ${existingItem?.quantity || 0}`));
   }
 
-  await cart.addItem(product, quantity);
+  const effectivePrice = await getEffectivePrice(product);
+  await cart.addItem(product, quantity, effectivePrice);
 
   await cart.populate([
     { path: 'items.productId', select: 'name price stock mainPhoto availability' },
@@ -81,7 +122,7 @@ exports.addItem = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    message: 'Produit ajouté au panier',
+    message: 'Article ajouté au panier',
     data: {
       cart: {
         _id: cart._id,
@@ -176,7 +217,7 @@ exports.removeItem = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    message: 'Produit retiré du panier',
+    message: 'Article supprimé du panier',
     data: {
       cart: {
         _id: cart._id,

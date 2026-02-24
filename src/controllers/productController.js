@@ -96,7 +96,7 @@ exports.getById = asyncHandler(async (req, res, next) => {
     .populate('boutiqueId', 'name slug logo contact location openingHours');
 
   if (!product) {
-    return next(new ApiError(404, 'Produit introuvable'));
+    return next(new ApiError(404, 'Product not found'));
   }
 
   // Increment views
@@ -118,7 +118,7 @@ exports.getBySlug = asyncHandler(async (req, res, next) => {
     .populate('boutiqueId', 'name slug logo contact location openingHours');
 
   if (!product) {
-    return next(new ApiError(404, 'Produit introuvable'));
+    return next(new ApiError(404, 'Product not found'));
   }
 
   // Increment views
@@ -207,17 +207,17 @@ exports.create = asyncHandler(async (req, res, next) => {
   // Check if boutique exists and belongs to user
   const boutique = await Boutique.findById(boutiqueId);
   if (!boutique) {
-    return next(new ApiError(404, 'Boutique introuvable'));
+    return next(new ApiError(404, 'Boutique not found'));
   }
 
   // Check ownership (unless admin)
   if (req.user.role !== 'admin' && !boutique.userId.equals(req.user._id)) {
-    return next(new ApiError(403, 'Vous n\'êtes pas autorisé à ajouter des produits à cette boutique'));
+    return next(new ApiError(403, 'You are not authorized to add products to this boutique'));
   }
 
   // Check boutique status
   if (boutique.status !== 'active') {
-    return next(new ApiError(400, 'Impossible d\'ajouter des produits à une boutique inactive'));
+    return next(new ApiError(400, 'Cannot add products to inactive boutique'));
   }
 
   const product = await Product.create({
@@ -239,7 +239,7 @@ exports.create = asyncHandler(async (req, res, next) => {
 
   res.status(201).json({
     success: true,
-    message: 'Produit créé avec succès',
+    message: 'Product created successfully',
     data: product
   });
 });
@@ -253,13 +253,13 @@ exports.update = asyncHandler(async (req, res, next) => {
   let product = await Product.findById(req.params.id);
 
   if (!product) {
-    return next(new ApiError(404, 'Produit introuvable'));
+    return next(new ApiError(404, 'Product not found'));
   }
 
   // Check ownership
   const boutique = await Boutique.findById(product.boutiqueId);
   if (req.user.role !== 'admin' && !boutique.userId.equals(req.user._id)) {
-    return next(new ApiError(403, 'Vous n\'êtes pas autorisé à modifier ce produit'));
+    return next(new ApiError(403, 'You are not authorized to update this product'));
   }
 
   const allowedFields = ['name', 'description', 'price', 'originalPrice', 'photos', 'mainPhoto', 'categoryInternal', 'availability', 'isFeatured', 'stock', 'lowStockThreshold'];
@@ -289,7 +289,7 @@ exports.update = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    message: 'Produit mis à jour avec succès',
+    message: 'Product updated successfully',
     data: product
   });
 });
@@ -304,13 +304,13 @@ exports.patchAvailability = asyncHandler(async (req, res, next) => {
 
   let product = await Product.findById(req.params.id);
   if (!product) {
-    return next(new ApiError(404, 'Produit introuvable'));
+    return next(new ApiError(404, 'Product not found'));
   }
 
   // Check ownership
   const boutique = await Boutique.findById(product.boutiqueId);
   if (req.user.role !== 'admin' && !boutique.userId.equals(req.user._id)) {
-    return next(new ApiError(403, 'Vous n\'êtes pas autorisé à modifier ce produit'));
+    return next(new ApiError(403, 'You are not authorized to update this product'));
   }
 
   product = await Product.findByIdAndUpdate(
@@ -323,7 +323,7 @@ exports.patchAvailability = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    message: 'Disponibilité du produit mise à jour',
+    message: 'Product availability updated',
     data: product
   });
 });
@@ -336,13 +336,13 @@ exports.patchAvailability = asyncHandler(async (req, res, next) => {
 exports.toggleFeatured = asyncHandler(async (req, res, next) => {
   let product = await Product.findById(req.params.id);
   if (!product) {
-    return next(new ApiError(404, 'Produit introuvable'));
+    return next(new ApiError(404, 'Product not found'));
   }
 
   // Check ownership
   const boutique = await Boutique.findById(product.boutiqueId);
   if (req.user.role !== 'admin' && !boutique.userId.equals(req.user._id)) {
-    return next(new ApiError(403, 'Vous n\'êtes pas autorisé à modifier ce produit'));
+    return next(new ApiError(403, 'You are not authorized to update this product'));
   }
 
   product = await Product.findByIdAndUpdate(
@@ -355,7 +355,7 @@ exports.toggleFeatured = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    message: `Produit ${product.isFeatured ? 'mis en avant' : 'retiré de la vitrine'}`,
+    message: `Product ${product.isFeatured ? 'marked as featured' : 'removed from featured'}`,
     data: product
   });
 });
@@ -369,13 +369,13 @@ exports.delete = asyncHandler(async (req, res, next) => {
   let product = await Product.findById(req.params.id);
 
   if (!product) {
-    return next(new ApiError(404, 'Produit introuvable'));
+    return next(new ApiError(404, 'Product not found'));
   }
 
   // Check ownership
   const boutique = await Boutique.findById(product.boutiqueId);
   if (req.user.role !== 'admin' && !boutique.userId.equals(req.user._id)) {
-    return next(new ApiError(403, 'Vous n\'êtes pas autorisé à supprimer ce produit'));
+    return next(new ApiError(403, 'You are not authorized to delete this product'));
   }
 
   await Product.findByIdAndUpdate(req.params.id, { isArchived: true });
@@ -385,7 +385,7 @@ exports.delete = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    message: 'Produit archivé avec succès'
+    message: 'Product archived successfully'
   });
 });
 
@@ -398,13 +398,13 @@ exports.restore = asyncHandler(async (req, res, next) => {
   let product = await Product.findById(req.params.id);
 
   if (!product) {
-    return next(new ApiError(404, 'Produit introuvable'));
+    return next(new ApiError(404, 'Product not found'));
   }
 
   // Check ownership
   const boutique = await Boutique.findById(product.boutiqueId);
   if (req.user.role !== 'admin' && !boutique.userId.equals(req.user._id)) {
-    return next(new ApiError(403, 'Vous n\'êtes pas autorisé à restaurer ce produit'));
+    return next(new ApiError(403, 'You are not authorized to restore this product'));
   }
 
   product = await Product.findByIdAndUpdate(
@@ -418,7 +418,7 @@ exports.restore = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    message: 'Produit restauré avec succès',
+    message: 'Product restored successfully',
     data: product
   });
 });
@@ -434,11 +434,11 @@ exports.getStats = asyncHandler(async (req, res, next) => {
   // Check ownership
   const boutique = await Boutique.findById(boutiqueId);
   if (!boutique) {
-    return next(new ApiError(404, 'Boutique introuvable'));
+    return next(new ApiError(404, 'Boutique not found'));
   }
 
   if (req.user.role !== 'admin' && !boutique.userId.equals(req.user._id)) {
-    return next(new ApiError(403, 'Vous n\'êtes pas autorisé à consulter ces statistiques'));
+    return next(new ApiError(403, 'You are not authorized to view these stats'));
   }
 
   const stats = await Product.aggregate([
@@ -508,7 +508,7 @@ exports.getMyProducts = asyncHandler(async (req, res, next) => {
   // Find boutique owned by user
   const boutique = await Boutique.findOne({ userId: req.user._id });
   if (!boutique) {
-    return next(new ApiError(404, 'Vous n\'avez pas de boutique'));
+    return next(new ApiError(404, 'You do not have a boutique'));
   }
 
   const query = { boutiqueId: boutique._id };
@@ -558,7 +558,7 @@ exports.getMyProductsStats = asyncHandler(async (req, res, next) => {
   // Find boutique owned by user
   const boutique = await Boutique.findOne({ userId: req.user._id });
   if (!boutique) {
-    return next(new ApiError(404, 'Vous n\'avez pas de boutique'));
+    return next(new ApiError(404, 'You do not have a boutique'));
   }
 
   const stats = await Product.aggregate([
@@ -617,17 +617,17 @@ exports.archive = asyncHandler(async (req, res, next) => {
   let product = await Product.findById(req.params.id);
 
   if (!product) {
-    return next(new ApiError(404, 'Produit introuvable'));
+    return next(new ApiError(404, 'Product not found'));
   }
 
   // Check ownership
   const boutique = await Boutique.findById(product.boutiqueId);
   if (req.user.role !== 'admin' && !boutique.userId.equals(req.user._id)) {
-    return next(new ApiError(403, 'Vous n\'êtes pas autorisé à archiver ce produit'));
+    return next(new ApiError(403, 'You are not authorized to archive this product'));
   }
 
   if (product.isArchived) {
-    return next(new ApiError(400, 'Le produit est déjà archivé'));
+    return next(new ApiError(400, 'Product is already archived'));
   }
 
   product = await Product.findByIdAndUpdate(
@@ -641,7 +641,7 @@ exports.archive = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    message: 'Produit archivé avec succès',
+    message: 'Product archived successfully',
     data: product
   });
 });

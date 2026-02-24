@@ -16,7 +16,7 @@ class ApiError extends Error {
  * Handle MongoDB CastError (invalid ObjectId)
  */
 const handleCastError = (err) => {
-  const message = `${err.path} invalide : ${err.value}`;
+  const message = `Invalid ${err.path}: ${err.value}`;
   return new ApiError(400, message);
 };
 
@@ -25,7 +25,7 @@ const handleCastError = (err) => {
  */
 const handleDuplicateKeyError = (err) => {
   const field = Object.keys(err.keyValue)[0];
-  const message = `${field} existe déjà. Veuillez utiliser une autre valeur.`;
+  const message = `${field} already exists. Please use another value.`;
   return new ApiError(400, message);
 };
 
@@ -34,7 +34,7 @@ const handleDuplicateKeyError = (err) => {
  */
 const handleValidationError = (err) => {
   const errors = Object.values(err.errors).map(el => el.message);
-  const message = `Données invalides : ${errors.join('. ')}`;
+  const message = `Invalid input data: ${errors.join('. ')}`;
   return new ApiError(400, message);
 };
 
@@ -42,14 +42,14 @@ const handleValidationError = (err) => {
  * Handle JWT Error
  */
 const handleJWTError = () => {
-  return new ApiError(401, 'Token invalide. Veuillez vous reconnecter.');
+  return new ApiError(401, 'Invalid token. Please log in again.');
 };
 
 /**
  * Handle JWT Expired Error
  */
 const handleJWTExpiredError = () => {
-  return new ApiError(401, 'Votre session a expiré. Veuillez vous reconnecter.');
+  return new ApiError(401, 'Your token has expired. Please log in again.');
 };
 
 /**
@@ -82,7 +82,7 @@ const sendErrorProd = (err, res) => {
     res.status(500).json({
       success: false,
       status: 'error',
-      message: 'Une erreur s\'est produite. Veuillez réessayer plus tard.'
+      message: 'Something went wrong. Please try again later.'
     });
   }
 };
@@ -115,7 +115,7 @@ const errorHandler = (err, req, res, next) => {
  * Handle 404 Not Found
  */
 const notFound = (req, res, next) => {
-  const error = new ApiError(404, `Route ${req.originalUrl} introuvable`);
+  const error = new ApiError(404, `Route ${req.originalUrl} not found`);
   next(error);
 };
 

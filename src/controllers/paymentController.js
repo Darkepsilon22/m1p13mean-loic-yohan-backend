@@ -15,21 +15,21 @@ exports.initializePayment = asyncHandler(async (req, res, next) => {
   const order = await Order.findById(orderId);
 
   if (!order) {
-    return next(new ApiError(404, 'Commande introuvable'));
+    return next(new ApiError(404, 'Order not found'));
   }
 
   // Verify ownership
   if (order.userId.toString() !== req.user._id.toString()) {
-    return next(new ApiError(403, 'Non autorisé'));
+    return next(new ApiError(403, 'Not authorized'));
   }
 
   // Check if order can be paid
   if (order.status !== 'pending') {
-    return next(new ApiError(400, `La commande ne peut pas être payée (statut : ${order.status})`));
+    return next(new ApiError(400, `Order cannot be paid (status: ${order.status})`));
   }
 
   if (order.paymentStatus === 'success') {
-    return next(new ApiError(400, 'Commande déjà payée'));
+    return next(new ApiError(400, 'Order already paid'));
   }
 
   // Check for existing pending payment
@@ -41,7 +41,7 @@ exports.initializePayment = asyncHandler(async (req, res, next) => {
   if (existingPayment && !existingPayment.isExpired()) {
     return res.status(200).json({
       success: true,
-      message: 'Paiement existant trouvé',
+      message: 'Existing payment found',
       data: {
         payment: {
           reference: existingPayment.reference,
@@ -82,7 +82,7 @@ exports.initializePayment = asyncHandler(async (req, res, next) => {
 
   res.status(201).json({
     success: true,
-    message: 'Paiement initialisé',
+    message: 'Payment initialized',
     data: {
       payment: {
         reference: payment.reference,
@@ -106,12 +106,12 @@ exports.getPaymentStatus = asyncHandler(async (req, res, next) => {
     .populate('orderId', 'orderReference status totalAmount');
 
   if (!payment) {
-    return next(new ApiError(404, 'Paiement introuvable'));
+    return next(new ApiError(404, 'Payment not found'));
   }
 
   // Verify ownership (unless admin)
   if (req.user.role !== 'admin' && payment.userId.toString() !== req.user._id.toString()) {
-    return next(new ApiError(403, 'Non autorisé'));
+    return next(new ApiError(403, 'Not authorized'));
   }
 
   res.status(200).json({
@@ -131,11 +131,11 @@ exports.confirmPayment = asyncHandler(async (req, res, next) => {
   const payment = await Payment.findOne({ reference: req.params.reference });
 
   if (!payment) {
-    return next(new ApiError(404, 'Paiement introuvable'));
+    return next(new ApiError(404, 'Payment not found'));
   }
 
   if (payment.status !== 'pending') {
-    return next(new ApiError(400, `Le paiement ne peut pas être confirmé (statut : ${payment.status})`));
+    return next(new ApiError(400, `Payment cannot be confirmed (status: ${payment.status})`));
   }
 
   await payment.markAsSuccess({
@@ -147,7 +147,7 @@ exports.confirmPayment = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    message: 'Paiement confirmé avec succès',
+    message: 'Payment confirmed successfully',
     data: { payment }
   });
 });
@@ -163,11 +163,11 @@ exports.failPayment = asyncHandler(async (req, res, next) => {
   const payment = await Payment.findOne({ reference: req.params.reference });
 
   if (!payment) {
-    return next(new ApiError(404, 'Paiement introuvable'));
+    return next(new ApiError(404, 'Payment not found'));
   }
 
   if (payment.status !== 'pending') {
-    return next(new ApiError(400, `Le statut du paiement ne peut pas être modifié (statut : ${payment.status})`));
+    return next(new ApiError(400, `Payment status cannot be changed (status: ${payment.status})`));
   }
 
   await payment.markAsFailed(reason);
@@ -176,7 +176,7 @@ exports.failPayment = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    message: 'Paiement marqué comme échoué',
+    message: 'Payment marked as failed',
     data: { payment }
   });
 });
@@ -192,13 +192,13 @@ exports.refundPayment = asyncHandler(async (req, res, next) => {
   const payment = await Payment.findOne({ reference: req.params.reference });
 
   if (!payment) {
-    return next(new ApiError(404, 'Paiement introuvable'));
+    return next(new ApiError(404, 'Payment not found'));
   }
 
   const refundAmount = amount || payment.amount;
 
   if (refundAmount > payment.amount) {
-    return next(new ApiError(400, 'Le montant du remboursement ne peut pas dépasser le montant du paiement'));
+    return next(new ApiError(400, 'Refund amount cannot exceed payment amount'));
   }
 
   await payment.processRefund(refundAmount, reason);
@@ -207,7 +207,7 @@ exports.refundPayment = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    message: 'Remboursement effectué avec succès',
+    message: 'Refund processed successfully',
     data: { payment }
   });
 });
@@ -222,17 +222,17 @@ exports.handleWebhook = asyncHandler(async (req, res) => {
 
   const { reference, status, providerReference, providerData } = req.body;
 
-  console.log('📩 Webhook de paiement reçu :', { reference, status });
+  console.log('📩 Payment webhook received:', { reference, status });
 
   const payment = await Payment.findOne({ reference });
 
   if (!payment) {
-    console.log('⚠️ Paiement introuvable :', reference);
+    console.log('⚠️ Payment not found:', reference);
     return res.status(200).send('OK');
   }
 
   if (payment.status !== 'pending') {
-    console.log('⚠️ Paiement déjà traité :', payment.status);
+    console.log('⚠️ Payment already processed:', payment.status);
     return res.status(200).send('OK');
   }
 
@@ -245,14 +245,14 @@ exports.handleWebhook = asyncHandler(async (req, res) => {
       reference: providerReference,
       response: providerData
     });
-    console.log('✅ Paiement marqué comme réussi :', reference);
+    console.log('✅ Payment marked as success:', reference);
   } else if (failedStatuses.includes(status?.toUpperCase())) {
-    await payment.markAsFailed(providerData?.message || 'Paiement échoué');
-    console.log('❌ Paiement marqué comme échoué :', reference);
+    await payment.markAsFailed(providerData?.message || 'Payment failed');
+    console.log('❌ Payment marked as failed:', reference);
   } else {
     payment.providerResponse = providerData;
     await payment.save();
-    console.log('ℹ️ Statut du paiement mis à jour :', status);
+    console.log('ℹ️ Payment status updated:', status);
   }
 
   res.status(200).send('OK');
@@ -407,7 +407,7 @@ exports.expirePendingPayments = asyncHandler(async (req, res) => {
 
   res.status(200).json({
     success: true,
-    message: `${expiredCount} paiement(s) en attente expiré(s)`,
+    message: `${expiredCount} pending payments expired`,
     data: { expiredCount }
   });
 });

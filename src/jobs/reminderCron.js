@@ -24,7 +24,7 @@ function startReminderJob() {
     }
   });
 
-  console.log('[CRON] Job de rappels démarré (quotidien à 10:00)');
+  console.log('[CRON] Reminder job started (daily at 10:00)');
 }
 
 module.exports = { startReminderJob };

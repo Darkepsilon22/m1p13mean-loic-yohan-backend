@@ -4,7 +4,7 @@ const slugify = require('slugify');
 const openingHoursSchema = new mongoose.Schema({
   day: {
     type: Number,
-    required: [true, 'Le jour est requis'],
+    required: [true, 'Day is required'],
     min: 0,
     max: 6
   },
@@ -38,17 +38,17 @@ const boutiqueSchema = new mongoose.Schema({
   description: {
     type: String,
     required: false,
-    maxlength: [2000, 'La description ne peut pas dépasser 2000 caractères']
+    maxlength: [2000, 'Description cannot exceed 2000 characters']
   },
   shortDescription: {
     type: String,
     trim: true,
-    maxlength: [200, 'La description courte ne peut pas dépasser 200 caractères']
+    maxlength: [200, 'Short description cannot exceed 200 characters']
   },
   categoryId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Category',
-    required: [true, 'La catégorie est requise']
+    required: [true, 'Category is required']
   },
   logo: {
     type: String,
@@ -101,7 +101,7 @@ const boutiqueSchema = new mongoose.Schema({
       validator: function(v) {
         return Array.isArray(v) && v.length === 7;
       },
-      message: 'Les heures d\'ouverture doivent contenir 7 entrées (lundi à dimanche)'
+      message: 'Opening hours must contain 7 entries (Monday to Sunday)'
     }
   },
   rating: {
@@ -121,7 +121,7 @@ const boutiqueSchema = new mongoose.Schema({
     type: String,
     enum: {
       values: ['pending', 'active', 'inactive', 'rejected'],
-      message: 'Le statut doit être en attente, actif, inactif ou rejeté'
+      message: 'Status must be pending, active, inactive, or rejected'
     },
     required: true,
     default: 'pending'
@@ -145,8 +145,8 @@ const boutiqueSchema = new mongoose.Schema({
   emplacementStatus: {
     type: String,
     enum: {
-      values: ['libre', 'temporaire', 'occupee'],
-      message: 'Le statut emplacement doit être: libre, temporaire ou occupee'
+      values: ['libre', 'temporaire', 'reservee', 'occupee'],
+      message: 'Le statut emplacement doit être: libre, temporaire, reservee ou occupee'
     },
     default: 'libre'
   },
@@ -215,9 +215,8 @@ boutiqueSchema.pre('validate', function() {
     this.slug = slugify(this.name, { lower: true, strict: true });
   }
 
-  // Validate photos array length
   if (this.photos && this.photos.length > 10) {
-    throw new Error('Le tableau de photos ne peut pas dépasser 10 éléments');
+    throw new Error('Photos array cannot exceed 10 items');
   }
 });
 

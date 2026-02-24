@@ -21,7 +21,7 @@ function startAutoTerminationJob() {
     }
   });
 
-  console.log('[CRON] Job de résiliation automatique démarré (quotidien à 09:00)');
+  console.log('[CRON] Auto-termination job started (daily at 09:00)');
 }
 
 module.exports = { startAutoTerminationJob };
