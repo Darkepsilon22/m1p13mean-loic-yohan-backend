@@ -1,5 +1,7 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 const boutiqueController = require('../controllers/boutiqueController');
 const { verifyToken } = require('../middlewares/auth');
 const { isAdminOrBoutique, isAdmin, isBoutique } = require('../middlewares/roles');
@@ -65,6 +67,10 @@ router.post('/:id/reject', validateBoutiqueId('id'), isAdmin, boutiqueController
 router.post('/:id/release', validateBoutiqueId('id'), isAdmin, boutiqueController.releaseBoutique);
 
 // ==================== ADMIN ONLY ROUTES (création/suppression) ====================
+
+// Import Excel - Admin seulement
+router.get('/import/template', isAdmin, boutiqueController.importTemplate);
+router.post('/import', isAdmin, upload.single('file'), boutiqueController.importExcel);
 
 // Créer une boutique (emplacement) - Admin seulement
 router.post('/', isAdmin, createBoutique, boutiqueController.create);

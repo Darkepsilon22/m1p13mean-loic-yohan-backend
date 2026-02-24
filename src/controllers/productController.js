@@ -1,5 +1,6 @@
 const Product = require('../models/Product');
 const Boutique = require('../models/Boutique');
+const ExcelJS = require('exceljs');
 const { asyncHandler, ApiError } = require('../middlewares/errorHandler');
 const { emitToAdmin, emitToPublic, emitToBoutique } = require('../socket');
 
@@ -775,5 +776,108 @@ exports.adminGetStats = asyncHandler(async (req, res) => {
       },
       topBoutiques: byBoutique
     }
+  });
+});
+
+/**
+ * @desc    Download Excel template for product import
+ * @route   GET /api/products/import/template
+ * @access  Private (boutique)
+ */
+exports.importTemplate = asyncHandler(async (req, res) => {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Produits');
+
+  sheet.columns = [
+    { header: 'Nom *', key: 'name', width: 30 },
+    { header: 'Description', key: 'description', width: 40 },
+    { header: 'Prix *', key: 'price', width: 15 },
+    { header: 'Prix original', key: 'originalPrice', width: 15 },
+    { header: 'Catégorie interne', key: 'categoryInternal', width: 20 },
+    { header: 'Stock', key: 'stock', width: 10 },
+    { header: 'Seuil stock bas', key: 'lowStockThreshold', width: 15 }
+  ];
+
+  const headerRow = sheet.getRow(1);
+  headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+  headerRow.eachCell(cell => {
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0ABDE3' } };
+  });
+
+  // Ligne exemple
+  sheet.addRow({ name: 'Exemple Produit', description: 'Description du produit', price: 15000, originalPrice: 20000, categoryInternal: 'Électronique', stock: 50, lowStockThreshold: 5 });
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', 'attachment; filename=template-produits.xlsx');
+  res.send(Buffer.from(buffer));
+});
+
+/**
+ * @desc    Import products from Excel file
+ * @route   POST /api/products/import
+ * @access  Private (boutique)
+ */
+exports.importExcel = asyncHandler(async (req, res, next) => {
+  if (!req.file) {
+    return next(new ApiError(400, 'Fichier Excel requis'));
+  }
+
+  const boutique = await Boutique.findOne({ userId: req.user._id });
+  if (!boutique) {
+    return next(new ApiError(404, 'Boutique non trouvée pour cet utilisateur'));
+  }
+
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(req.file.buffer);
+  const sheet = workbook.worksheets[0];
+
+  if (!sheet) {
+    return next(new ApiError(400, 'Le fichier ne contient aucune feuille'));
+  }
+
+  const results = { created: 0, errors: [] };
+  const rows = [];
+
+  sheet.eachRow((row, rowNumber) => {
+    if (rowNumber === 1) return; // Skip header
+    rows.push({ rowNumber, values: row.values });
+  });
+
+  for (const { rowNumber, values } of rows) {
+    try {
+      const name = values[1] ? String(values[1]).trim() : '';
+      const price = values[3] != null ? Number(values[3]) : NaN;
+
+      if (!name) {
+        results.errors.push({ row: rowNumber, message: 'Nom requis' });
+        continue;
+      }
+      if (isNaN(price) || price < 0) {
+        results.errors.push({ row: rowNumber, message: 'Prix invalide' });
+        continue;
+      }
+
+      await Product.create({
+        boutiqueId: boutique._id,
+        name,
+        description: values[2] ? String(values[2]).trim() : '',
+        price,
+        originalPrice: values[4] != null && !isNaN(Number(values[4])) ? Number(values[4]) : undefined,
+        categoryInternal: values[5] ? String(values[5]).trim() : '',
+        stock: values[6] != null && !isNaN(Number(values[6])) ? Math.max(0, Number(values[6])) : 0,
+        lowStockThreshold: values[7] != null && !isNaN(Number(values[7])) ? Math.max(0, Number(values[7])) : 5
+      });
+
+      results.created++;
+    } catch (err) {
+      results.errors.push({ row: rowNumber, message: err.message });
+    }
+  }
+
+  res.status(200).json({
+    success: true,
+    message: `${results.created} produit(s) importé(s)`,
+    data: results
   });
 });
