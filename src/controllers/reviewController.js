@@ -114,7 +114,6 @@ exports.create = asyncHandler(async (req, res, next) => {
     status: 'published'
   });
 
-  // Recalculer le rating boutique seulement pour les avis boutique
   if (!productId) {
     await recalculateBoutiqueRating(boutiqueId);
   }
