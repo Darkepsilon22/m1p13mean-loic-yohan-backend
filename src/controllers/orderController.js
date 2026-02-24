@@ -590,3 +590,199 @@ exports.expirePendingOrders = asyncHandler(async (req, res) => {
     data: { expiredCount }
   });
 });
+
+// ==================== BOUTIQUE MONTHLY REPORT ====================
+
+/**
+ * @desc    Export boutique monthly report as PDF
+ * @route   GET /api/orders/boutique/report/pdf?month=1&year=2026
+ * @access  Private (boutique)
+ */
+exports.exportBoutiqueMonthlyReportPDF = asyncHandler(async (req, res) => {
+  const reportData = await buildBoutiqueMonthlyReport(req);
+  const buffer = await generateMonthlyReportPDF(reportData);
+
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename=rapport-${reportData.month}-${reportData.year}.pdf`);
+  res.send(buffer);
+});
+
+/**
+ * @desc    Export boutique monthly report as Excel
+ * @route   GET /api/orders/boutique/report/excel?month=1&year=2026
+ * @access  Private (boutique)
+ */
+exports.exportBoutiqueMonthlyReportExcel = asyncHandler(async (req, res) => {
+  const reportData = await buildBoutiqueMonthlyReport(req);
+  const buffer = await generateMonthlyReportExcel(reportData);
+
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename=rapport-${reportData.month}-${reportData.year}.xlsx`);
+  res.send(buffer);
+});
+
+/**
+ * @desc    Export boutique orders as PDF (with filters)
+ * @route   GET /api/orders/boutique/export/pdf?status=pending&paymentStatus=success&startDate=2025-01-01&endDate=2025-12-31
+ * @access  Private (boutique)
+ */
+exports.exportBoutiqueOrdersPDF = asyncHandler(async (req, res) => {
+  const filter = buildBoutiqueOrderFilter(req.user.boutiqueId, req.query);
+  const orders = await Order.find(filter)
+    .populate('items.productId', 'name mainPhoto')
+    .populate('userId', 'firstName lastName email')
+    .sort({ createdAt: -1 })
+    .lean();
+
+  const boutique = await Boutique.findById(req.user.boutiqueId).select('name');
+  const boutiqueName = boutique?.name || 'Ma Boutique';
+  const statusLabel = req.query.status ? (STATUS_LABELS[req.query.status] || req.query.status) : null;
+  const buffer = await generateOrdersPDF(orders, boutiqueName, statusLabel);
+
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename=commandes-boutique-${Date.now()}.pdf`);
+  res.send(buffer);
+});
+
+/**
+ * @desc    Export boutique orders as Excel (with filters)
+ * @route   GET /api/orders/boutique/export/excel?status=pending&paymentStatus=success&startDate=2025-01-01&endDate=2025-12-31
+ * @access  Private (boutique)
+ */
+exports.exportBoutiqueOrdersExcel = asyncHandler(async (req, res) => {
+  const filter = buildBoutiqueOrderFilter(req.user.boutiqueId, req.query);
+  const orders = await Order.find(filter)
+    .populate('items.productId', 'name mainPhoto')
+    .populate('userId', 'firstName lastName email')
+    .sort({ createdAt: -1 })
+    .lean();
+
+  const boutique = await Boutique.findById(req.user.boutiqueId).select('name');
+  const boutiqueName = boutique?.name || 'Ma Boutique';
+  const statusLabel = req.query.status ? (STATUS_LABELS[req.query.status] || req.query.status) : null;
+  const buffer = await generateOrdersExcel(orders, boutiqueName, statusLabel);
+
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename=commandes-boutique-${Date.now()}.xlsx`);
+  res.send(buffer);
+});
+
+/**
+ * Build filtered order query for a boutique
+ */
+function buildBoutiqueOrderFilter(boutiqueId, query) {
+  const filter = { 'items.boutiqueId': boutiqueId };
+
+  if (query.status) {
+    filter.status = query.status;
+  }
+
+  if (query.paymentStatus) {
+    filter.paymentStatus = query.paymentStatus;
+  }
+
+  if (query.startDate || query.endDate) {
+    filter.createdAt = {};
+    if (query.startDate) filter.createdAt.$gte = new Date(query.startDate);
+    if (query.endDate) {
+      const end = new Date(query.endDate);
+      end.setHours(23, 59, 59, 999);
+      filter.createdAt.$lte = end;
+    }
+  }
+
+  return filter;
+}
+
+/**
+ * Build monthly report data for the authenticated boutique user
+ */
+async function buildBoutiqueMonthlyReport(req) {
+  const boutiqueId = req.user.boutiqueId;
+  const now = new Date();
+  const month = parseInt(req.query.month) || now.getMonth() + 1;
+  const year = parseInt(req.query.year) || now.getFullYear();
+
+  // Date range for the month
+  const startDate = new Date(year, month - 1, 1);
+  const endDate = new Date(year, month, 1);
+
+  // Get boutique name
+  const boutique = await Boutique.findById(boutiqueId).select('name');
+  const boutiqueName = boutique?.name || 'Ma Boutique';
+
+  // Get all orders for this boutique in the given month
+  const orders = await Order.find({
+    'items.boutiqueId': boutiqueId,
+    createdAt: { $gte: startDate, $lt: endDate }
+  })
+    .populate('items.productId', 'name mainPhoto')
+    .sort({ createdAt: -1 });
+
+  // Filter items per order to only include this boutique's items
+  const processedOrders = [];
+  let totalRevenue = 0;
+  let totalProducts = 0;
+  let completedOrders = 0;
+  let cancelledOrders = 0;
+  const productMap = {};
+
+  for (const order of orders) {
+    const boutiqueItems = order.items.filter(
+      item => item.boutiqueId.toString() === boutiqueId.toString()
+    );
+    const boutiqueTotal = boutiqueItems.reduce((sum, item) => sum + item.totalPrice, 0);
+
+    processedOrders.push({
+      orderReference: order.orderReference,
+      createdAt: order.createdAt,
+      status: order.status,
+      paymentStatus: order.paymentStatus,
+      items: boutiqueItems,
+      boutiqueTotal
+    });
+
+    if (['completed', 'delivered'].includes(order.status)) {
+      totalRevenue += boutiqueTotal;
+      completedOrders++;
+    }
+    if (order.status === 'cancelled') {
+      cancelledOrders++;
+    }
+
+    // Aggregate products sold (only from non-cancelled orders)
+    if (order.status !== 'cancelled') {
+      for (const item of boutiqueItems) {
+        const pid = item.productId?._id?.toString() || item.productId?.toString() || 'unknown';
+        if (!productMap[pid]) {
+          productMap[pid] = {
+            productName: item.productName || item.productId?.name || 'Produit',
+            quantity: 0,
+            unitPrice: item.unitPrice,
+            totalRevenue: 0
+          };
+        }
+        productMap[pid].quantity += item.quantity;
+        productMap[pid].totalRevenue += item.totalPrice;
+      }
+    }
+
+    totalProducts += boutiqueItems.reduce((sum, item) => sum + item.quantity, 0);
+  }
+
+  // Sort products by quantity descending
+  const productsSold = Object.values(productMap).sort((a, b) => b.quantity - a.quantity);
+
+  return {
+    boutiqueName,
+    month,
+    year,
+    orders: processedOrders,
+    totalRevenue,
+    totalOrders: processedOrders.length,
+    totalProducts,
+    completedOrders,
+    cancelledOrders,
+    productsSold
+  };
+}
