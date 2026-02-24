@@ -96,6 +96,20 @@ router.get('/boutique/report/pdf', verifyToken, isBoutique, orderController.expo
 router.get('/boutique/report/excel', verifyToken, isBoutique, orderController.exportBoutiqueMonthlyReportExcel);
 
 /**
+ * @route   GET /api/orders/boutique/export/pdf
+ * @desc    Export boutique orders as PDF (with filters)
+ * @access  Private (boutique)
+ */
+router.get('/boutique/export/pdf', verifyToken, isBoutique, orderController.exportBoutiqueOrdersPDF);
+
+/**
+ * @route   GET /api/orders/boutique/export/excel
+ * @desc    Export boutique orders as Excel (with filters)
+ * @access  Private (boutique)
+ */
+router.get('/boutique/export/excel', verifyToken, isBoutique, orderController.exportBoutiqueOrdersExcel);
+
+/**
  * @route   PATCH /api/orders/boutique/:id/status
  * @desc    Boutique updates order status
  * @access  Private (boutique)

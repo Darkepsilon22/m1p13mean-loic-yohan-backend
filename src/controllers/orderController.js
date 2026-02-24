@@ -860,6 +860,79 @@ exports.exportBoutiqueMonthlyReportExcel = asyncHandler(async (req, res) => {
 });
 
 /**
+ * @desc    Export boutique orders as PDF (with filters)
+ * @route   GET /api/orders/boutique/export/pdf?status=pending&paymentStatus=success&startDate=2025-01-01&endDate=2025-12-31
+ * @access  Private (boutique)
+ */
+exports.exportBoutiqueOrdersPDF = asyncHandler(async (req, res) => {
+  const filter = buildBoutiqueOrderFilter(req.user.boutiqueId, req.query);
+  const orders = await Order.find(filter)
+    .populate('items.productId', 'name mainPhoto')
+    .populate('userId', 'firstName lastName email')
+    .sort({ createdAt: -1 })
+    .lean();
+
+  const boutique = await Boutique.findById(req.user.boutiqueId).select('name');
+  const boutiqueName = boutique?.name || 'Ma Boutique';
+  const statusLabel = req.query.status ? (STATUS_LABELS[req.query.status] || req.query.status) : null;
+  const buffer = await generateOrdersPDF(orders, boutiqueName, statusLabel);
+
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename=commandes-boutique-${Date.now()}.pdf`);
+  res.send(buffer);
+});
+
+/**
+ * @desc    Export boutique orders as Excel (with filters)
+ * @route   GET /api/orders/boutique/export/excel?status=pending&paymentStatus=success&startDate=2025-01-01&endDate=2025-12-31
+ * @access  Private (boutique)
+ */
+exports.exportBoutiqueOrdersExcel = asyncHandler(async (req, res) => {
+  const filter = buildBoutiqueOrderFilter(req.user.boutiqueId, req.query);
+  const orders = await Order.find(filter)
+    .populate('items.productId', 'name mainPhoto')
+    .populate('userId', 'firstName lastName email')
+    .sort({ createdAt: -1 })
+    .lean();
+
+  const boutique = await Boutique.findById(req.user.boutiqueId).select('name');
+  const boutiqueName = boutique?.name || 'Ma Boutique';
+  const statusLabel = req.query.status ? (STATUS_LABELS[req.query.status] || req.query.status) : null;
+  const buffer = await generateOrdersExcel(orders, boutiqueName, statusLabel);
+
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename=commandes-boutique-${Date.now()}.xlsx`);
+  res.send(buffer);
+});
+
+/**
+ * Build filtered order query for a boutique
+ */
+function buildBoutiqueOrderFilter(boutiqueId, query) {
+  const filter = { 'items.boutiqueId': boutiqueId };
+
+  if (query.status) {
+    filter.status = query.status;
+  }
+
+  if (query.paymentStatus) {
+    filter.paymentStatus = query.paymentStatus;
+  }
+
+  if (query.startDate || query.endDate) {
+    filter.createdAt = {};
+    if (query.startDate) filter.createdAt.$gte = new Date(query.startDate);
+    if (query.endDate) {
+      const end = new Date(query.endDate);
+      end.setHours(23, 59, 59, 999);
+      filter.createdAt.$lte = end;
+    }
+  }
+
+  return filter;
+}
+
+/**
  * Build monthly report data for the authenticated boutique user
  */
 async function buildBoutiqueMonthlyReport(req) {
