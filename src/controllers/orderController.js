@@ -502,6 +502,13 @@ exports.boutiqueUpdateOrderStatus = asyncHandler(async (req, res, next) => {
     // Don't fail the request if email fails
   }
 
+  // Notify acheteur via socket
+  emitToUser(order.userId.toString(), 'order:statusUpdated', {
+    orderId: order._id,
+    reference: order.orderReference,
+    status
+  });
+
   res.status(200).json({
     success: true,
     message: `Statut mis à jour : ${status}`,
@@ -546,6 +553,16 @@ exports.confirmReception = asyncHandler(async (req, res, next) => {
     );
   } catch (emailErr) {
     console.error('Email notification failed:', emailErr.message);
+  }
+
+  // Notify boutique owner that acheteur confirmed reception
+  const firstBoutiqueIdForNotif = order.items[0]?.boutiqueId;
+  if (firstBoutiqueIdForNotif) {
+    emitToBoutique(firstBoutiqueIdForNotif.toString(), 'order:receptionConfirmed', {
+      orderId: order._id,
+      reference: order.orderReference,
+      customerName: order.customerName
+    });
   }
 
   res.status(200).json({
