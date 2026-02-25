@@ -61,7 +61,7 @@ class InvoiceService {
         const result = await this.generateMonthlyInvoice(contract, today);
         if (result.created) {
           results.generated++;
-          results.details.push({ contractRef: contract.reference, invoiceRef: result.invoice.reference, status: 'generated' });
+          results.details.push({ contractRef: contract.reference, invoiceRef: result.invoice.reference, invoice: result.invoice, status: 'generated' });
         } else {
           results.skipped++;
           results.details.push({ contractRef: contract.reference, status: 'already_exists' });

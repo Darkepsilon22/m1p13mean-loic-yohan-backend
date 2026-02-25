@@ -147,6 +147,7 @@ exports.createOrder = asyncHandler(async (req, res, next) => {
   const boutiqueIds = [...new Set(orderItems.map(item => item.boutiqueId.toString()))];
   emitToAdmin('order:created', { orderId: order._id, reference: order.orderReference, totalAmount: order.totalAmount });
   boutiqueIds.forEach(bid => emitToBoutique(bid, 'order:created', { orderId: order._id, reference: order.orderReference, totalAmount: order.totalAmount }));
+  emitToUser(req.user._id.toString(), 'order:created', { orderId: order._id, reference: order.orderReference, totalAmount: order.totalAmount });
 
   res.status(201).json({
     success: true,

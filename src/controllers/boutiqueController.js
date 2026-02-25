@@ -295,6 +295,7 @@ exports.patchStatus = asyncHandler(async (req, res, next) => {
     .populate('userId', 'firstName lastName email');
 
   if (populated.userId) emitToBoutique(populated._id.toString(), 'boutique:statusChanged', { boutiqueId: populated._id, name: populated.name, status });
+  emitToAdmin('boutique:statusChanged', { boutiqueId: populated._id, name: populated.name, status });
 
   res.status(200).json({
     success: true,
@@ -498,6 +499,7 @@ exports.releaseBoutique = asyncHandler(async (req, res, next) => {
   }
 
   if (previousUserId) emitToBoutique(req.params.id, 'boutique:released', { boutiqueId: req.params.id });
+  emitToAdmin('boutique:released', { boutiqueId: req.params.id, name: boutique.name });
 
   res.json({
     success: true,
@@ -519,6 +521,7 @@ exports.reserveBoutique = asyncHandler(async (req, res, next) => {
     );
 
     emitToAdmin('reservation:created', { boutiqueId: req.params.id, userId: req.user._id });
+    emitToUser(req.user._id.toString(), 'reservation:created', { boutiqueId: req.params.id });
 
     res.json(result);
   } catch (error) {
@@ -539,6 +542,7 @@ exports.confirmReservation = asyncHandler(async (req, res, next) => {
     );
 
     emitToAdmin('reservation:confirmed', { boutiqueId: req.params.id, userId: req.user._id });
+    emitToUser(req.user._id.toString(), 'reservation:confirmed', { boutiqueId: req.params.id });
 
     res.json(result);
   } catch (error) {
@@ -560,6 +564,7 @@ exports.cancelReservation = asyncHandler(async (req, res, next) => {
     );
 
     emitToAdmin('reservation:cancelled', { boutiqueId: req.params.id, userId: req.user._id });
+    emitToUser(req.user._id.toString(), 'reservation:cancelled', { boutiqueId: req.params.id });
 
     res.json(result);
   } catch (error) {

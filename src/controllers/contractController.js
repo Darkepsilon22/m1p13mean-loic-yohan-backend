@@ -3,6 +3,7 @@ const Contract = require('../models/Contract');
 const ExcelJS = require('exceljs');
 const PDFDocument = require('pdfkit');
 const { asyncHandler } = require('../middlewares/errorHandler');
+const { emitToAdmin, emitToUser } = require('../socket');
 
 const CONTRACT_STATUS_LABELS = {
   draft: 'Brouillon',
@@ -35,6 +36,9 @@ exports.createContract = asyncHandler(async (req, res) => {
     req.user._id
   );
 
+  emitToUser(tenantId, 'contract:created', { contractId: contract._id, reference: contract.reference });
+  emitToAdmin('contract:created', { contractId: contract._id, reference: contract.reference, tenantId });
+
   res.status(201).json({ success: true, message: 'Contrat créé avec succès', data: contract });
 });
 
@@ -66,6 +70,9 @@ exports.getById = asyncHandler(async (req, res) => {
  */
 exports.sendForSignature = asyncHandler(async (req, res) => {
   const contract = await ContractService.sendForSignature(req.params.id, req.user._id);
+
+  emitToUser(contract.tenant.toString(), 'contract:sentForSignature', { contractId: contract._id, reference: contract.reference });
+
   res.status(200).json({ success: true, message: 'Contrat envoyé pour signature', data: contract });
 });
 
@@ -76,6 +83,9 @@ exports.sendForSignature = asyncHandler(async (req, res) => {
  */
 exports.signContract = asyncHandler(async (req, res) => {
   const contract = await ContractService.signContract(req.params.id, req.user._id);
+
+  emitToAdmin('contract:signed', { contractId: contract._id, reference: contract.reference, tenantId: req.user._id });
+
   res.status(200).json({ success: true, message: 'Contrat signé avec succès', data: contract });
 });
 
@@ -90,6 +100,9 @@ exports.payDeposit = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, message: 'amount et method sont requis' });
   }
   const contract = await ContractService.payDeposit(req.params.id, req.user._id, { amount, method, reference, notes });
+
+  emitToAdmin('contract:depositPaid', { contractId: contract._id, reference: contract.reference, amount });
+
   res.status(200).json({ success: true, message: 'Paiement du dépôt enregistré', data: contract });
 });
 
@@ -100,6 +113,10 @@ exports.payDeposit = asyncHandler(async (req, res) => {
  */
 exports.confirmDeposit = asyncHandler(async (req, res) => {
   const contract = await ContractService.confirmDeposit(req.params.id, req.user._id);
+
+  emitToUser(contract.tenant.toString(), 'contract:depositConfirmed', { contractId: contract._id, reference: contract.reference });
+  emitToUser(contract.tenant.toString(), 'contract:activated', { contractId: contract._id, reference: contract.reference });
+
   res.status(200).json({ success: true, message: 'Dépôt confirmé et contrat activé', data: contract });
 });
 
@@ -111,6 +128,10 @@ exports.confirmDeposit = asyncHandler(async (req, res) => {
 exports.suspendContract = asyncHandler(async (req, res) => {
   const { reason } = req.body;
   const contract = await ContractService.suspendContract(req.params.id, req.user._id, reason);
+
+  emitToUser(contract.tenant.toString(), 'contract:suspended', { contractId: contract._id, reference: contract.reference, reason });
+  emitToAdmin('contract:suspended', { contractId: contract._id, reference: contract.reference });
+
   res.status(200).json({ success: true, message: 'Contrat suspendu', data: contract });
 });
 
@@ -121,6 +142,10 @@ exports.suspendContract = asyncHandler(async (req, res) => {
  */
 exports.reactivateContract = asyncHandler(async (req, res) => {
   const contract = await ContractService.reactivateContract(req.params.id, req.user._id);
+
+  emitToUser(contract.tenant.toString(), 'contract:reactivated', { contractId: contract._id, reference: contract.reference });
+  emitToAdmin('contract:reactivated', { contractId: contract._id, reference: contract.reference });
+
   res.status(200).json({ success: true, message: 'Contrat réactivé', data: contract });
 });
 
@@ -132,6 +157,10 @@ exports.reactivateContract = asyncHandler(async (req, res) => {
 exports.terminateContract = asyncHandler(async (req, res) => {
   const { reason } = req.body;
   const contract = await ContractService.terminateContract(req.params.id, req.user._id, reason);
+
+  emitToUser(contract.tenant.toString(), 'contract:terminated', { contractId: contract._id, reference: contract.reference, reason });
+  emitToAdmin('contract:terminated', { contractId: contract._id, reference: contract.reference });
+
   res.status(200).json({ success: true, message: 'Contrat résilié', data: contract });
 });
 
