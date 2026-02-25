@@ -1,8 +1,6 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
-const mongoSanitize = require('express-mongo-sanitize');
-const hpp = require('hpp');
 const { errorHandler, notFound } = require('./middlewares/errorHandler');
 
 const app = express();
@@ -49,11 +47,22 @@ app.use((req, res, next) => {
 });
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// NoSQL injection protection
-app.use(mongoSanitize());
-
-// HTTP parameter pollution protection
-app.use(hpp());
+// NoSQL injection protection (sanitize req.body and req.params only — req.query is read-only in Express 5)
+function sanitizeObject(obj) {
+  if (!obj || typeof obj !== 'object') return;
+  for (const key of Object.keys(obj)) {
+    if (key.startsWith('$') || key.includes('.')) {
+      delete obj[key];
+    } else if (typeof obj[key] === 'object') {
+      sanitizeObject(obj[key]);
+    }
+  }
+}
+app.use((req, res, next) => {
+  sanitizeObject(req.body);
+  sanitizeObject(req.params);
+  next();
+});
 
 // Rate limiting global (200 req/min par IP)
 const { apiLimiter } = require('./middlewares/rateLimiter');
