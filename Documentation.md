@@ -695,3 +695,46 @@ Le module exporte des fonctions pratiques :
 | `product:created` | Quand un produit est ajouté |
 
 ---
+
+
+## 19. Les services (email, export, etc.)
+
+### Le service email (`emailService.js`)
+
+C'est le service le plus riche. Il utilise l'API **Brevo** pour envoyer tous les emails transactionnels de l'application. Voici la liste complète :
+
+| Fonction | Ce qu'elle envoie |
+|----------|-------------------|
+| `sendVerificationEmail` | Lien de vérification d'email |
+| `sendOTPEmail` | Code OTP pour la connexion |
+| `sendPasswordResetEmail` | Lien de réinitialisation du mot de passe |
+| `sendWelcomeEmail` | Email de bienvenue après vérification |
+| `sendInvoiceEmail` | Facture en pièce jointe (PDF généré à la volée) |
+| `sendApprovalEmail` | Notification d'approbation du compte |
+| `sendRejectionEmail` | Notification de rejet avec motif |
+| `sendPendingApprovalEmail` | Notification de mise en attente |
+| `sendLowStockAlertEmail` | Alerte de stock bas |
+| `sendReservationApprovedEmail` | Confirmation de réservation |
+| `sendContractCreatedEmail` | Détails du nouveau contrat |
+| `sendContractSignedEmail` | Notification de signature (→ admin) |
+| `sendDepositPartialEmail` | Dépôt partiellement payé |
+| `sendContractActivatedEmail` | Contrat activé |
+| `sendRentReminderEmail` | Rappel avant échéance de loyer |
+| `sendRentLateDay1/7/30Email` | Relances à J+1, J+7, J+30 |
+| `sendContractExpiringEmail` | Contrat bientôt expiré |
+| `sendContractTerminatedEmail` | Contrat résilié |
+| `sendOrderStatusEmail` | Changement de statut de commande |
+
+### Les services d'export
+
+- **`stockExportService.js`** : génère des PDF et des fichiers Excel avec les données de stock (produits, mouvements)
+- **`orderExportService.js`** : pareil pour les commandes (historique acheteur, rapports mensuels boutique)
+
+### Les services métier
+
+- **`contractService.js`** : gère tout le cycle de vie des contrats (création, signature, dépôt, suspension, résiliation…)
+- **`invoiceService.js`** : gère les factures de loyer (création, paiement, annulation, listing des factures en retard)
+- **`boutiqueReservationService.js`** : gère les réservations d'emplacements, y compris la libération automatique des réservations expirées
+- **`stripeBrandingService.js`** : configure le branding Stripe (logo et icône sur la page de paiement)
+
+---
