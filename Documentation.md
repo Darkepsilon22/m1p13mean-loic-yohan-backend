@@ -655,3 +655,43 @@ Le backend fournit des données agrégées pour les dashboards admin et boutique
 | GET | `/api/stats/boutique/products-trends` | Tendances produits |
 
 ---
+
+
+## 18. Les WebSockets (temps réel)
+
+### Comment c'est mis en place
+
+Socket.io est initialisé dans `src/socket/index.js`. À la connexion, le serveur vérifie le **token JWT** envoyé par le client (via `socket.handshake.auth.token` ou en query param). Si le token est valide, le socket rejoint automatiquement les rooms appropriées.
+
+### Les rooms
+
+| Room | Qui y est | À quoi ça sert |
+|------|-----------|----------------|
+| `user:<userId>` | Un utilisateur précis | Notifications personnelles |
+| `boutique:<boutiqueId>` | Le propriétaire d'une boutique | Nouvelles commandes, avis, stock… |
+| `admin` | Tous les admins | Nouveaux comptes, réservations… |
+| `public` | Tout le monde | Événements, nouveautés globales |
+
+### Les helpers
+
+Le module exporte des fonctions pratiques :
+- `getIO()` : récupère l'instance Socket.io
+- `emitToAdmin(event, data)` : émet vers tous les admins
+- `emitToUser(userId, event, data)` : émet vers un utilisateur précis
+- `emitToBoutique(boutiqueId, event, data)` : émet vers une boutique
+- `emitToPublic(event, data)` : émet vers tout le monde
+
+### Exemples d'événements
+
+| Événement | Quand il est émis |
+|-----------|-------------------|
+| `order:created` | Quand une commande est passée |
+| `order:statusChanged` | Quand le statut d'une commande change |
+| `stripe:paymentVerified` | Quand un paiement Stripe est confirmé |
+| `stock:lowAlert` | Quand le stock descend en dessous du seuil |
+| `review:created` | Quand un nouvel avis est posté |
+| `user:approved` | Quand l'admin approuve un compte |
+| `boutique:created` | Quand une boutique est créée |
+| `product:created` | Quand un produit est ajouté |
+
+---
