@@ -807,6 +807,7 @@ exports.approveUser = asyncHandler(async (req, res, next) => {
   }
 
   emitToUser(userId, 'user:approved', { userId, firstName: user.firstName, role: user.role });
+  emitToAdmin('user:approved', { userId, firstName: user.firstName, role: user.role });
 
   res.status(200).json({
     success: true,
@@ -843,6 +844,7 @@ exports.rejectUser = asyncHandler(async (req, res, next) => {
   }
 
   emitToUser(userId, 'user:rejected', { userId, reason: user.statusReason });
+  emitToAdmin('user:rejected', { userId, email: user.email, reason: user.statusReason });
 
   res.status(200).json({
     success: true,
@@ -881,6 +883,7 @@ exports.blockUser = asyncHandler(async (req, res, next) => {
   await user.save({ validateBeforeSave: false });
 
   emitToUser(userId, 'user:blocked', { userId, reason: user.statusReason });
+  emitToAdmin('user:blocked', { userId, email: user.email, reason: user.statusReason });
 
   res.status(200).json({
     success: true,
@@ -912,6 +915,7 @@ exports.unblockUser = asyncHandler(async (req, res, next) => {
   await user.save({ validateBeforeSave: false });
 
   emitToUser(userId, 'user:unblocked', { userId });
+  emitToAdmin('user:unblocked', { userId, email: user.email });
 
   res.status(200).json({
     success: true,

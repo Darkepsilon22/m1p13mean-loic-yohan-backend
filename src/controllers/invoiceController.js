@@ -1,5 +1,6 @@
 const InvoiceService = require('../services/invoiceService');
 const { asyncHandler } = require('../middlewares/errorHandler');
+const { emitToAdmin, emitToUser } = require('../socket');
 
 /**
  * @desc    Obtenir toutes les factures (admin)
@@ -45,6 +46,12 @@ exports.recordPayment = asyncHandler(async (req, res) => {
   }
 
   const invoice = await InvoiceService.recordPayment(req.params.id, { amount, method, reference, notes }, req.user._id);
+
+  emitToUser(invoice.tenant.toString(), 'invoice:paymentRecorded', { invoiceId: invoice._id, reference: invoice.reference, amount });
+  if (invoice.status === 'paid') {
+    emitToUser(invoice.tenant.toString(), 'invoice:paid', { invoiceId: invoice._id, reference: invoice.reference });
+  }
+
   res.status(200).json({ success: true, message: 'Paiement enregistré', data: invoice });
 });
 
@@ -55,6 +62,9 @@ exports.recordPayment = asyncHandler(async (req, res) => {
  */
 exports.cancelInvoice = asyncHandler(async (req, res) => {
   const invoice = await InvoiceService.cancelInvoice(req.params.id);
+
+  emitToUser(invoice.tenant.toString(), 'invoice:cancelled', { invoiceId: invoice._id, reference: invoice.reference });
+
   res.status(200).json({ success: true, message: 'Facture annulée', data: invoice });
 });
 
@@ -103,5 +113,11 @@ exports.payMyInvoice = asyncHandler(async (req, res) => {
   }
 
   const updated = await InvoiceService.recordPayment(req.params.id, { amount, method, reference, notes }, req.user._id);
+
+  emitToAdmin('invoice:paymentRecorded', { invoiceId: updated._id, reference: updated.reference, amount });
+  if (updated.status === 'paid') {
+    emitToAdmin('invoice:paid', { invoiceId: updated._id, reference: updated.reference });
+  }
+
   res.status(200).json({ success: true, message: 'Paiement enregistré', data: updated });
 });
