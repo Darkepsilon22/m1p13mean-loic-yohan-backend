@@ -569,3 +569,89 @@ Les acheteurs notent les boutiques (1 à 5) avec un commentaire. Les propriétai
 | DELETE | `/api/reviews/:id` | Supprimer |
 
 ---
+
+
+## 15. Le plan et la navigation (Map)
+
+### La modélisation
+
+Le centre commercial est modélisé en couches :
+- **Étages** (`Floor`) : chaque niveau du bâtiment
+- **Zones** (`Zone`) : des subdivisions d'un étage (aile nord, sud…)
+- **Espaces spéciaux** (`SpecialSpace`) : escaliers, ascenseurs, entrées, parkings, points d'info
+
+### Le graphe de navigation
+
+Pour le pathfinding, on a construit un **graphe** composé de :
+- **Nœuds** (`NavigationNode`) : des points sur la carte (intersections, couloirs, escaliers, ascenseurs, entrées…)
+- **Arêtes** (`NavigationEdge`) : des connexions entre nœuds, avec un coût et un flag d'accessibilité
+
+Le pathfinding fonctionne **entre les étages** (via escaliers ou ascenseurs) et propose des options d'accessibilité (éviter les escaliers, chemin accessible uniquement).
+
+| Méthode | Route | Ce que ça fait |
+|---------|-------|----------------|
+| GET | `/api/map/floor/:floorId` | Plan d'un étage |
+| POST | `/api/map/route` | Segment de route |
+| POST | `/api/map/route/pathfinding` | Itinéraire complet multi-étages |
+| GET/POST/PUT/DELETE | `/api/floors/*` | CRUD étages |
+| GET/POST/PUT/DELETE | `/api/zones/*` | CRUD zones |
+| GET/POST/PUT/DELETE | `/api/special-spaces/*` | CRUD espaces spéciaux |
+| GET/POST/PUT/DELETE | `/api/navigation/nodes/*` | CRUD nœuds |
+| GET/POST/PUT/DELETE | `/api/navigation/edges/*` | CRUD arêtes |
+
+---
+
+## 16. Les contrats et la facturation
+
+### Les contrats
+
+Quand un emplacement est validé, un contrat de location est créé. Son cycle de vie : `draft` → `pending_signature` → `signed` → `active` (après paiement du dépôt) → `terminated` ou `expired`. L'admin peut aussi suspendre et réactiver un contrat.
+
+### La facturation
+
+Les factures de loyer sont générées automatiquement par un CRON. Le système envoie des rappels avant l'échéance et des relances en cas de retard (J+1, J+7, J+30). Après un trop long retard, le contrat peut être automatiquement résilié.
+
+| Méthode | Route | Ce que ça fait |
+|---------|-------|----------------|
+| GET | `/api/contracts` | Tous les contrats (admin) |
+| POST | `/api/contracts` | Créer |
+| GET | `/api/contracts/:id` | Détail |
+| POST | `/api/contracts/:id/send-signature` | Envoyer pour signature |
+| POST | `/api/contracts/:id/sign` | Signer |
+| POST | `/api/contracts/:id/confirm-deposit` | Confirmer le dépôt |
+| POST | `/api/contracts/:id/suspend` | Suspendre |
+| POST | `/api/contracts/:id/reactivate` | Réactiver |
+| POST | `/api/contracts/:id/terminate` | Résilier |
+| GET | `/api/contracts/my/active` | Mon contrat actif |
+| GET | `/api/contracts/my/history` | Mon historique |
+| POST | `/api/contracts/my/:id/pay-deposit` | Payer le dépôt |
+| GET | `/api/invoices` | Toutes les factures (admin) |
+| GET | `/api/invoices/admin/late` | Factures en retard |
+| GET | `/api/invoices/:id` | Détail |
+| POST | `/api/invoices/:id/pay` | Enregistrer un paiement |
+| POST | `/api/invoices/:id/cancel` | Annuler |
+| GET | `/api/invoices/my` | Mes factures (boutique) |
+| GET | `/api/invoices/my/:id` | Détail de ma facture |
+| POST | `/api/invoices/my/:id/pay` | Payer ma facture |
+
+---
+
+## 17. Les statistiques
+
+Le backend fournit des données agrégées pour les dashboards admin et boutique : revenus, métriques clients, comparaisons de périodes, tendances des boutiques, taux d'occupation, marges, produits les plus vendus…
+
+| Méthode | Route | Ce que ça fait |
+|---------|-------|----------------|
+| GET | `/api/stats/admin/dashboard` | Dashboard admin complet |
+| GET | `/api/stats/admin/revenue` | Revenus globaux |
+| GET | `/api/stats/admin/customers` | Métriques clients |
+| GET | `/api/stats/admin/comparison` | Comparaison de périodes |
+| GET | `/api/stats/admin/boutiques-trends` | Tendances boutiques |
+| GET | `/api/stats/admin/rental-dashboard` | Dashboard location |
+| GET | `/api/stats/boutique/dashboard` | Dashboard boutique |
+| GET | `/api/stats/boutique/revenue` | Revenus boutique |
+| GET | `/api/stats/boutique/trends` | Tendances de vente |
+| GET | `/api/stats/boutique/margins` | Marges |
+| GET | `/api/stats/boutique/products-trends` | Tendances produits |
+
+---
