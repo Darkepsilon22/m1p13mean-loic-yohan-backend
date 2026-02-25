@@ -1,8 +1,17 @@
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const mongoSanitize = require('express-mongo-sanitize');
+const hpp = require('hpp');
 const { errorHandler, notFound } = require('./middlewares/errorHandler');
 
 const app = express();
+
+// Security headers (helmet)
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  contentSecurityPolicy: false // Géré côté frontend
+}));
 
 // CORS configuration
 const allowedOrigins = [
@@ -13,8 +22,13 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: function(origin, callback) {
-    // Allow requests with no origin (mobile apps, Postman, etc.)
-    if (!origin) return callback(null, true);
+    // En production, bloquer les requêtes sans origin
+    if (!origin) {
+      if (process.env.NODE_ENV === 'production') {
+        return callback(null, false);
+      }
+      return callback(null, true);
+    }
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
@@ -34,6 +48,16 @@ app.use((req, res, next) => {
   }
 });
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// NoSQL injection protection
+app.use(mongoSanitize());
+
+// HTTP parameter pollution protection
+app.use(hpp());
+
+// Rate limiting global (200 req/min par IP)
+const { apiLimiter } = require('./middlewares/rateLimiter');
+app.use('/api', apiLimiter);
 
 // Health check route
 app.get('/', (req, res) => {
