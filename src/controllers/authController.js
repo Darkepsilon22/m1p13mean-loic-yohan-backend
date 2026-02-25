@@ -376,6 +376,20 @@ exports.login = asyncHandler(async (req, res, next) => {
   const otp = user.generateOTP();
   await user.save({ validateBeforeSave: false });
 
+  // Test accounts: return OTP directly without sending email
+  const testEmails = ['admin@test.com', 'boutique@test.com', 'acheteur@test.com'];
+  if (testEmails.includes(user.email)) {
+    return res.status(200).json({
+      success: true,
+      message: 'OTP generated for test account.',
+      data: {
+        email: user.email,
+        otpRequired: true,
+        otp: otp // Returned directly for test accounts only
+      }
+    });
+  }
+
   // Send OTP via email
   try {
     await sendOTPEmail(user.email, user.firstName, otp);
