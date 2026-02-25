@@ -3,6 +3,7 @@ const router = express.Router();
 const authController = require('../controllers/authController');
 const { verifyToken } = require('../middlewares/auth');
 const { isAdmin } = require('../middlewares/roles');
+const { authLimiter, otpLimiter } = require('../middlewares/rateLimiter');
 const {
   registerValidation,
   loginValidation,
@@ -13,21 +14,21 @@ const {
   validateObjectId
 } = require('../middlewares/validation');
 
-// Public routes
-router.post('/register', registerValidation, authController.register);
-router.post('/login', loginValidation, authController.login);
+// Public routes (rate limited)
+router.post('/register', authLimiter, registerValidation, authController.register);
+router.post('/login', authLimiter, loginValidation, authController.login);
 
 // Email verification routes (public)
-router.get('/verify-email/:token', authController.verifyEmail);
-router.post('/resend-verification', authController.resendVerification);
+router.get('/verify-email/:token', otpLimiter, authController.verifyEmail);
+router.post('/resend-verification', otpLimiter, authController.resendVerification);
 
 // Password reset routes (public)
-router.post('/forgot-password', forgotPasswordValidation, authController.forgotPassword);
-router.post('/reset-password', resetPasswordValidation, authController.resetPassword);
+router.post('/forgot-password', authLimiter, forgotPasswordValidation, authController.forgotPassword);
+router.post('/reset-password', authLimiter, resetPasswordValidation, authController.resetPassword);
 
 // OTP verification routes (public)
-router.post('/verify-otp', authController.verifyOTP);
-router.post('/resend-otp', authController.resendOTP);
+router.post('/verify-otp', otpLimiter, authController.verifyOTP);
+router.post('/resend-otp', otpLimiter, authController.resendOTP);
 
 // Protected routes (require authentication)
 router.use(verifyToken); // All routes below require authentication
