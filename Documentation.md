@@ -738,3 +738,22 @@ C'est le service le plus riche. Il utilise l'API **Brevo** pour envoyer tous les
 - **`stripeBrandingService.js`** : configure le branding Stripe (logo et icône sur la page de paiement)
 
 ---
+
+
+## 20. Les tâches planifiées
+
+Ces tâches tournent en arrière-plan sans intervention humaine :
+
+| Tâche | Fréquence | Ce qu'elle fait |
+|-------|-----------|-----------------|
+| **Expiration des réservations** | Toutes les minutes | Libère les emplacements réservés mais non confirmés à temps |
+| **Expiration des commandes** | Régulièrement | Annule les commandes en attente de paiement depuis trop longtemps |
+| **Génération des factures** | Selon la périodicité | Crée les factures de loyer automatiquement |
+| **Relances de paiement** | Quotidiennement | Envoie des emails de relance pour les factures en retard (J+1, J+7, J+30) |
+| **Rappels de loyer** | Quotidiennement | Prévient les boutiques avant l'échéance du loyer |
+| **Vérification des dépôts** | Régulièrement | Vérifie que les dépôts de garantie ont été payés dans les temps |
+| **Résiliation automatique** | Régulièrement | Résilie les contrats en cas de non-paiement prolongé |
+
+Seul le CRON des réservations est démarré directement dans `server.js`. Les autres sont configurés dans leurs fichiers respectifs sous `src/jobs/`.
+
+---
