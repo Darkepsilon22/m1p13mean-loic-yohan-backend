@@ -243,8 +243,8 @@ exports.patchStatus = asyncHandler(async (req, res, next) => {
   if (status === 'deleted' && !isAdmin && !isAuthor) {
     return next(new ApiError(403, 'Only author or admin can delete a review'));
   }
-  if (status === 'published' && !isAdmin) {
-    return next(new ApiError(403, 'Only admin can republish a review'));
+  if (status === 'published' && !isAdmin && !isBoutiqueOwner) {
+    return next(new ApiError(403, 'Seul l\'administrateur ou le propriétaire de la boutique peut republier un avis'));
   }
 
   const previousStatus = review.status;
