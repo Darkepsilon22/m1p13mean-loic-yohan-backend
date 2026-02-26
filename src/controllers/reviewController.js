@@ -240,8 +240,8 @@ exports.patchStatus = asyncHandler(async (req, res, next) => {
   if (status === 'reported' && !isAdmin) {
     return next(new ApiError(403, 'Only admin can set reported status'));
   }
-  if (status === 'deleted' && !isAdmin && !isAuthor) {
-    return next(new ApiError(403, 'Only author or admin can delete a review'));
+  if (status === 'deleted' && !isAdmin && !isAuthor && !isBoutiqueOwner) {
+    return next(new ApiError(403, 'Only author, admin or boutique owner can delete a review'));
   }
   if (status === 'published' && !isAdmin && !isBoutiqueOwner) {
     return next(new ApiError(403, 'Seul l\'administrateur ou le propriétaire de la boutique peut republier un avis'));
@@ -249,6 +249,13 @@ exports.patchStatus = asyncHandler(async (req, res, next) => {
 
   const previousStatus = review.status;
   review.status = status;
+
+  // Reset report data when republishing a reported review
+  if (status === 'published' && previousStatus === 'reported') {
+    review.reportCount = 0;
+    review.reportReasons = [];
+  }
+
   await review.save();
 
   if (previousStatus !== status && (previousStatus === 'published' || status === 'published')) {
@@ -306,6 +313,7 @@ exports.report = asyncHandler(async (req, res, next) => {
   }
 
   emitToAdmin('review:reported', { reviewId: review._id, boutiqueId: review.boutiqueId, reportCount: review.reportCount });
+  emitToBoutique(review.boutiqueId.toString(), 'review:reported', { reviewId: review._id, boutiqueId: review.boutiqueId, reportCount: review.reportCount });
 
   res.status(200).json({
     success: true,
@@ -323,14 +331,20 @@ exports.report = asyncHandler(async (req, res, next) => {
  * @access  Private (boutique owner)
  */
 exports.getMyReviews = asyncHandler(async (req, res, next) => {
-  const boutique = await Boutique.findOne({ userId: req.user._id });
-  if (!boutique) {
-    return next(new ApiError(404, 'Vous n\'avez pas de boutique'));
+  const isAdmin = req.user.role === 'admin';
+  const filter = {};
+
+  if (isAdmin) {
+    // Admin sees all reviews (no boutique filter)
+  } else {
+    const boutique = await Boutique.findOne({ userId: req.user._id });
+    if (!boutique) {
+      return next(new ApiError(404, 'Vous n\'avez pas de boutique'));
+    }
+    filter.boutiqueId = boutique._id;
   }
 
   const { type, status, rating, page = 1, limit = 20, sort = '-createdAt' } = req.query;
-
-  const filter = { boutiqueId: boutique._id };
 
   // Filtre par type : boutique (productId null) ou product (productId existe)
   if (type === 'boutique') {
@@ -339,7 +353,11 @@ exports.getMyReviews = asyncHandler(async (req, res, next) => {
     filter.productId = { $ne: null };
   }
 
-  if (status) filter.status = status;
+  if (status === 'reported') {
+    filter.reportCount = { $gt: 0 };
+  } else if (status) {
+    filter.status = status;
+  }
   if (rating) filter.rating = parseInt(rating, 10);
 
   const skip = (Math.max(1, parseInt(page, 10)) - 1) * Math.min(100, Math.max(1, parseInt(limit, 10)));
@@ -349,6 +367,7 @@ exports.getMyReviews = asyncHandler(async (req, res, next) => {
     Review.find(filter)
       .populate('userId', 'firstName lastName email')
       .populate('productId', 'name')
+      .populate('boutiqueId', 'name slug')
       .sort(sort)
       .skip(skip)
       .limit(limitNum)
@@ -384,8 +403,10 @@ exports.delete = asyncHandler(async (req, res, next) => {
 
   const isAuthor = review.userId && review.userId.toString() === req.user._id.toString();
   const isAdmin = req.user.role === 'admin';
+  const boutique = await Boutique.findById(review.boutiqueId);
+  const isBoutiqueOwner = boutique && boutique.userId && boutique.userId.toString() === req.user._id.toString();
 
-  if (!isAuthor && !isAdmin) {
+  if (!isAuthor && !isAdmin && !isBoutiqueOwner) {
     return next(new ApiError(403, 'You can only delete your own review'));
   }
 
