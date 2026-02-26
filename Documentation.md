@@ -738,3 +738,160 @@ C'est le service le plus riche. Il utilise l'API **Brevo** pour envoyer tous les
 - **`stripeBrandingService.js`** : configure le branding Stripe (logo et icône sur la page de paiement)
 
 ---
+
+
+## 20. Les tâches planifiées
+
+Ces tâches tournent en arrière-plan sans intervention humaine :
+
+| Tâche | Fréquence | Ce qu'elle fait |
+|-------|-----------|-----------------|
+| **Expiration des réservations** | Toutes les minutes | Libère les emplacements réservés mais non confirmés à temps |
+| **Expiration des commandes** | Régulièrement | Annule les commandes en attente de paiement depuis trop longtemps |
+| **Génération des factures** | Selon la périodicité | Crée les factures de loyer automatiquement |
+| **Relances de paiement** | Quotidiennement | Envoie des emails de relance pour les factures en retard (J+1, J+7, J+30) |
+| **Rappels de loyer** | Quotidiennement | Prévient les boutiques avant l'échéance du loyer |
+| **Vérification des dépôts** | Régulièrement | Vérifie que les dépôts de garantie ont été payés dans les temps |
+| **Résiliation automatique** | Régulièrement | Résilie les contrats en cas de non-paiement prolongé |
+
+Seul le CRON des réservations est démarré directement dans `server.js`. Les autres sont configurés dans leurs fichiers respectifs sous `src/jobs/`.
+
+---
+
+
+## 21. Référence API
+
+### URL de base
+
+- Développement : `http://localhost:5000/api`
+- Production : `https://votre-domaine.com/api`
+
+### Authentification
+
+Toutes les routes protégées attendent un token JWT :
+
+```
+Authorization: Bearer <token_jwt>
+```
+
+### Format des réponses
+
+```json
+// Succès
+{ "success": true, "message": "...", "data": { ... } }
+
+// Erreur
+{ "success": false, "message": "...", "errors": [ ... ] }
+```
+
+### Récapitulatif
+
+| Préfixe | Module | ~Routes |
+|---------|--------|---------|
+| `/api/auth` | Authentification et utilisateurs | 22 |
+| `/api/boutiques` | Boutiques et emplacements | 15 |
+| `/api/categories` | Catégories | 11 |
+| `/api/products` | Produits | 16 |
+| `/api/stock` | Gestion du stock | 9 |
+| `/api/promotions` | Promotions | 10 |
+| `/api/events` | Événements | 12 |
+| `/api/cart` | Panier | 7 |
+| `/api/orders` | Commandes | 15 |
+| `/api/payments` | Paiements et Stripe | 12 |
+| `/api/reviews` | Avis | 9 |
+| `/api/map` | Carte | 3 |
+| `/api/floors` | Étages | 5 |
+| `/api/zones` | Zones | 6 |
+| `/api/special-spaces` | Espaces spéciaux | 6 |
+| `/api/navigation` | Navigation | 10 |
+| `/api/stats` | Statistiques | 11 |
+| `/api/contracts` | Contrats | 12 |
+| `/api/invoices` | Factures | 8 |
+| **Total** | | **~189** |
+
+---
+
+## 22. La base de données
+
+### Vue d'ensemble
+
+La base tourne sur **MongoDB Atlas**. On utilise **Mongoose** pour définir les schémas et interagir avec la base. Au total, **18 collections**.
+
+### Les modèles principaux
+
+#### User
+
+| Champ | Type | À quoi ça sert |
+|-------|------|----------------|
+| email | String | Adresse email unique |
+| password | String | Mot de passe hashé (bcrypt) |
+| role | String | `admin`, `boutique` ou `acheteur` |
+| firstName, lastName | String | Nom et prénom |
+| phone | String | Téléphone |
+| avatar | String | URL de la photo de profil |
+| status | String | `active`, `inactive`, `pending`, `blocked` |
+| isEmailVerified | Boolean | Email vérifié ? |
+| otp, otpExpires, otpAttempts | String, Date, Number | Gestion du code OTP |
+| passwordResetToken, passwordResetExpires | String, Date | Réinitialisation de mot de passe |
+| lockUntil | Date | Verrouillage temporaire du compte |
+| favorites | [ObjectId → Boutique] | Boutiques favorites |
+
+#### Boutique
+
+| Champ | Type | À quoi ça sert |
+|-------|------|----------------|
+| userId | ObjectId → User | Le propriétaire |
+| name, slug | String | Nom et slug URL |
+| description, shortDescription | String | Descriptions |
+| categoryId | ObjectId → Category | Catégorie |
+| logo, coverImage, photos | String / [String] | Images |
+| contact | Object | {phone, email, website} |
+| location | Object | {floor, zone, number, mapCoordinates} |
+| openingHours | [Object] | Horaires d'ouverture |
+| status | String | `active`, `inactive`, `pending`, `suspended` |
+
+#### Product
+
+| Champ | Type | À quoi ça sert |
+|-------|------|----------------|
+| boutiqueId | ObjectId → Boutique | Boutique propriétaire |
+| name, slug, description | String | Infos de base |
+| price, originalPrice | Number | Prix actuel et prix barré |
+| photos, mainPhoto | [String], String | Images |
+| stock, lowStockThreshold | Number | Stock et seuil d'alerte |
+| availability | String | `available`, `out_of_stock`, `on_order` |
+| isFeatured, isArchived | Boolean | Vedette / Archivé |
+| views | Number | Nombre de vues |
+
+#### Order
+
+| Champ | Type | À quoi ça sert |
+|-------|------|----------------|
+| orderReference | String | Référence unique |
+| userId | ObjectId → User | L'acheteur |
+| items | [Object] | Articles (productId, boutiqueId, quantité, prix) |
+| shippingAddress, billingAddress | Object | Adresses |
+| totalAmount, shippingFee | Number | Montants |
+| status | String | `pending` → `confirmed` → `processing` → `shipped` → `delivered` |
+| paymentStatus, paymentMethod | String | Paiement |
+| trackingNumber, carrier | String | Suivi de livraison |
+
+#### Les 14 autres modèles
+
+| Modèle | Ce qu'il stocke |
+|--------|-----------------|
+| **Category** | Catégories de boutiques (arborescence parent/enfant, slug) |
+| **Cart** | Panier d'un utilisateur (userId + items[{productId, quantity}]) |
+| **Payment** | Paiements (référence, montant, devise MGA, statut, ID Stripe) |
+| **Review** | Avis sur une boutique (note, commentaire, réponse, signalements) |
+| **Promotion** | Promotion sur un produit (remise %, montant fixe, dates) |
+| **Event** | Événement du centre (titre, dates, lieu, statut, vedette, bannière) |
+| **StockMovement** | Mouvement de stock (produit, type, quantité, stock avant/après, raison) |
+| **Contract** | Contrat de location (boutique, dates, dépôt, statut) |
+| **ReservationBoutique** | Réservation temporaire d'emplacement (boutiqueId, expiresAt) |
+| **Invoice** | Facture de loyer (contrat, période, montant, statut, paiements) |
+| **Floor** | Étage du centre (nom, niveau, ordre) |
+| **Zone** | Zone d'un étage (floorId, nom) |
+| **SpecialSpace** | Espace spécial (type, coordonnées, floorId, zoneId) |
+| **NavigationNode** | Point du graphe de navigation (type, x, y, floorId) |
+| **NavigationEdge** | Connexion entre deux nœuds (coût, bidirectionnel, accessible) |
