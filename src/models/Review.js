@@ -63,6 +63,8 @@ reviewSchema.index({ boutiqueId: 1 });
 reviewSchema.index({ status: 1 });
 reviewSchema.index({ rating: -1 });
 reviewSchema.index({ createdAt: -1 });
+reviewSchema.index({ reportCount: 1 });
+reviewSchema.index({ boutiqueId: 1, status: 1 });
 
 const Review = mongoose.model('Review', reviewSchema);
 

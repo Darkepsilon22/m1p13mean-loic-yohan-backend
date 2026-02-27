@@ -91,6 +91,9 @@ productSchema.index({ isFeatured: -1 });
 productSchema.index({ isArchived: 1 });
 productSchema.index({ price: 1 });
 productSchema.index({ createdAt: -1 });
+productSchema.index({ categoryInternal: 1 });
+productSchema.index({ boutiqueId: 1, isArchived: 1 });
+productSchema.index({ boutiqueId: 1, availability: 1 });
 
 // Pre-validate hook for slug generation
 productSchema.pre('validate', function() {

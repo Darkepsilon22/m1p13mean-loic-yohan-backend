@@ -87,6 +87,8 @@ promotionSchema.index({ boutiqueId: 1 });
 promotionSchema.index({ status: 1 });
 promotionSchema.index({ startDate: 1, endDate: 1 });
 promotionSchema.index({ endDate: 1 }); // For cron job to update expired promotions
+promotionSchema.index({ products: 1 });
+promotionSchema.index({ status: 1, startDate: 1, endDate: 1 });
 
 // Pre-save hook to set initial status based on dates
 promotionSchema.pre('save', function() {

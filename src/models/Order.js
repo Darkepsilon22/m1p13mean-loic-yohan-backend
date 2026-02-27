@@ -185,6 +185,8 @@ orderSchema.index({ paymentStatus: 1 });
 orderSchema.index({ createdAt: -1 });
 orderSchema.index({ 'items.boutiqueId': 1 });
 orderSchema.index({ expiresAt: 1 });
+orderSchema.index({ userId: 1, createdAt: -1 });
+orderSchema.index({ status: 1, paymentStatus: 1 });
 
 // Pre-validate hook to generate order reference
 orderSchema.pre('validate', async function() {
