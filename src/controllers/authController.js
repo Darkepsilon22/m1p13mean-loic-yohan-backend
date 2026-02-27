@@ -1,6 +1,8 @@
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
+const ExcelJS = require('exceljs');
+const PDFDocument = require('pdfkit');
 const { ApiError, asyncHandler } = require('../middlewares/errorHandler');
 const { sendVerificationEmail, sendPasswordResetEmail, sendOTPEmail, sendWelcomeEmail, sendApprovalEmail, sendRejectionEmail, sendPendingApprovalEmail } = require('../services/emailService');
 const { emitToAdmin, emitToUser } = require('../socket');
@@ -936,4 +938,135 @@ exports.unblockUser = asyncHandler(async (req, res, next) => {
     message: 'User unblocked successfully',
     data: { user }
   });
+});
+
+// ==================== EXPORT ====================
+
+const buildUserFilter = (query) => {
+  const filter = {};
+  if (query.status) filter.status = query.status;
+  if (query.role) filter.role = query.role;
+  if (query.search) {
+    filter.$or = [
+      { firstName: { $regex: query.search, $options: 'i' } },
+      { lastName: { $regex: query.search, $options: 'i' } },
+      { email: { $regex: query.search, $options: 'i' } }
+    ];
+  }
+  return filter;
+};
+
+const ROLE_LABELS = { admin: 'Admin', boutique: 'Boutique', acheteur: 'Acheteur' };
+const STATUS_LABELS = { active: 'Actif', pending: 'En attente', blocked: 'Bloqué', inactive: 'Inactif' };
+
+exports.exportUsersExcel = asyncHandler(async (req, res) => {
+  const filter = buildUserFilter(req.query);
+  const users = await User.find(filter).select('-password').sort({ createdAt: -1 }).lean();
+
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'Smar\'ket';
+  const sheet = workbook.addWorksheet('Utilisateurs');
+
+  sheet.mergeCells('A1:F1');
+  sheet.getCell('A1').value = 'Liste des utilisateurs — Smar\'ket';
+  sheet.getCell('A1').font = { bold: true, size: 14 };
+  sheet.mergeCells('A2:F2');
+  sheet.getCell('A2').value = `Généré le ${new Date().toLocaleString('fr-FR')} — ${users.length} utilisateur(s)`;
+  sheet.getCell('A2').font = { size: 10, color: { argb: 'FF666666' } };
+
+  sheet.columns = [
+    { key: 'name', width: 28 },
+    { key: 'email', width: 32 },
+    { key: 'phone', width: 18 },
+    { key: 'role', width: 14 },
+    { key: 'status', width: 14 },
+    { key: 'createdAt', width: 20 }
+  ];
+
+  const headerRow = sheet.getRow(4);
+  headerRow.values = ['Nom', 'Email', 'Téléphone', 'Rôle', 'Statut', 'Inscription'];
+  headerRow.font = { bold: true };
+  headerRow.eachCell(cell => {
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4680FF' } };
+    cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    cell.alignment = { horizontal: 'center' };
+  });
+
+  let rowNum = 5;
+  for (const u of users) {
+    const row = sheet.getRow(rowNum);
+    row.values = [
+      `${u.firstName || ''} ${u.lastName || ''}`.trim() || '—',
+      u.email,
+      u.phone || '—',
+      ROLE_LABELS[u.role] || u.role,
+      STATUS_LABELS[u.status] || u.status,
+      u.createdAt ? new Date(u.createdAt).toLocaleDateString('fr-FR') : '—'
+    ];
+    rowNum++;
+  }
+
+  const totalRow = sheet.getRow(rowNum + 1);
+  totalRow.getCell(1).value = `Total : ${users.length} utilisateur(s)`;
+  totalRow.getCell(1).font = { bold: true };
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename=utilisateurs-${Date.now()}.xlsx`);
+  res.send(Buffer.from(buffer));
+});
+
+exports.exportUsersPDF = asyncHandler(async (req, res) => {
+  const filter = buildUserFilter(req.query);
+  const users = await User.find(filter).select('-password').sort({ createdAt: -1 }).lean();
+
+  const doc = new PDFDocument({ margin: 40, size: 'A4', bufferPages: true });
+  const chunks = [];
+  doc.on('data', c => chunks.push(c));
+  doc.on('end', () => {
+    const result = Buffer.concat(chunks);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=utilisateurs-${Date.now()}.pdf`);
+    res.send(result);
+  });
+
+  // Title
+  doc.fontSize(18).font('Helvetica-Bold').text('Liste des utilisateurs — Smar\'ket', { align: 'center' });
+  doc.moveDown(0.3);
+  doc.fontSize(10).font('Helvetica').fillColor('#666')
+    .text(`Généré le ${new Date().toLocaleString('fr-FR')} — ${users.length} utilisateur(s)`, { align: 'center' });
+  doc.moveDown(1);
+
+  // Table header
+  const cols = [40, 180, 300, 380, 440, 500];
+  const headers = ['Nom', 'Email', 'Rôle', 'Statut', 'Inscription'];
+  doc.fontSize(9).font('Helvetica-Bold').fillColor('#fff');
+  doc.rect(35, doc.y, 525, 20).fill('#4680ff');
+  const headerY = doc.y + 5;
+  headers.forEach((h, i) => {
+    doc.fillColor('#fff').text(h, cols[i], headerY, { width: (cols[i + 1] || 560) - cols[i], continued: false });
+  });
+  doc.y = headerY + 20;
+
+  // Rows
+  doc.font('Helvetica').fontSize(8).fillColor('#333');
+  for (const u of users) {
+    if (doc.y > 750) { doc.addPage(); doc.y = 40; }
+    const y = doc.y;
+    const name = `${u.firstName || ''} ${u.lastName || ''}`.trim() || '—';
+    doc.text(name, cols[0], y, { width: 135 });
+    doc.text(u.email, cols[1], y, { width: 115 });
+    doc.text(ROLE_LABELS[u.role] || u.role, cols[2], y, { width: 75 });
+    doc.text(STATUS_LABELS[u.status] || u.status, cols[3], y, { width: 55 });
+    doc.text(u.createdAt ? new Date(u.createdAt).toLocaleDateString('fr-FR') : '—', cols[4], y, { width: 60 });
+    doc.y = y + 16;
+    doc.strokeColor('#eee').moveTo(35, doc.y).lineTo(560, doc.y).stroke();
+    doc.y += 2;
+  }
+
+  doc.moveDown(1);
+  doc.fontSize(9).font('Helvetica-Bold').fillColor('#333')
+    .text(`Total : ${users.length} utilisateur(s)`);
+
+  doc.end();
 });
