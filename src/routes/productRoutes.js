@@ -5,6 +5,7 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 *
 const productController = require('../controllers/productController');
 const { verifyToken } = require('../middlewares/auth');
 const { isAdmin, isAdminOrBoutique } = require('../middlewares/roles');
+const { cache } = require('../middlewares/cache');
 const {
   validateProductId,
   createProduct,
@@ -13,11 +14,11 @@ const {
   listProducts
 } = require('../middlewares/productValidation');
 
-// Public routes
-router.get('/', listProducts, productController.getAll);
-router.get('/featured', productController.getFeatured);
-router.get('/slug/:slug', productController.getBySlug);
-router.get('/boutique/:boutiqueId', validateProductId('boutiqueId'), productController.getByBoutique);
+// Public routes (cached)
+router.get('/', listProducts, cache(30), productController.getAll);
+router.get('/featured', cache(60), productController.getFeatured);
+router.get('/slug/:slug', cache(30), productController.getBySlug);
+router.get('/boutique/:boutiqueId', validateProductId('boutiqueId'), cache(30), productController.getByBoutique);
 
 // Protected routes (Boutique owner or Admin)
 router.use(verifyToken);

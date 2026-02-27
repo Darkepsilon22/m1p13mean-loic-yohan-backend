@@ -11,13 +11,15 @@ const {
   listEvents
 } = require('../middlewares/eventValidation');
 
-// Public routes
-router.get('/', listEvents, eventController.getAll);
-router.get('/upcoming', eventController.getUpcoming);
-router.get('/current', eventController.getCurrent);
-router.get('/featured', eventController.getFeatured);
-router.get('/banners', optionalAuth, eventController.getBanners);
-router.get('/:id', validateEventId('id'), eventController.getById);
+const { cache } = require('../middlewares/cache');
+
+// Public routes (cached)
+router.get('/', listEvents, cache(60), eventController.getAll);
+router.get('/upcoming', cache(60), eventController.getUpcoming);
+router.get('/current', cache(60), eventController.getCurrent);
+router.get('/featured', cache(60), eventController.getFeatured);
+router.get('/banners', optionalAuth, cache(60), eventController.getBanners);
+router.get('/:id', validateEventId('id'), cache(60), eventController.getById);
 
 // Admin routes
 router.use(verifyToken);

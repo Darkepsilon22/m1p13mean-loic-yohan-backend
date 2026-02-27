@@ -14,12 +14,14 @@ const {
   listBoutiques
 } = require('../middlewares/boutiqueValidation');
 
-// ==================== PUBLIC ROUTES ====================
+const { cache } = require('../middlewares/cache');
+
+// ==================== PUBLIC ROUTES (cached) ====================
 
 // Routes boutiques publiques
-router.get('/', listBoutiques, boutiqueController.getAll);
+router.get('/', listBoutiques, cache(30), boutiqueController.getAll);
 
-router.get('/:id', validateBoutiqueId('id'), boutiqueController.getById);
+router.get('/:id', validateBoutiqueId('id'), cache(30), boutiqueController.getById);
 
 // ==================== PROTECTED ROUTES ====================
 router.use(verifyToken);

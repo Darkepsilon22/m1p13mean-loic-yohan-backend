@@ -16,6 +16,8 @@ const {
   validateSlug
 } = require('../middlewares/categoryValidation');
 
+const { cache } = require('../middlewares/cache');
+
 // ============================================
 // PUBLIC ROUTES (no authentication required)
 // ============================================
@@ -26,7 +28,7 @@ const {
  * @access  Public
  * @query   active, parent, root, page, limit, sort
  */
-router.get('/', listCategories, categoryController.getAll);
+router.get('/', listCategories, cache(120), categoryController.getAll);
 
 /**
  * @route   GET /api/categories/tree
@@ -34,14 +36,14 @@ router.get('/', listCategories, categoryController.getAll);
  * @access  Public
  * @query   active (default: true)
  */
-router.get('/tree', categoryController.getTree);
+router.get('/tree', cache(120), categoryController.getTree);
 
 /**
  * @route   GET /api/categories/stats
  * @desc    Get boutiques count per category
  * @access  Public
  */
-router.get('/stats', categoryController.getStats);
+router.get('/stats', cache(120), categoryController.getStats);
 
 /**
  * @route   GET /api/categories/slug/:slug
