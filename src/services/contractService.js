@@ -342,8 +342,8 @@ class ContractService {
         boutique.assignee = null;
         boutique.userId = null;
         boutique.reservationExpires = null;
-        boutique.name = null;
-        boutique.slug = null;
+        boutique.name = undefined;
+        boutique.slug = undefined;
         boutique.description = null;
         boutique.shortDescription = null;
         boutique.logo = null;

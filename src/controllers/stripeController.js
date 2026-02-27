@@ -124,7 +124,7 @@ exports.createCheckoutSession = asyncHandler(async (req, res, next) => {
   order.paymentUrl = session.url;
   await order.save();
 
-  emitToAdmin('stripe:sessionCreated', { orderId: order._id, sessionId: session.id });
+  emitToUser(req.user._id.toString(), 'stripe:sessionCreated', { orderId: order._id, sessionId: session.id });
 
   res.status(200).json({
     success: true,
@@ -253,7 +253,6 @@ exports.stripeWebhook = asyncHandler(async (req, res, next) => {
             }
           });
           console.log(`✅ Payment confirmed via webhook: ${payment.reference}`);
-          emitToAdmin('stripe:webhookProcessed', { type: event.type });
           if (payment && payment.userId) emitToUser(payment.userId.toString(), 'stripe:webhookProcessed', { type: event.type, reference: payment.reference });
         } else {
           // Async payment - mark as processing, wait for async_payment_succeeded

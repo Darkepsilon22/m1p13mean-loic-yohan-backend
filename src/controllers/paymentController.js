@@ -78,7 +78,7 @@ exports.initializePayment = asyncHandler(async (req, res, next) => {
   payment.paymentUrl = paymentUrl;
   await payment.save();
 
-  emitToAdmin('payment:initialized', { paymentRef: payment.reference, orderId: order._id, amount: payment.amount });
+  emitToUser(req.user._id.toString(), 'payment:initialized', { paymentRef: payment.reference, orderId: order._id, amount: payment.amount });
 
   res.status(201).json({
     success: true,

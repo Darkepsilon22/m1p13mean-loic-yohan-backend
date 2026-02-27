@@ -145,7 +145,6 @@ exports.createOrder = asyncHandler(async (req, res, next) => {
   ]);
 
   const boutiqueIds = [...new Set(orderItems.map(item => item.boutiqueId.toString()))];
-  emitToAdmin('order:created', { orderId: order._id, reference: order.orderReference, totalAmount: order.totalAmount });
   boutiqueIds.forEach(bid => emitToBoutique(bid, 'order:created', { orderId: order._id, reference: order.orderReference, totalAmount: order.totalAmount }));
   emitToUser(req.user._id.toString(), 'order:created', { orderId: order._id, reference: order.orderReference, totalAmount: order.totalAmount });
 
@@ -366,7 +365,6 @@ exports.cancelOrder = asyncHandler(async (req, res, next) => {
   await order.save();
 
   const cancelBoutiqueIds = [...new Set(order.items.map(item => item.boutiqueId.toString()))];
-  emitToAdmin('order:cancelled', { orderId: order._id, reference: order.orderReference });
   cancelBoutiqueIds.forEach(bid => emitToBoutique(bid, 'order:cancelled', { orderId: order._id, reference: order.orderReference }));
 
   res.status(200).json({

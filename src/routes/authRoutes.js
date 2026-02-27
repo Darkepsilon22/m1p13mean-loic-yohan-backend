@@ -49,6 +49,8 @@ router.delete('/favorites/:boutiqueId', validateObjectId('boutiqueId'), authCont
 
 // Admin routes for user management
 router.get('/users', isAdmin, authController.getAllUsers);
+router.get('/users/export/excel', isAdmin, authController.exportUsersExcel);
+router.get('/users/export/pdf', isAdmin, authController.exportUsersPDF);
 router.get('/users/pending', isAdmin, authController.getPendingUsers);
 router.patch('/users/:userId/status', isAdmin, validateObjectId('userId'), authController.updateUserStatus);
 router.patch('/users/:userId/approve', isAdmin, validateObjectId('userId'), authController.approveUser);

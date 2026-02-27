@@ -1,0 +1,44 @@
+## Annexe — Les captures d'écran à fournir
+
+Pour illustrer cette documentation, placez les captures d'écran dans le dossier screenshots/ :
+
+| Nom du fichier | Ce qu'il faut capturer |
+|----------------|------------------------|
+| landing-page.png | La page d'accueil du site |
+| auth-register.png | Le formulaire d'inscription |
+| auth-login.png | La page de connexion |
+| auth-otp.png | La saisie du code OTP |
+| auth-reset-password.png | La réinitialisation du mot de passe |
+| admin-users-list.png | La liste des utilisateurs (vue admin) |
+| admin-pending-boutiques.png | Les boutiques en attente d'approbation |
+| boutique-list.png | La liste des boutiques |
+| boutique-create.png | Le formulaire de création d'une boutique |
+| boutique-public-detail.png | La page publique d'une boutique |
+| emplacement-available.png | Les emplacements disponibles sur le plan |
+| emplacement-my-reservation.png | La page "Ma réservation" |
+| category-list.png | La liste des catégories |
+| product-list.png | La liste des produits |
+| product-create.png | Le formulaire de création d'un produit |
+| product-view.png | La fiche produit côté acheteur |
+| stock-management.png | La gestion du stock |
+| stock-movements-history.png | L'historique des mouvements de stock |
+| stock-export.png | L'export PDF ou Excel du stock |
+| promotion-list.png | La liste des promotions |
+| promotion-create.png | Le formulaire de création d'une promotion |
+| event-list.png | La liste des événements |
+| event-create.png | Le formulaire de création d'un événement |
+| cart.png | Le panier d'achat |
+| order-tracking.png | Le suivi d'une commande |
+| order-history.png | L'historique des commandes |
+| payment-stripe.png | La page de paiement Stripe |
+| payment-confirmation.png | La confirmation après paiement |
+| review-boutique.png | Les avis d'une boutique |
+| review-response.png | La réponse du propriétaire à un avis |
+| map-view.png | Le plan du centre commercial |
+| map-editor.png | L'éditeur de carte (admin) |
+| map-navigation.png | Le calcul d'itinéraire |
+| contracts.png | La gestion des contrats |
+| invoices.png | La page des factures |
+| dashboard-admin.png | Le tableau de bord administrateur |
+| dashboard-boutique.png | Le tableau de bord boutique |
+| notifications.png | Les notifications en temps réel |

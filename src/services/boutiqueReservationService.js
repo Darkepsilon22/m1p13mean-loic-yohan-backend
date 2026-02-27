@@ -345,11 +345,11 @@ class BoutiqueReservationService {
       boutique.assignee = null;
       boutique.userId = null;
       boutique.reservationExpires = null;
-      boutique.name=null;
+      boutique.name = undefined;
       
       // NOUVEAU: Réinitialiser toutes les données modifiables par l'utilisateur
       // On garde uniquement les données de base de l'emplacement (créées par l'admin)
-      boutique.slug = null; // Le slug sera regénéré si un nouvel utilisateur prend l'emplacement
+      boutique.slug = undefined; // undefined (pas null) pour que sparse:true fonctionne avec l'index unique
       boutique.description = boutique.shortDescription || 'Emplacement disponible';
       boutique.shortDescription = boutique.shortDescription || 'Emplacement disponible';
       boutique.logo = null;
