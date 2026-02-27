@@ -1,4 +1,6 @@
 const { Server } = require('socket.io');
+const { createAdapter } = require('@socket.io/redis-adapter');
+const Redis = require('ioredis');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Boutique = require('../models/Boutique');
@@ -23,6 +25,18 @@ const initSocket = (httpServer) => {
     pingTimeout: parseInt(process.env.SOCKET_PING_TIMEOUT, 10) || 60000,
     pingInterval: parseInt(process.env.SOCKET_PING_INTERVAL, 10) || 25000
   });
+
+  // Redis adapter pour multi-instance
+  if (process.env.REDIS_URL) {
+    try {
+      const pubClient = new Redis(process.env.REDIS_URL);
+      const subClient = pubClient.duplicate();
+      io.adapter(createAdapter(pubClient, subClient));
+      console.log('[Socket.io] Redis adapter activé');
+    } catch (err) {
+      console.warn('[Socket.io] Redis adapter indisponible, fallback mémoire :', err.message);
+    }
+  }
 
   io.use(async (socket, next) => {
     try {

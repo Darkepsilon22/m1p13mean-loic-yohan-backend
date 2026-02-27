@@ -1,4 +1,19 @@
 const rateLimit = require('express-rate-limit');
+const { RedisStore } = require('rate-limit-redis');
+const { getRedis } = require('../config');
+
+/**
+ * Crée un store Redis si disponible, sinon fallback mémoire
+ */
+const createStore = (prefix) => {
+  const client = getRedis();
+  if (!client) return undefined; // fallback mémoire par défaut
+
+  return new RedisStore({
+    sendCommand: (...args) => client.call(...args),
+    prefix: `rl:${prefix}:`
+  });
+};
 
 /**
  * Rate limiter pour les routes d'authentification (login, register, forgot-password)
@@ -12,7 +27,8 @@ const authLimiter = rateLimit({
     message: 'Trop de tentatives. Réessayez dans 15 minutes.'
   },
   standardHeaders: true,
-  legacyHeaders: false
+  legacyHeaders: false,
+  store: createStore('auth')
 });
 
 /**
@@ -27,7 +43,8 @@ const otpLimiter = rateLimit({
     message: 'Trop de tentatives de vérification. Réessayez dans 15 minutes.'
   },
   standardHeaders: true,
-  legacyHeaders: false
+  legacyHeaders: false,
+  store: createStore('otp')
 });
 
 /**
@@ -42,7 +59,8 @@ const apiLimiter = rateLimit({
     message: 'Trop de requêtes. Réessayez dans un instant.'
   },
   standardHeaders: true,
-  legacyHeaders: false
+  legacyHeaders: false,
+  store: createStore('api')
 });
 
 module.exports = { authLimiter, otpLimiter, apiLimiter };

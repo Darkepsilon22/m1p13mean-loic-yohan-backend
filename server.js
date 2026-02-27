@@ -1,7 +1,7 @@
 require('dotenv').config();
 const http = require('http');
 const app = require('./src/app');
-const { connectDB } = require('./src/config');
+const { connectDB, connectRedis } = require('./src/config');
 const { startBoutiqueReservationCronJob } = require('./src/jobs/boutiqueReservationCron');
 const { initSocket } = require('./src/socket');
 const { startOrderExpirationJob } = require('./src/jobs/orderExpiration');
@@ -15,6 +15,9 @@ const { initBranding } = require('./src/services/stripeBrandingService');
 const PORT = process.env.PORT || 5000;
 
 const server = http.createServer(app);
+
+// Initialiser Redis avant Socket.io (pour l'adapter)
+connectRedis();
 
 initSocket(server);
 
