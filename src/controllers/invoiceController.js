@@ -1,6 +1,9 @@
 const InvoiceService = require('../services/invoiceService');
+const { generateInvoicesPDF, generateInvoicesExcel, STATUS_LABELS } = require('../services/invoiceExportService');
 const { asyncHandler } = require('../middlewares/errorHandler');
 const { emitToAdmin, emitToUser } = require('../socket');
+const Invoice = require('../models/Invoice');
+const User = require('../models/User');
 
 /**
  * @desc    Obtenir toutes les factures (admin)
@@ -120,4 +123,54 @@ exports.payMyInvoice = asyncHandler(async (req, res) => {
   }
 
   res.status(200).json({ success: true, message: 'Paiement enregistré', data: updated });
+});
+
+/**
+ * @desc    Exporter mes factures en Excel
+ * @route   GET /api/invoices/my/export/excel
+ * @access  Private (boutique)
+ */
+exports.exportMyInvoicesExcel = asyncHandler(async (req, res) => {
+  const { status } = req.query;
+  const query = { tenant: req.user._id };
+  if (status) query.status = status;
+
+  const invoices = await Invoice.find(query)
+    .populate('contract', 'reference')
+    .populate('boutique', 'name location')
+    .sort({ createdAt: -1 });
+
+  const user = await User.findById(req.user._id);
+  const tenantName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'Locataire';
+  const statusLabel = status ? (STATUS_LABELS[status] || status) : null;
+
+  const buffer = await generateInvoicesExcel(invoices, tenantName, statusLabel);
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename=mes-factures-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  res.send(buffer);
+});
+
+/**
+ * @desc    Exporter mes factures en PDF
+ * @route   GET /api/invoices/my/export/pdf
+ * @access  Private (boutique)
+ */
+exports.exportMyInvoicesPdf = asyncHandler(async (req, res) => {
+  const { status } = req.query;
+  const query = { tenant: req.user._id };
+  if (status) query.status = status;
+
+  const invoices = await Invoice.find(query)
+    .populate('contract', 'reference')
+    .populate('boutique', 'name location')
+    .sort({ createdAt: -1 });
+
+  const user = await User.findById(req.user._id);
+  const tenantName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'Locataire';
+  const statusLabel = status ? (STATUS_LABELS[status] || status) : null;
+
+  const buffer = await generateInvoicesPDF(invoices, tenantName, statusLabel);
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename=mes-factures-${new Date().toISOString().slice(0, 10)}.pdf`);
+  res.send(buffer);
 });
