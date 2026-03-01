@@ -6,6 +6,8 @@ const { isAdmin, isBoutique, isAdminOrBoutique } = require('../middlewares/roles
 
 // ==================== BOUTIQUE ROUTES (avant les routes paramétrées) ====================
 
+router.get('/my/export/excel', verifyToken, isBoutique, invoiceController.exportMyInvoicesExcel);
+router.get('/my/export/pdf', verifyToken, isBoutique, invoiceController.exportMyInvoicesPdf);
 router.get('/my', verifyToken, isBoutique, invoiceController.getMyInvoices);
 router.get('/my/:id', verifyToken, isBoutique, invoiceController.getMyInvoiceById);
 router.post('/my/:id/pay', verifyToken, isBoutique, invoiceController.payMyInvoice);
