@@ -101,21 +101,27 @@ class ContractService {
     const deadline = new Date(contract.signedAt);
     deadline.setDate(deadline.getDate() + 7);
 
-    // Générer facture dépôt (pending, due dans 7 jours)
-    const existingDeposit = await Invoice.findOne({ contract: contract._id, type: 'deposit' });
-    if (!existingDeposit) {
-      const depositInvoice = new Invoice({
-        contract: contract._id,
-        tenant: contract.tenant,
-        boutique: contract.boutique,
-        amountDue: contract.deposit,
-        periodStart: contract.startDate,
-        periodEnd: contract.startDate,
-        dueDate: deadline,
-        type: 'deposit',
-        status: 'pending'
-      });
-      await depositInvoice.save();
+    // Générer facture dépôt (pending, due dans 7 jours) — seulement si dépôt > 0
+    if (contract.deposit && contract.deposit > 0) {
+      const existingDeposit = await Invoice.findOne({ contract: contract._id, type: 'deposit' });
+      if (!existingDeposit) {
+        const depositInvoice = new Invoice({
+          contract: contract._id,
+          tenant: contract.tenant,
+          boutique: contract.boutique,
+          amountDue: contract.deposit,
+          periodStart: contract.startDate,
+          periodEnd: contract.startDate,
+          dueDate: deadline,
+          type: 'deposit',
+          status: 'pending'
+        });
+        await depositInvoice.save();
+      }
+    } else {
+      // Pas de dépôt -> marquer directement comme confirmé
+      contract.depositStatus = 'confirmed';
+      await contract.save();
     }
 
     // Générer facture 1er loyer (pending, due dans 7 jours)
@@ -233,10 +239,12 @@ class ContractService {
     if (!contract) throw new Error('Contrat non trouvé');
     if (contract.status !== 'pending_activation') throw new Error('Le contrat n\'est pas en attente d\'activation');
 
-    // Vérifier facture dépôt payée
-    const depositInvoice = await Invoice.findOne({ contract: contract._id, type: 'deposit' });
-    if (!depositInvoice || depositInvoice.status !== 'paid') {
-      throw new Error('La facture de caution n\'est pas encore entièrement payée');
+    // Vérifier facture dépôt payée (seulement si dépôt > 0)
+    if (contract.deposit && contract.deposit > 0) {
+      const depositInvoice = await Invoice.findOne({ contract: contract._id, type: 'deposit' });
+      if (!depositInvoice || depositInvoice.status !== 'paid') {
+        throw new Error('La facture de caution n\'est pas encore entièrement payée');
+      }
     }
 
     // Vérifier facture 1er loyer payée
@@ -503,17 +511,17 @@ class ContractService {
   }
 
   /**
-   * Obtenir le contrat actif d'un locataire
+   * Obtenir les contrats actifs d'un locataire
    */
-  static async getMyActiveContract(tenantId) {
-    const contract = await Contract.findOne({
+  static async getMyActiveContracts(tenantId) {
+    const contracts = await Contract.find({
       tenant: tenantId,
       status: { $in: ['draft', 'pending_signature', 'pending_activation', 'active', 'suspended'] }
     })
       .populate('boutique', 'name location surface price')
       .sort({ createdAt: -1 });
 
-    return contract;
+    return contracts;
   }
 
   /**

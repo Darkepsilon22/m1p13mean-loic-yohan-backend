@@ -170,8 +170,8 @@ exports.terminateContract = asyncHandler(async (req, res) => {
  * @access  Private (boutique)
  */
 exports.getMyContract = asyncHandler(async (req, res) => {
-  const contract = await ContractService.getMyActiveContract(req.user._id);
-  res.status(200).json({ success: true, data: contract });
+  const contracts = await ContractService.getMyActiveContracts(req.user._id);
+  res.status(200).json({ success: true, data: contracts });
 });
 
 /**

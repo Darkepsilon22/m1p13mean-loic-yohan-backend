@@ -94,6 +94,20 @@ const errorHandler = (err, req, res, next) => {
   err.statusCode = err.statusCode || 500;
   err.status = err.status || 'error';
 
+  // Ensure CORS headers are present on error responses
+  const origin = req.headers.origin;
+  if (origin && !res.headersSent) {
+    const allowedOrigins = [
+      'http://localhost:4200',
+      'http://localhost:5000',
+      process.env.FRONTEND_URL
+    ].filter(Boolean);
+    if (allowedOrigins.includes(origin)) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+    }
+  }
+
   if (process.env.NODE_ENV === 'development') {
     sendErrorDev(err, res);
   } else {

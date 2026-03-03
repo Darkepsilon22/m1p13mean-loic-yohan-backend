@@ -47,7 +47,15 @@ const cartSchema = new mongoose.Schema({
     required: [true, 'User is required'],
     unique: true
   },
-  items: [cartItemSchema],
+  items: {
+    type: [cartItemSchema],
+    validate: {
+      validator: function(v) {
+        return v.length <= 50;
+      },
+      message: 'Cart cannot have more than 50 different items'
+    }
+  },
   currency: {
     type: String,
     enum: ['MGA'],

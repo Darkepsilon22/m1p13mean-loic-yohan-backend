@@ -38,7 +38,14 @@ const userSchema = new mongoose.Schema({
   },
   phone: {
     type: String,
-    trim: true
+    trim: true,
+    validate: {
+      validator: function(v) {
+        if (!v) return true; // optional field
+        return /^[\d\s+\-().]{6,20}$/.test(v);
+      },
+      message: 'Please provide a valid phone number'
+    }
   },
   avatar: {
     type: String,
@@ -112,6 +119,7 @@ const userSchema = new mongoose.Schema({
 // Index for better query performance (email index is already defined via unique: true)
 userSchema.index({ role: 1 });
 userSchema.index({ status: 1 });
+userSchema.index({ role: 1, status: 1 });
 userSchema.index({ emailVerificationToken: 1 });
 userSchema.index({ resetPasswordToken: 1 });
 

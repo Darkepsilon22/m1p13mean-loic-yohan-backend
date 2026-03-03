@@ -52,7 +52,11 @@ const reviewSchema = new mongoose.Schema({
   reportReasons: [{
     type: String,
     trim: true
-  }]
+  }],
+  isVerifiedPurchase: {
+    type: Boolean,
+    default: false
+  }
 }, {
   timestamps: true
 });

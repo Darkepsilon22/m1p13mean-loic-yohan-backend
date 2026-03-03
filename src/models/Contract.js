@@ -134,6 +134,16 @@ contractSchema.pre('validate', function () {
     const randomPart = Math.random().toString(36).substring(2, 8).toUpperCase();
     this.reference = `CTR-${dateStr}-${randomPart}`;
   }
+
+  // Validate endDate > startDate
+  if (this.startDate && this.endDate && this.endDate <= this.startDate) {
+    this.invalidate('endDate', 'La date de fin doit être après la date de début');
+  }
+
+  // Validate deposit cannot exceed 6 months of rent
+  if (this.deposit && this.monthlyRent && this.deposit > this.monthlyRent * 6) {
+    this.invalidate('deposit', 'La caution ne peut pas dépasser 6 mois de loyer');
+  }
 });
 
 // Virtual: duration in months

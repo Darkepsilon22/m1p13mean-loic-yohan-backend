@@ -504,15 +504,26 @@ exports.getStats = asyncHandler(async (req, res, next) => {
  * @access  Private (Boutique owner)
  */
 exports.getMyProducts = asyncHandler(async (req, res, next) => {
-  const { page = 1, limit = 20, availability, category, search, sort = '-createdAt', includeArchived } = req.query;
+  const { page = 1, limit = 20, availability, category, search, sort = '-createdAt', includeArchived, boutiqueId: reqBoutiqueId } = req.query;
 
-  // Find boutique owned by user
-  const boutique = await Boutique.findOne({ userId: req.user._id });
-  if (!boutique) {
-    return next(new ApiError(404, 'You do not have a boutique'));
+  // Find boutique(s) owned by user
+  let targetBoutiqueId;
+  if (reqBoutiqueId) {
+    // Verify the user owns this boutique
+    const boutique = await Boutique.findOne({ _id: reqBoutiqueId, userId: req.user._id });
+    if (!boutique) {
+      return next(new ApiError(404, 'Boutique not found or not yours'));
+    }
+    targetBoutiqueId = boutique._id;
+  } else {
+    const boutique = await Boutique.findOne({ userId: req.user._id });
+    if (!boutique) {
+      return next(new ApiError(404, 'You do not have a boutique'));
+    }
+    targetBoutiqueId = boutique._id;
   }
 
-  const query = { boutiqueId: boutique._id };
+  const query = { boutiqueId: targetBoutiqueId };
 
   // Include archived products if requested
   if (includeArchived !== 'true') {

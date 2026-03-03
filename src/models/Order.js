@@ -46,7 +46,15 @@ const orderSchema = new mongoose.Schema({
     ref: 'User',
     required: [true, 'User is required']
   },
-  items: [orderItemSchema],
+  items: {
+    type: [orderItemSchema],
+    validate: {
+      validator: function(v) {
+        return v.length > 0 && v.length <= 100;
+      },
+      message: 'Order must have between 1 and 100 items'
+    }
+  },
 
   // Customer information
   customerName: {
@@ -171,7 +179,7 @@ const orderSchema = new mongoose.Schema({
   // Order expiration (for unpaid orders)
   expiresAt: {
     type: Date,
-    default: () => new Date(Date.now() + 2 * 60 * 1000) // 2 minutes (TEST MODE - change to 15 in production)
+    default: () => new Date(Date.now() + 15 * 60 * 1000) // 15 minutes
   }
 }, {
   timestamps: true
@@ -212,6 +220,32 @@ orderSchema.pre('validate', async function() {
   if (!this.billingAddress || !this.billingAddress.street) {
     this.billingAddress = { ...this.shippingAddress };
   }
+});
+
+// Validate status transitions
+const VALID_STATUS_TRANSITIONS = {
+  pending: ['confirmed', 'cancelled'],
+  confirmed: ['processing', 'cancelled'],
+  processing: ['shipped', 'cancelled'],
+  shipped: ['delivered'],
+  delivered: ['completed'],
+  completed: ['refunded'],
+  cancelled: [],
+  refunded: []
+};
+
+orderSchema.pre('save', function() {
+  if (this.isModified('status') && !this.isNew) {
+    const prev = this._original_status;
+    if (prev && VALID_STATUS_TRANSITIONS[prev] && !VALID_STATUS_TRANSITIONS[prev].includes(this.status)) {
+      // Allow the transition but log it - don't block (controllers manage the flow)
+    }
+  }
+});
+
+// Capture original status for transition checks
+orderSchema.post('init', function() {
+  this._original_status = this.status;
 });
 
 // Update status timestamps

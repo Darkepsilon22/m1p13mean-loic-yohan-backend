@@ -77,6 +77,26 @@ const promotionSchema = new mongoose.Schema({
       message: 'Status must be scheduled, active, ended, or cancelled'
     },
     default: 'scheduled'
+  },
+  maxUsagePerUser: {
+    type: Number,
+    default: null,
+    min: [1, 'Max usage per user must be at least 1']
+  },
+  maxTotalUsage: {
+    type: Number,
+    default: null,
+    min: [1, 'Max total usage must be at least 1']
+  },
+  usageCount: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  minOrderValue: {
+    type: Number,
+    default: null,
+    min: [0, 'Minimum order value cannot be negative']
   }
 }, {
   timestamps: true

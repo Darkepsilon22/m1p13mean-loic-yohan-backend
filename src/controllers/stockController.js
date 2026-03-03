@@ -590,12 +590,17 @@ exports.getGlobalStats = asyncHandler(async (req, res) => {
  * @access  Private (Boutique)
  */
 exports.exportStockPDF = asyncHandler(async (req, res, next) => {
-  const boutique = await Boutique.findOne({ userId: req.user._id });
+  const { dateDebut, dateFin, productIds: productIdsParam, category, type, boutiqueId: reqBoutiqueId } = req.query;
+
+  let boutique;
+  if (reqBoutiqueId) {
+    boutique = await Boutique.findOne({ _id: reqBoutiqueId, userId: req.user._id });
+  } else {
+    boutique = await Boutique.findOne({ userId: req.user._id });
+  }
   if (!boutique) {
     return next(new ApiError(404, 'Boutique not found'));
   }
-
-  const { dateDebut, dateFin, productIds: productIdsParam, category, type } = req.query;
   if (!dateDebut || !dateFin) {
     return next(new ApiError(400, 'dateDebut and dateFin are required (YYYY-MM-DD)'));
   }
@@ -628,12 +633,17 @@ exports.exportStockPDF = asyncHandler(async (req, res, next) => {
  * @access  Private (Boutique)
  */
 exports.exportStockExcel = asyncHandler(async (req, res, next) => {
-  const boutique = await Boutique.findOne({ userId: req.user._id });
+  const { dateDebut, dateFin, productIds: productIdsParam, category, type, boutiqueId: reqBoutiqueId } = req.query;
+
+  let boutique;
+  if (reqBoutiqueId) {
+    boutique = await Boutique.findOne({ _id: reqBoutiqueId, userId: req.user._id });
+  } else {
+    boutique = await Boutique.findOne({ userId: req.user._id });
+  }
   if (!boutique) {
     return next(new ApiError(404, 'Boutique not found'));
   }
-
-  const { dateDebut, dateFin, productIds: productIdsParam, category, type } = req.query;
   if (!dateDebut || !dateFin) {
     return next(new ApiError(400, 'dateDebut and dateFin are required (YYYY-MM-DD)'));
   }
