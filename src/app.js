@@ -5,22 +5,15 @@ const { errorHandler, notFound } = require('./middlewares/errorHandler');
 
 const app = express();
 
-// Security headers (helmet)
-app.use(helmet({
-  crossOriginResourcePolicy: { policy: 'cross-origin' },
-  contentSecurityPolicy: false // Géré côté frontend
-}));
-
-// CORS configuration
+// CORS configuration — must be BEFORE helmet and all other middleware
 const allowedOrigins = [
   'http://localhost:4200',
   'http://localhost:5000',
   process.env.FRONTEND_URL
 ].filter(Boolean);
 
-app.use(cors({
+const corsOptions = {
   origin: function(origin, callback) {
-    // En production, bloquer les requêtes sans origin
     if (!origin) {
       if (process.env.NODE_ENV === 'production') {
         return callback(null, false);
@@ -34,7 +27,32 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  exposedHeaders: ['Content-Disposition']
+};
+
+app.use(cors(corsOptions));
+
+// Explicit preflight handling for all routes (Express 5 compatible)
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    const origin = req.headers.origin;
+    if (origin && allowedOrigins.includes(origin)) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,PATCH,OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
+      res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
+      return res.sendStatus(204);
+    }
+  }
+  next();
+});
+
+// Security headers (helmet) — after CORS
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  contentSecurityPolicy: false
 }));
 
 // Body parser - Exclude Stripe webhook route from JSON parsing (needs raw body)

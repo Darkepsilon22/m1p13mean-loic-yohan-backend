@@ -226,17 +226,21 @@ exports.update = asyncHandler(async (req, res, next) => {
     if (!categoryExists) return next(new ApiError(400, 'Catégorie invalide.'));
   }
 
-  const zoneId = body.zoneId !== undefined ? body.zoneId : boutique.zoneId;
-  const mapShape = body.mapShape !== undefined ? body.mapShape : boutique.mapShape;
-  const surface = body.surface !== undefined ? body.surface : boutique.surface;
-  if (zoneId && mapShape && mapShape.x != null && mapShape.y != null && mapShape.width != null && mapShape.height != null) {
-    await validateBoutiqueZoneConstraints({
-      zoneId,
-      floorId: body.floorId !== undefined ? body.floorId : boutique.floorId,
-      mapShape,
-      surface,
-      excludeBoutiqueId: req.params.id
-    });
+  // Only validate zone constraints if zone/map fields are being modified
+  const isZoneFieldModified = body.zoneId !== undefined || body.mapShape !== undefined || body.surface !== undefined;
+  if (isZoneFieldModified) {
+    const zoneId = body.zoneId !== undefined ? body.zoneId : boutique.zoneId;
+    const mapShape = body.mapShape !== undefined ? body.mapShape : boutique.mapShape;
+    const surface = body.surface !== undefined ? body.surface : boutique.surface;
+    if (zoneId && mapShape && mapShape.x != null && mapShape.y != null && mapShape.width != null && mapShape.height != null) {
+      await validateBoutiqueZoneConstraints({
+        zoneId,
+        floorId: body.floorId !== undefined ? body.floorId : boutique.floorId,
+        mapShape,
+        surface,
+        excludeBoutiqueId: req.params.id
+      });
+    }
   }
 
   boutique = await Boutique.findByIdAndUpdate(

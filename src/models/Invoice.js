@@ -108,13 +108,24 @@ invoiceSchema.index({ type: 1 });
 invoiceSchema.index({ status: 1, dueDate: 1 });
 invoiceSchema.index({ contract: 1, periodStart: 1 }, { unique: true });
 
-// Auto-generate reference
+// Auto-generate reference and validate dates
 invoiceSchema.pre('validate', function () {
   if (this.isNew && !this.reference) {
     const date = new Date();
     const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '');
     const randomPart = Math.random().toString(36).substring(2, 8).toUpperCase();
     this.reference = `INV-${dateStr}-${randomPart}`;
+  }
+
+  // Validate periodEnd >= periodStart (equal is allowed for deposit invoices)
+  if (this.periodStart && this.periodEnd && this.periodEnd < this.periodStart) {
+    this.invalidate('periodEnd', 'La date fin de période doit être après ou égale à la date début');
+  }
+
+  // Validate amountPaid does not exceed totalDue
+  const totalDue = (this.amountDue || 0) + (this.lateFees || 0);
+  if (this.amountPaid > totalDue) {
+    this.invalidate('amountPaid', 'Le montant payé ne peut pas dépasser le montant dû');
   }
 });
 

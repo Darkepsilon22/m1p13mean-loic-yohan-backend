@@ -30,8 +30,6 @@ const boutiqueSchema = new mongoose.Schema({
   },
   slug: {
     type: String,
-    unique: true,
-    sparse: true, // Permet plusieurs valeurs null/undefined
     lowercase: true,
     trim: true
   },
@@ -180,6 +178,7 @@ const boutiqueSchema = new mongoose.Schema({
   timestamps: true
 });
 
+boutiqueSchema.index({ slug: 1 }, { unique: true, partialFilterExpression: { slug: { $type: 'string' } } });
 boutiqueSchema.index({ userId: 1 }, { sparse: true });
 boutiqueSchema.index({ name: 'text' });
 boutiqueSchema.index({ categoryId: 1 });

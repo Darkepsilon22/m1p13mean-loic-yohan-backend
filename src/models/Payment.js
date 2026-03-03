@@ -100,10 +100,12 @@ const paymentSchema = new mongoose.Schema({
 
   // For refunds
   refundReason: {
-    type: String
+    type: String,
+    trim: true
   },
   refundAmount: {
-    type: Number
+    type: Number,
+    min: [0, 'Refund amount cannot be negative']
   },
 
   // Expiration
@@ -293,9 +295,14 @@ paymentSchema.methods.processRefund = async function(amount, reason = '') {
     throw new Error('Only successful payments can be refunded');
   }
 
+  const refundAmt = amount || this.amount;
+  if (refundAmt > this.amount) {
+    throw new Error('Refund amount cannot exceed the original payment amount');
+  }
+
   this.status = 'refunded';
   this.refundedAt = new Date();
-  this.refundAmount = amount || this.amount;
+  this.refundAmount = refundAmt;
   this.refundReason = reason;
 
   // Update the related order
@@ -378,6 +385,14 @@ paymentSchema.statics.expirePendingPayments = async function() {
   }
 
   return expiredPayments.length;
+};
+
+// Remove sensitive data from JSON output
+paymentSchema.methods.toJSON = function() {
+  const payment = this.toObject();
+  delete payment.providerResponse;
+  delete payment.metadata;
+  return payment;
 };
 
 module.exports = mongoose.model('Payment', paymentSchema);

@@ -9,6 +9,42 @@ const ReservationBoutique = require('../models/ReservationBoutique');
 const { asyncHandler } = require('../middlewares/errorHandler');
 const mongoose = require('mongoose');
 
+/**
+ * Resolve effective boutiqueId(s) for stats queries.
+ * Supports boutiqueId query param for filtering a specific boutique.
+ * Returns ObjectId(s) ready for MongoDB aggregation.
+ */
+function resolveStatsBoutiqueIds(req) {
+  const queryBoutiqueId = req.query.boutiqueId;
+  const userBoutiqueIds = req.user.boutiqueIds || (req.user.boutiqueId ? [req.user.boutiqueId] : []);
+
+  if (queryBoutiqueId) {
+    const isOwned = userBoutiqueIds.some(id => id.toString() === queryBoutiqueId);
+    if (isOwned) {
+      return { ids: [new mongoose.Types.ObjectId(queryBoutiqueId)], single: new mongoose.Types.ObjectId(queryBoutiqueId) };
+    }
+  }
+
+  if (userBoutiqueIds.length === 1) {
+    return { ids: [new mongoose.Types.ObjectId(userBoutiqueIds[0])], single: new mongoose.Types.ObjectId(userBoutiqueIds[0]) };
+  }
+
+  return {
+    ids: userBoutiqueIds.map(id => new mongoose.Types.ObjectId(id)),
+    single: null
+  };
+}
+
+function boutiqueMatchFilter(ids) {
+  if (ids.length === 1) return { 'items.boutiqueId': ids[0] };
+  return { 'items.boutiqueId': { $in: ids } };
+}
+
+function boutiqueProductFilter(ids) {
+  if (ids.length === 1) return { boutiqueId: ids[0] };
+  return { boutiqueId: { $in: ids } };
+}
+
 
 /**
  * @desc    Get global center revenue statistics (CA total)
@@ -909,7 +945,8 @@ exports.getBoutiqueRevenue = asyncHandler(async (req, res) => {
  * @access  Private (boutique)
  */
 exports.getBoutiqueSalesTrends = asyncHandler(async (req, res) => {
-  const boutiqueId = req.user.boutiqueId;
+  const { ids } = resolveStatsBoutiqueIds(req);
+  const matchFilter = boutiqueMatchFilter(ids);
   const { months = 12 } = req.query;
 
   const startDate = new Date();
@@ -919,13 +956,13 @@ exports.getBoutiqueSalesTrends = asyncHandler(async (req, res) => {
   const monthlyTrends = await Order.aggregate([
     {
       $match: {
-        'items.boutiqueId': new mongoose.Types.ObjectId(boutiqueId),
+        ...matchFilter,
         paymentStatus: 'success',
         createdAt: { $gte: startDate }
       }
     },
     { $unwind: '$items' },
-    { $match: { 'items.boutiqueId': new mongoose.Types.ObjectId(boutiqueId) } },
+    { $match: { 'items.boutiqueId': ids.length === 1 ? ids[0] : { $in: ids } } },
     {
       $group: {
         _id: {
@@ -948,16 +985,17 @@ exports.getBoutiqueSalesTrends = asyncHandler(async (req, res) => {
     { $sort: { '_id.year': 1, '_id.month': 1 } }
   ]);
 
+  const itemFilter = ids.length === 1 ? ids[0] : { $in: ids };
   const topProducts = await Order.aggregate([
     {
       $match: {
-        'items.boutiqueId': new mongoose.Types.ObjectId(boutiqueId),
+        ...matchFilter,
         paymentStatus: 'success',
         createdAt: { $gte: startDate }
       }
     },
     { $unwind: '$items' },
-    { $match: { 'items.boutiqueId': new mongoose.Types.ObjectId(boutiqueId) } },
+    { $match: { 'items.boutiqueId': itemFilter } },
     {
       $group: {
         _id: '$items.productId',
@@ -975,13 +1013,13 @@ exports.getBoutiqueSalesTrends = asyncHandler(async (req, res) => {
   const salesByDayOfWeek = await Order.aggregate([
     {
       $match: {
-        'items.boutiqueId': new mongoose.Types.ObjectId(boutiqueId),
+        ...matchFilter,
         paymentStatus: 'success',
         createdAt: { $gte: startDate }
       }
     },
     { $unwind: '$items' },
-    { $match: { 'items.boutiqueId': new mongoose.Types.ObjectId(boutiqueId) } },
+    { $match: { 'items.boutiqueId': itemFilter } },
     {
       $group: {
         _id: { $dayOfWeek: '$createdAt' },
@@ -1116,13 +1154,18 @@ exports.getBoutiqueMargins = asyncHandler(async (req, res) => {
  * @access  Private (boutique)
  */
 exports.getBoutiqueDashboard = asyncHandler(async (req, res) => {
-  const boutiqueId = req.user.boutiqueId;
+  const { ids } = resolveStatsBoutiqueIds(req);
+  const matchFilter = boutiqueMatchFilter(ids);
+  const prodFilter = boutiqueProductFilter(ids);
+  const itemFilter = ids.length === 1 ? ids[0] : { $in: ids };
+  const idStrings = ids.map(id => id.toString());
+
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const startOfYear = new Date(now.getFullYear(), 0, 1);
 
   const baseMatch = {
-    'items.boutiqueId': new mongoose.Types.ObjectId(boutiqueId),
+    ...matchFilter,
     paymentStatus: 'success'
   };
 
@@ -1140,37 +1183,37 @@ exports.getBoutiqueDashboard = asyncHandler(async (req, res) => {
     Order.aggregate([
       { $match: baseMatch },
       { $unwind: '$items' },
-      { $match: { 'items.boutiqueId': new mongoose.Types.ObjectId(boutiqueId) } },
+      { $match: { 'items.boutiqueId': itemFilter } },
       { $group: { _id: null, total: { $sum: '$items.totalPrice' } } }
     ]),
     // Monthly revenue
     Order.aggregate([
       { $match: { ...baseMatch, createdAt: { $gte: startOfMonth } } },
       { $unwind: '$items' },
-      { $match: { 'items.boutiqueId': new mongoose.Types.ObjectId(boutiqueId) } },
+      { $match: { 'items.boutiqueId': itemFilter } },
       { $group: { _id: null, total: { $sum: '$items.totalPrice' } } }
     ]),
     // Yearly revenue
     Order.aggregate([
       { $match: { ...baseMatch, createdAt: { $gte: startOfYear } } },
       { $unwind: '$items' },
-      { $match: { 'items.boutiqueId': new mongoose.Types.ObjectId(boutiqueId) } },
+      { $match: { 'items.boutiqueId': itemFilter } },
       { $group: { _id: null, total: { $sum: '$items.totalPrice' } } }
     ]),
     // Total orders
-    Order.countDocuments({ 'items.boutiqueId': boutiqueId }),
+    Order.countDocuments(matchFilter),
     // Pending orders
-    Order.countDocuments({ 'items.boutiqueId': boutiqueId, status: 'pending' }),
+    Order.countDocuments({ ...matchFilter, status: 'pending' }),
     // Total products
-    Product.countDocuments({ boutiqueId, isArchived: false }),
+    Product.countDocuments({ ...prodFilter, isArchived: false }),
     // Low stock products
     Product.countDocuments({
-      boutiqueId,
+      ...prodFilter,
       isArchived: false,
       $expr: { $and: [{ $gt: ['$stock', 0] }, { $lte: ['$stock', '$lowStockThreshold'] }] }
     }),
     // Recent orders
-    Order.find({ 'items.boutiqueId': boutiqueId })
+    Order.find(matchFilter)
       .populate('userId', 'firstName lastName')
       .sort('-createdAt')
       .limit(5)
@@ -1181,7 +1224,7 @@ exports.getBoutiqueDashboard = asyncHandler(async (req, res) => {
   // Filter recent orders to show only this boutique's items
   const filteredRecentOrders = recentOrders.map(order => {
     const boutiqueItems = order.items.filter(
-      item => item.boutiqueId.toString() === boutiqueId.toString()
+      item => idStrings.includes(item.boutiqueId.toString())
     );
     const boutiqueTotal = boutiqueItems.reduce((sum, item) => sum + item.totalPrice, 0);
     return {
@@ -1218,24 +1261,26 @@ exports.getBoutiqueDashboard = asyncHandler(async (req, res) => {
  * @access  Private (boutique)
  */
 exports.getBoutiqueProductsTrends = asyncHandler(async (req, res) => {
-  const boutiqueId = req.user.boutiqueId;
+  const { ids } = resolveStatsBoutiqueIds(req);
+  const matchFilter = boutiqueMatchFilter(ids);
+  const ptItemFilter = ids.length === 1 ? ids[0] : { $in: ids };
   const { months = 12, type = 'top' } = req.query;
 
   const startDate = new Date();
   startDate.setMonth(startDate.getMonth() - parseInt(months));
 
-  
+
   const sortOrder = type === 'low' ? 1 : -1;
   const topProducts = await Order.aggregate([
     {
       $match: {
-        'items.boutiqueId': new mongoose.Types.ObjectId(boutiqueId),
+        ...matchFilter,
         paymentStatus: 'success',
         createdAt: { $gte: startDate }
       }
     },
     { $unwind: '$items' },
-    { $match: { 'items.boutiqueId': new mongoose.Types.ObjectId(boutiqueId) } },
+    { $match: { 'items.boutiqueId': ptItemFilter } },
     {
       $group: {
         _id: '$items.productId',
@@ -1259,7 +1304,7 @@ exports.getBoutiqueProductsTrends = asyncHandler(async (req, res) => {
   const monthlySales = await Order.aggregate([
     {
       $match: {
-        'items.boutiqueId': new mongoose.Types.ObjectId(boutiqueId),
+        ...matchFilter,
         paymentStatus: 'success',
         createdAt: { $gte: startDate }
       }
@@ -1267,7 +1312,7 @@ exports.getBoutiqueProductsTrends = asyncHandler(async (req, res) => {
     { $unwind: '$items' },
     {
       $match: {
-        'items.boutiqueId': new mongoose.Types.ObjectId(boutiqueId),
+        'items.boutiqueId': ptItemFilter,
         'items.productId': { $in: productIds }
       }
     },

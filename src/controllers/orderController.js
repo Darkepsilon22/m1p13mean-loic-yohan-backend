@@ -12,6 +12,26 @@ const { sendLowStockAlertEmail, sendOrderStatusEmail } = require('../services/em
 const { generateOrdersPDF, generateOrdersExcel, generateMonthlyReportPDF, generateMonthlyReportExcel, STATUS_LABELS } = require('../services/orderExportService');
 
 /**
+ * Resolve effective boutiqueId from query param or user's default.
+ * If boutiqueId is provided in query, validate it belongs to the user.
+ * If not provided, returns all boutiqueIds (for multi-boutique queries).
+ */
+function resolveEffectiveBoutiqueId(req) {
+  const queryBoutiqueId = req.query.boutiqueId;
+  const userBoutiqueIds = req.user.boutiqueIds || (req.user.boutiqueId ? [req.user.boutiqueId] : []);
+
+  if (queryBoutiqueId) {
+    // Validate the requested boutiqueId belongs to this user
+    const isOwned = userBoutiqueIds.some(id => id.toString() === queryBoutiqueId);
+    if (isOwned) return { single: queryBoutiqueId, all: userBoutiqueIds };
+    // If not owned, fallback to default
+    return { single: req.user.boutiqueId, all: userBoutiqueIds };
+  }
+
+  return { single: null, all: userBoutiqueIds };
+}
+
+/**
  * @desc    Create order from cart
  * @route   POST /api/orders
  * @access  Private (acheteur)
@@ -383,20 +403,47 @@ exports.cancelOrder = asyncHandler(async (req, res, next) => {
  */
 exports.getBoutiqueOrders = asyncHandler(async (req, res) => {
   const { status, paymentStatus, startDate, endDate, page = 1, limit = 20, sort = '-createdAt' } = req.query;
+  const { single, all } = resolveEffectiveBoutiqueId(req);
+  const effectiveId = single || (all.length === 1 ? all[0] : null);
 
-  const result = await Order.getByBoutique(req.user.boutiqueId, {
-    status,
-    paymentStatus,
-    startDate,
-    endDate,
-    page,
-    limit,
-    sort
-  });
+  if (effectiveId) {
+    // Single boutique filter
+    const result = await Order.getByBoutique(effectiveId, {
+      status, paymentStatus, startDate, endDate, page, limit, sort
+    });
+    return res.status(200).json({ success: true, data: result });
+  }
+
+  // Multi-boutique: query all user's boutiques
+  const query = { 'items.boutiqueId': { $in: all } };
+  if (status) query.status = status;
+  if (paymentStatus) query.paymentStatus = paymentStatus;
+  if (startDate) query.createdAt = { $gte: new Date(startDate) };
+  if (endDate) {
+    query.createdAt = query.createdAt || {};
+    query.createdAt.$lte = new Date(endDate);
+  }
+
+  const pageNum = Math.max(1, parseInt(page) || 1);
+  const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 20));
+  const skip = (pageNum - 1) * limitNum;
+
+  const [orders, total] = await Promise.all([
+    Order.find(query)
+      .populate('userId', 'firstName lastName email phone')
+      .sort(sort)
+      .skip(skip)
+      .limit(limitNum)
+      .lean(),
+    Order.countDocuments(query)
+  ]);
 
   res.status(200).json({
     success: true,
-    data: result
+    data: {
+      orders,
+      pagination: { page: pageNum, limit: limitNum, total, pages: Math.ceil(total / limitNum) || 1 }
+    }
   });
 });
 
@@ -406,9 +453,10 @@ exports.getBoutiqueOrders = asyncHandler(async (req, res) => {
  * @access  Private (boutique)
  */
 exports.getBoutiqueOrderById = asyncHandler(async (req, res, next) => {
+  const userBoutiqueIds = req.user.boutiqueIds || (req.user.boutiqueId ? [req.user.boutiqueId] : []);
   const order = await Order.findOne({
     _id: req.params.id,
-    'items.boutiqueId': req.user.boutiqueId
+    'items.boutiqueId': { $in: userBoutiqueIds }
   })
     .populate('items.productId', 'name mainPhoto')
     .populate('userId', 'firstName lastName email phone');
@@ -417,9 +465,10 @@ exports.getBoutiqueOrderById = asyncHandler(async (req, res, next) => {
     return next(new ApiError(404, 'Order not found'));
   }
 
-  // Filter items to show only this boutique's items
+  // Filter items to show only this user's boutiques' items
+  const idStrings = userBoutiqueIds.map(id => id.toString());
   const boutiqueItems = order.items.filter(
-    item => item.boutiqueId.toString() === req.user.boutiqueId.toString()
+    item => idStrings.includes(item.boutiqueId.toString())
   );
 
   const boutiqueSubtotal = boutiqueItems.reduce((sum, item) => sum + item.totalPrice, 0);
@@ -443,10 +492,11 @@ exports.getBoutiqueOrderById = asyncHandler(async (req, res, next) => {
  */
 exports.boutiqueUpdateOrderStatus = asyncHandler(async (req, res, next) => {
   const { status, trackingNumber, carrier } = req.body;
+  const userBoutiqueIds = req.user.boutiqueIds || (req.user.boutiqueId ? [req.user.boutiqueId] : []);
 
   const order = await Order.findOne({
     _id: req.params.id,
-    'items.boutiqueId': req.user.boutiqueId
+    'items.boutiqueId': { $in: userBoutiqueIds }
   });
 
   if (!order) {
@@ -487,7 +537,9 @@ exports.boutiqueUpdateOrderStatus = asyncHandler(async (req, res, next) => {
 
   // Send email notification to customer
   try {
-    const boutique = await Boutique.findById(req.user.boutiqueId).select('name').lean();
+    // Find which boutique this order belongs to
+    const orderBoutiqueId = order.items[0]?.boutiqueId;
+    const boutique = await Boutique.findById(orderBoutiqueId || userBoutiqueIds[0]).select('name').lean();
     const boutiqueName = boutique?.name || 'la boutique';
     await sendOrderStatusEmail(
       order.customerEmail,
@@ -577,12 +629,19 @@ exports.confirmReception = asyncHandler(async (req, res, next) => {
  * @access  Private (boutique)
  */
 exports.getBoutiqueOrderStats = asyncHandler(async (req, res) => {
-  const boutiqueId = req.user.boutiqueId;
+  const { single, all } = resolveEffectiveBoutiqueId(req);
+  const mongoose = require('mongoose');
+  const boutiqueFilter = single
+    ? { 'items.boutiqueId': new mongoose.Types.ObjectId(single) }
+    : { 'items.boutiqueId': { $in: all.map(id => new mongoose.Types.ObjectId(id)) } };
+  const boutiqueItemFilter = single
+    ? { 'items.boutiqueId': new mongoose.Types.ObjectId(single) }
+    : { 'items.boutiqueId': { $in: all.map(id => new mongoose.Types.ObjectId(id)) } };
 
   const stats = await Order.aggregate([
-    { $match: { 'items.boutiqueId': boutiqueId } },
+    { $match: boutiqueFilter },
     { $unwind: '$items' },
-    { $match: { 'items.boutiqueId': boutiqueId } },
+    { $match: boutiqueItemFilter },
     {
       $group: {
         _id: '$status',
@@ -600,13 +659,13 @@ exports.getBoutiqueOrderStats = asyncHandler(async (req, res) => {
   const monthlyStats = await Order.aggregate([
     {
       $match: {
-        'items.boutiqueId': boutiqueId,
+        ...boutiqueFilter,
         paymentStatus: 'success',
         createdAt: { $gte: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000) }
       }
     },
     { $unwind: '$items' },
-    { $match: { 'items.boutiqueId': boutiqueId } },
+    { $match: boutiqueItemFilter },
     {
       $group: {
         _id: {
@@ -881,14 +940,16 @@ exports.exportBoutiqueMonthlyReportExcel = asyncHandler(async (req, res) => {
  * @access  Private (boutique)
  */
 exports.exportBoutiqueOrdersPDF = asyncHandler(async (req, res) => {
-  const filter = buildBoutiqueOrderFilter(req.user.boutiqueId, req.query);
+  const { single, all } = resolveEffectiveBoutiqueId(req);
+  const effectiveIds = single || all;
+  const filter = buildBoutiqueOrderFilter(effectiveIds, req.query);
   const orders = await Order.find(filter)
     .populate('items.productId', 'name mainPhoto')
     .populate('userId', 'firstName lastName email')
     .sort({ createdAt: -1 })
     .lean();
 
-  const boutique = await Boutique.findById(req.user.boutiqueId).select('name');
+  const boutique = await Boutique.findById(single || all[0]).select('name');
   const boutiqueName = boutique?.name || 'Ma Boutique';
   const statusLabel = req.query.status ? (STATUS_LABELS[req.query.status] || req.query.status) : null;
   const buffer = await generateOrdersPDF(orders, boutiqueName, statusLabel);
@@ -904,14 +965,16 @@ exports.exportBoutiqueOrdersPDF = asyncHandler(async (req, res) => {
  * @access  Private (boutique)
  */
 exports.exportBoutiqueOrdersExcel = asyncHandler(async (req, res) => {
-  const filter = buildBoutiqueOrderFilter(req.user.boutiqueId, req.query);
+  const { single, all } = resolveEffectiveBoutiqueId(req);
+  const effectiveIds = single || all;
+  const filter = buildBoutiqueOrderFilter(effectiveIds, req.query);
   const orders = await Order.find(filter)
     .populate('items.productId', 'name mainPhoto')
     .populate('userId', 'firstName lastName email')
     .sort({ createdAt: -1 })
     .lean();
 
-  const boutique = await Boutique.findById(req.user.boutiqueId).select('name');
+  const boutique = await Boutique.findById(single || all[0]).select('name');
   const boutiqueName = boutique?.name || 'Ma Boutique';
   const statusLabel = req.query.status ? (STATUS_LABELS[req.query.status] || req.query.status) : null;
   const buffer = await generateOrdersExcel(orders, boutiqueName, statusLabel);
@@ -925,7 +988,10 @@ exports.exportBoutiqueOrdersExcel = asyncHandler(async (req, res) => {
  * Build filtered order query for a boutique
  */
 function buildBoutiqueOrderFilter(boutiqueId, query) {
-  const filter = { 'items.boutiqueId': boutiqueId };
+  // boutiqueId can be an array (multi-boutique) or single
+  const filter = Array.isArray(boutiqueId)
+    ? { 'items.boutiqueId': { $in: boutiqueId } }
+    : { 'items.boutiqueId': boutiqueId };
 
   if (query.status) {
     filter.status = query.status;
@@ -952,7 +1018,13 @@ function buildBoutiqueOrderFilter(boutiqueId, query) {
  * Build monthly report data for the authenticated boutique user
  */
 async function buildBoutiqueMonthlyReport(req) {
-  const boutiqueId = req.user.boutiqueId;
+  const { single, all } = resolveEffectiveBoutiqueId(req);
+  const effectiveId = single || (all.length === 1 ? all[0] : null);
+  const effectiveIds = effectiveId ? [effectiveId] : all;
+  const boutiqueFilter = effectiveId
+    ? { 'items.boutiqueId': effectiveId }
+    : { 'items.boutiqueId': { $in: all } };
+
   const now = new Date();
   const month = parseInt(req.query.month) || now.getMonth() + 1;
   const year = parseInt(req.query.year) || now.getFullYear();
@@ -962,18 +1034,19 @@ async function buildBoutiqueMonthlyReport(req) {
   const endDate = new Date(year, month, 1);
 
   // Get boutique name
-  const boutique = await Boutique.findById(boutiqueId).select('name');
+  const boutique = await Boutique.findById(effectiveIds[0]).select('name');
   const boutiqueName = boutique?.name || 'Ma Boutique';
 
   // Get all orders for this boutique in the given month
   const orders = await Order.find({
-    'items.boutiqueId': boutiqueId,
+    ...boutiqueFilter,
     createdAt: { $gte: startDate, $lt: endDate }
   })
     .populate('items.productId', 'name mainPhoto')
     .sort({ createdAt: -1 });
 
   // Filter items per order to only include this boutique's items
+  const effectiveIdStrings = effectiveIds.map(id => id.toString());
   const processedOrders = [];
   let totalRevenue = 0;
   let totalProducts = 0;
@@ -983,7 +1056,7 @@ async function buildBoutiqueMonthlyReport(req) {
 
   for (const order of orders) {
     const boutiqueItems = order.items.filter(
-      item => item.boutiqueId.toString() === boutiqueId.toString()
+      item => effectiveIdStrings.includes(item.boutiqueId.toString())
     );
     const boutiqueTotal = boutiqueItems.reduce((sum, item) => sum + item.totalPrice, 0);
 

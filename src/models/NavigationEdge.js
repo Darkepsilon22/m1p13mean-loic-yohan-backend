@@ -39,6 +39,11 @@ navigationEdgeSchema.index({ fromNode: 1, toNode: 1 }, { unique: true });
 // Calcul automatique du coût et validation de distance
 navigationEdgeSchema.pre('validate', async function() {
   if (this.isNew || this.isModified('fromNode') || this.isModified('toNode')) {
+    // Prevent self-referential edges
+    if (this.fromNode && this.toNode && this.fromNode.toString() === this.toNode.toString()) {
+      throw new Error('Une arête ne peut pas relier un noeud à lui-même');
+    }
+
     const MAX_DISTANCE = 200;
     const fromNode = await mongoose.model('NavigationNode').findById(this.fromNode);
     const toNode = await mongoose.model('NavigationNode').findById(this.toNode);

@@ -95,12 +95,17 @@ productSchema.index({ categoryInternal: 1 });
 productSchema.index({ boutiqueId: 1, isArchived: 1 });
 productSchema.index({ boutiqueId: 1, availability: 1 });
 
-// Pre-validate hook for slug generation
+// Pre-validate hook for slug generation and price validation
 productSchema.pre('validate', function() {
   if (this.isModified('name') && this.name && !this.slug) {
     // Add boutiqueId to make slug unique per boutique
     const baseSlug = slugify(this.name, { lower: true, strict: true });
     this.slug = `${baseSlug}-${this.boutiqueId.toString().slice(-6)}`;
+  }
+
+  // Validate originalPrice >= price (originalPrice is the "before discount" price)
+  if (this.originalPrice != null && this.price != null && this.originalPrice < this.price) {
+    this.invalidate('originalPrice', 'Le prix original doit être supérieur ou égal au prix actuel');
   }
 });
 

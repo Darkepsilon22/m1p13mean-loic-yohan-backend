@@ -62,11 +62,12 @@ const verifyToken = async (req, res, next) => {
     req.user = user.toObject();
     req.userId = user._id;
 
-    // If user is a boutique, attach boutiqueId
+    // If user is a boutique, attach boutiqueId(s)
     if (user.role === 'boutique') {
-      const boutique = await Boutique.findOne({ userId: user._id }).select('_id');
-      if (boutique) {
-        req.user.boutiqueId = boutique._id;
+      const boutiques = await Boutique.find({ userId: user._id }).select('_id');
+      if (boutiques.length > 0) {
+        req.user.boutiqueId = boutiques[0]._id;
+        req.user.boutiqueIds = boutiques.map(b => b._id);
       }
     }
 
